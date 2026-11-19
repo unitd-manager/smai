@@ -1,0 +1,7 @@
+npm error Lifecycle script `start` failed with error:
+npm error code 3221226505
+npm error path C:\very new copy paste of social media marketing\apps\api
+npm error workspace @united-technologies/api@0.1.0
+npm error location C:\very new copy paste of social media marketing\apps\api
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c node dist/server.js

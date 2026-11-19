@@ -1,0 +1,13 @@
+.git
+**/.git
+node_modules
+**/node_modules
+**/.next
+**/dist
+coverage
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/assets/rendered
+apps/api/assets/video-work
+apps/api/assets/voices

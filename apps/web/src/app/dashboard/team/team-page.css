@@ -1,0 +1,338 @@
+.app-shell .team-page {
+  width: min(100%, 1120px);
+  margin-inline: auto;
+}
+
+.app-shell .team-page > .dashboard-lead {
+  max-width: 680px;
+  margin: 0;
+}
+
+.team-page .team-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.team-page .team-summary > article {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--ivory-300);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: var(--ivory-50);
+}
+
+.team-page .team-summary span,
+.team-page .team-member-identity span,
+.team-page .team-member-identity small,
+.team-page .team-permission-list span {
+  color: var(--navy-500);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.team-page .team-summary strong {
+  color: var(--navy-800);
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.team-page .team-invite-card,
+.team-page .team-members-card,
+.team-page .team-invites-card,
+.team-page .team-permissions-card {
+  margin: 16px 0;
+  border: 1px solid var(--ivory-300);
+  border-radius: 14px;
+  padding: 22px;
+  background: var(--ivory-50);
+}
+
+.team-page .team-invite-card h2,
+.team-page .team-section-heading h2,
+.team-page .team-invites-card h2,
+.team-page .team-permissions-card h2 {
+  margin: 0 0 6px;
+  color: var(--navy-800);
+  font-size: 19px;
+}
+
+.team-page .team-invite-card > p,
+.team-page .team-section-heading p,
+.team-page .team-invites-card > p,
+.team-page .team-permission-note {
+  color: var(--navy-500);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.team-page .team-invite-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) auto;
+  align-items: end;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.team-page .team-invite-form label,
+.team-page .team-invite-link label {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: var(--navy-800);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.team-page .team-invite-form input,
+.team-page .team-invite-form select,
+.team-page .team-invite-link input,
+.team-page .team-role-control select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--ivory-300);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: var(--ivory-50);
+  color: var(--navy-800);
+}
+
+.team-page .team-invite-form button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.team-page .team-invite-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.team-page .team-invite-link label {
+  min-width: 0;
+}
+
+.team-page .team-invite-activation-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--navy-500);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.team-page .team-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.team-page .team-section-heading p {
+  margin: 0 0 16px;
+}
+
+.team-page .team-section-heading > span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--accent-100);
+  color: var(--accent-700);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-page .team-member-list {
+  display: grid;
+}
+
+.team-page .team-member-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid var(--ivory-300);
+  padding: 16px 0;
+}
+
+.team-page .team-member-avatar {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-100);
+  color: var(--accent-700);
+  font-weight: 800;
+}
+
+.team-page .team-member-identity {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+}
+
+.team-page .team-member-identity strong {
+  color: var(--navy-800);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.team-page .team-role-control {
+  display: grid;
+  min-width: 150px;
+  gap: 6px;
+  color: var(--navy-800);
+  font-size: 12px;
+}
+
+.team-page .team-role-control select {
+  min-height: 38px;
+  text-transform: capitalize;
+}
+
+.team-page .team-role-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: var(--accent-100);
+  color: var(--accent-700);
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.team-page .team-permission-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+}
+
+.team-page .team-permission-list p {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+  border-top: 1px solid var(--ivory-300);
+  padding: 12px 0;
+}
+
+.team-page .team-permission-list strong {
+  color: var(--navy-800);
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.team-page .team-permission-note {
+  margin-bottom: 0;
+}
+
+html[data-app-theme="dark"] .app-shell .team-page .team-summary > article,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-card,
+html[data-app-theme="dark"] .app-shell .team-page .team-members-card,
+html[data-app-theme="dark"] .app-shell .team-page .team-invites-card,
+html[data-app-theme="dark"] .app-shell .team-page .team-permissions-card {
+  border-color: var(--navy-600);
+  background: var(--navy-800);
+}
+
+html[data-app-theme="dark"] .app-shell .team-page .team-summary strong,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-card h2,
+html[data-app-theme="dark"] .app-shell .team-page .team-section-heading h2,
+html[data-app-theme="dark"] .app-shell .team-page .team-invites-card h2,
+html[data-app-theme="dark"] .app-shell .team-page .team-permissions-card h2,
+html[data-app-theme="dark"] .app-shell .team-page .team-member-identity strong,
+html[data-app-theme="dark"] .app-shell .team-page .team-permission-list strong {
+  color: var(--ivory-100);
+}
+
+html[data-app-theme="dark"] .app-shell .team-page .team-summary span,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-card > p,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-activation-note,
+html[data-app-theme="dark"] .app-shell .team-page .team-section-heading p,
+html[data-app-theme="dark"] .app-shell .team-page .team-invites-card > p,
+html[data-app-theme="dark"] .app-shell .team-page .team-permission-note,
+html[data-app-theme="dark"] .app-shell .team-page .team-member-identity span,
+html[data-app-theme="dark"] .app-shell .team-page .team-member-identity small,
+html[data-app-theme="dark"] .app-shell .team-page .team-permission-list span {
+  color: var(--navy-200);
+}
+
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-form label,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-link label,
+html[data-app-theme="dark"] .app-shell .team-page .team-role-control {
+  color: var(--ivory-100);
+}
+
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-form input,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-form select,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-link input,
+html[data-app-theme="dark"] .app-shell .team-page .team-role-control select,
+html[data-app-theme="dark"] .app-shell .team-page .team-member-row,
+html[data-app-theme="dark"] .app-shell .team-page .team-permission-list p {
+  border-color: var(--navy-600);
+}
+
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-form input,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-form select,
+html[data-app-theme="dark"] .app-shell .team-page .team-invite-link input,
+html[data-app-theme="dark"] .app-shell .team-page .team-role-control select {
+  background: var(--navy-950);
+  color: var(--ivory-100);
+}
+
+@media (max-width: 760px) {
+  .app-shell .team-page {
+    padding-inline: 20px;
+  }
+
+  .team-page .team-invite-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-page .team-invite-form button {
+    justify-self: start;
+  }
+
+  .team-page .team-member-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .team-page .team-member-identity {
+    flex-basis: calc(100% - 60px);
+  }
+
+  .team-page .team-role-control {
+    margin-left: 52px;
+  }
+
+  .team-page .team-permission-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-page .team-invite-link {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .team-page .team-invite-activation-note { grid-column: 1; }
+}
+
+@media (max-width: 480px) {
+  .team-page .team-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .team-page .team-invite-card,
+  .team-page .team-members-card,
+  .team-page .team-invites-card,
+  .team-page .team-permissions-card {
+    padding: 16px;
+  }
+}

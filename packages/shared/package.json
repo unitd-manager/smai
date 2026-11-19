@@ -1,0 +1,13 @@
+{
+  "name": "@united-technologies/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./brand": "./src/brand.ts",
+    "./plans": "./src/plans.ts",
+    "./platform-specs": "./src/platform-specs.ts",
+    "./design-document": "./src/design-document.ts"
+  }
+}

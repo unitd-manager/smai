@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+coverage/
+apps/api/assets/rendered/
+apps/api/assets/video-work/
+apps/api/assets/voices/
+.env
+.env.*
+!.env.example
+apps/web/.git/
+apps/web/package-lock.json
+*.tsbuildinfo

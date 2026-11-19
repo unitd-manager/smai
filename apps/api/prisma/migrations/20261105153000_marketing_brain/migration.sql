@@ -1,0 +1,23 @@
+CREATE TABLE `MarketingRecommendation` (
+    `id` VARCHAR(191) NOT NULL,
+    `workspaceId` VARCHAR(191) NOT NULL,
+    `brandId` VARCHAR(191) NOT NULL,
+    `recommendationKey` VARCHAR(191) NOT NULL,
+    `reasonFingerprint` VARCHAR(191) NOT NULL,
+    `title` VARCHAR(191) NOT NULL,
+    `explanation` TEXT NOT NULL,
+    `actionLabel` VARCHAR(191) NOT NULL,
+    `actionHref` VARCHAR(191) NOT NULL,
+    `kind` VARCHAR(191) NOT NULL,
+    `status` VARCHAR(191) NOT NULL DEFAULT 'ACTIVE',
+    `snoozedUntil` DATETIME(3) NULL,
+    `metadata` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    INDEX `MarketingRecommendation_brand_status_idx`(`workspaceId`, `brandId`, `status`, `createdAt`),
+    INDEX `MarketingRecommendation_snooze_idx`(`workspaceId`, `status`, `snoozedUntil`),
+    UNIQUE INDEX `MarketingRecommendation_unique_reason`(`workspaceId`, `brandId`, `recommendationKey`, `reasonFingerprint`),
+    PRIMARY KEY (`id`),
+    CONSTRAINT `MarketingRecommendation_workspaceId_fkey` FOREIGN KEY (`workspaceId`) REFERENCES `Workspace`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `MarketingRecommendation_brandId_fkey` FOREIGN KEY (`brandId`) REFERENCES `Brand`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

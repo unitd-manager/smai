@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: united-technologies-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: "10000"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: WEB_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: SOCIAL_TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_ENDPOINT
+        value: ""
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_FORCE_PATH_STYLE
+        value: "false"
+      - key: INSTAGRAM_APP_ID
+        value: ""
+      - key: INSTAGRAM_APP_SECRET
+        value: ""
+      - key: INSTAGRAM_REDIRECT_URI
+        value: ""
+      - key: GOOGLE_AI_STUDIO_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: GROQ_API_KEY
+        value: ""
+      - key: PEXELS_API_KEY
+        value: ""
+      - key: SUPER_ADMIN_EMAIL
+        value: ""
+  - type: web
+    name: united-technologies-web
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci --include=dev && npm run build --workspace=@united-technologies/web
+    startCommand: npm run start --workspace=@united-technologies/web
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://united-technologies-api.onrender.com

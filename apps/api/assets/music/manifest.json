@@ -1,0 +1,60 @@
+{
+  "tracks": [
+    {
+      "id": "soft-brand-ambient",
+      "title": "Soft Brand Ambient",
+      "mood": "calm",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized United Technologies track; no third-party samples. Royalty-free for use in this app.",
+      "file": "soft-brand-ambient.wav"
+    },
+    {
+      "id": "bright-momentum",
+      "title": "Bright Momentum",
+      "mood": "uplifting corporate",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized instrumental created for United Technologies; no third-party samples. Royalty-free for use in this app.",
+      "file": "bright-momentum.wav"
+    },
+    {
+      "id": "professional-focus",
+      "title": "Professional Focus",
+      "mood": "subtle productivity",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized instrumental created for United Technologies; no third-party samples. Royalty-free for use in this app.",
+      "file": "professional-focus.wav"
+    },
+    {
+      "id": "gentle-piano",
+      "title": "Gentle Piano",
+      "mood": "soft and reflective",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized instrumental created for United Technologies; no third-party samples. Royalty-free for use in this app.",
+      "file": "gentle-piano.wav"
+    },
+    {
+      "id": "cinematic-rise",
+      "title": "Cinematic Rise",
+      "mood": "dramatic and inspiring",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized instrumental created for United Technologies; no third-party samples. Royalty-free for use in this app.",
+      "file": "cinematic-rise.wav"
+    },
+    {
+      "id": "gentle-motion",
+      "title": "Gentle Motion",
+      "mood": "mild and reassuring",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized instrumental created for United Technologies; no third-party samples. Royalty-free for use in this app.",
+      "file": "gentle-motion.wav"
+    },
+    {
+      "id": "calm-horizon",
+      "title": "Calm Horizon",
+      "mood": "soft and spacious",
+      "durationSeconds": 24,
+      "licenseNote": "Original synthesized instrumental created for United Technologies; no third-party samples. Royalty-free for use in this app.",
+      "file": "calm-horizon.wav"
+    }
+  ]
+}

@@ -1,0 +1,365 @@
+API proxy request failed for GET /api/notifications. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for POST /api/designs/generate. Error: read ECONNRESET
+    at ignore-listed frames {
+  errno: -4077,
+  code: 'ECONNRESET',
+  syscall: 'read'
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for PUT /api/theme-settings. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+API proxy request failed for GET /api/workspaces. AggregateError: 
+    at ignore-listed frames {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 4000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:4000
+        at ignore-listed frames {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 4000
+    }
+  ]
+}
+npm error Lifecycle script `start` failed with error:
+npm error code 3221226505
+npm error path C:\very new copy paste of social media marketing\apps\web
+npm error workspace @united-technologies/web@0.1.0
+npm error location C:\very new copy paste of social media marketing\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c next start

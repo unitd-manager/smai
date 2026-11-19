@@ -1,0 +1,11 @@
+ALTER TABLE `MediaAsset`
+  ADD COLUMN `inGallery` BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE `VideoRenderJob`
+  ADD COLUMN `inGallery` BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE `Design`
+  ADD COLUMN `inGallery` BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE `GeneratedContent`
+  ADD COLUMN `inGallery` BOOLEAN NOT NULL DEFAULT false;

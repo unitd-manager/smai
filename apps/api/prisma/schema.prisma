@@ -1,0 +1,692 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  EDITOR
+  CONTRIBUTOR
+  VIEWER
+}
+
+enum AccountType {
+  BUSINESS
+  AGENCY
+  CREATOR
+  PERSONAL
+}
+
+enum EmailType {
+  WORK
+  FREE
+}
+
+model User {
+  id              String       @id @default(cuid())
+  name            String
+  email           String       @unique
+  passwordHash    String
+  emailVerifiedAt DateTime?
+  themePreference Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  memberships     Membership[]
+  refreshTokens   RefreshToken[]
+  ownedResellers  Reseller[]     @relation("ResellerOwner")
+  teamInvites     TeamInvite[]
+}
+
+model Reseller {
+  id              String      @id @default(cuid())
+  ownerUserId     String?     @unique
+  name            String
+  status          String      @default("PENDING")
+  plan            String      @default("white-label-starter")
+  limits          Json?
+  createdAt       DateTime    @default(now())
+  ownerUser       User?       @relation("ResellerOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  workspaces      Workspace[]
+  contactMessages ContactMessage[]
+  demoRequests    DemoRequest[]
+  partnerApplications PartnerApplication[]
+
+  @@index([status, createdAt])
+}
+
+model Workspace {
+  id           String       @id @default(cuid())
+  name         String
+  status       WorkspaceStatus @default(ACTIVE)
+  resellerId   String?
+  reseller     Reseller?    @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+  trialStartsAt DateTime    @default(now())
+  trialEndsAt  DateTime
+  approvalEmailRecipient String? @db.VarChar(320)
+  themeDefaults Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  brands       Brand[]
+  subscription Subscription?
+  socialAccounts SocialAccount[]
+  mediaAssets   MediaAsset[]
+  templates     Template[]
+  designs       Design[]
+  generatedContents GeneratedContent[]
+  contentSets    ContentSet[]
+  contentPlans  ContentPlan[]
+  posts         Post[]
+  postTargets   PostTarget[]
+  publishJobs   PublishJob[]
+  videoRenderJobs VideoRenderJob[]
+  approvals     Approval[]
+  comments      Comment[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  inboxItems    InboxItem[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  marketingRecommendations MarketingRecommendation[]
+  instagramAutopilotRuns InstagramAutopilotRun[]
+  teamInvites   TeamInvite[]
+  contentVersions ContentVersion[]
+
+  @@index([resellerId])
+}
+
+model Membership {
+  id          String         @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        MembershipRole @default(OWNER)
+  createdAt   DateTime       @default(now())
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model Brand {
+  id          String         @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  name        String
+  timezone    String         @default("UTC")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile     CompanyProfile?
+  kit         BrandKit?
+  designs     Design[]
+  generatedContents GeneratedContent[]
+  contentSets  ContentSet[]
+  contentPlans ContentPlan[]
+  marketingRecommendations MarketingRecommendation[]
+  instagramAutopilotRuns InstagramAutopilotRun[]
+  posts       Post[]
+  videoRenderJobs VideoRenderJob[]
+
+  @@index([workspaceId, resellerId])
+}
+
+model CompanyProfile {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  resellerId      String?
+  brandId          String      @unique
+  companyWebsite   String?
+  websiteVerified  Boolean     @default(false)
+  accountType      AccountType @default(BUSINESS)
+  emailType        EmailType   @default(WORK)
+  segment          String
+  industry         String?     @db.Text
+  description      String?     @db.Text
+  products         String?     @db.Text
+  audience         String?     @db.Text
+  offers           String?     @db.Text
+  tone             String?     @db.Text
+  brandVoiceRules Json?
+  bannedWords     Json?
+  city             String?     @db.Text
+  country          String?     @db.Text
+  languages        Json?
+  competitors      Json?
+  goals             Json?
+  preferredPlatforms Json?
+  instagramAutopilotEnabled Boolean @default(false)
+  instagramAutopilotNextRunAt DateTime?
+  brand            Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  updatedAt        DateTime    @updatedAt
+
+  @@index([workspaceId, resellerId])
+}
+
+model BrandKit {
+  id        String   @id @default(cuid())
+  workspaceId String
+  resellerId String?
+  brandId   String   @unique
+  logoUrl   String?
+  colors    Json?
+  fonts     Json?
+  templateIds Json?
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId, resellerId])
+}
+
+model Subscription {
+  id         String    @id @default(cuid())
+  workspaceId String   @unique
+  plan       String    @default("trial")
+  status     String    @default("trialing")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+
+model Plan {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  limits    Json
+  features  Json?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model TeamInvite {
+  id          String         @id @default(cuid())
+  workspaceId String
+  inviterId   String
+  email       String
+  role        MembershipRole
+  tokenHash   String         @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviter     User           @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, email])
+  @@index([workspaceId, expiresAt])
+}
+
+model SocialAccount {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  resellerId      String?
+  brandId         String?
+  provider        String
+  providerAccountId String
+  displayName     String
+  encryptedTokens String   @db.Text
+  tokenExpiresAt  DateTime?
+  status          String   @default("CONNECTED")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([workspaceId, resellerId])
+}
+
+model MediaAsset {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  brandId     String?
+  ownerId     String?
+  inGallery   Boolean  @default(false)
+  fileName    String
+  storageKey  String
+  mimeType    String
+  sizeBytes   BigInt
+  fileData    Bytes?   @db.LongBlob
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  postTargets PostTarget[]
+
+  @@index([workspaceId, resellerId, createdAt])
+}
+
+model VideoRenderJob {
+  id          String   @id @default(cuid())
+  workspaceId String
+  brandId     String?
+  contentId   String
+  status      String   @default("QUEUED")
+  progress    Int      @default(0)
+  inGallery   Boolean  @default(false)
+  inputJson   Json
+  outputKey   String?
+  error       String?  @db.Text
+  attempts    Int      @default(0)
+  lockedAt    DateTime?
+  heartbeatAt DateTime?
+  timeoutAt   DateTime?
+  nextAttemptAt DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([workspaceId, status, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([status, heartbeatAt])
+}
+
+model InstagramAutopilotRun {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  brandId       String
+  weekStart     DateTime
+  status        String   @default("QUEUED")
+  attempts      Int      @default(0)
+  contentPlanId String?
+  contentIds    Json?
+  videoJobIds   Json?
+  error         String?  @db.Text
+  lockedAt      DateTime?
+  nextAttemptAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  completedAt   DateTime?
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand         Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([brandId, weekStart])
+  @@index([status, nextAttemptAt])
+  @@index([workspaceId, brandId, createdAt])
+}
+
+model Template {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  resellerId  String?
+  name        String
+  format      String
+  language    String   @default("en")
+  templateJson Json
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resellerId, format])
+}
+
+model Design {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  brandId     String
+  templateId  String?
+  title       String
+  designJson  Json
+  previewUrl  String?  @db.Text
+  status      String   @default("DRAFT")
+  inGallery   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  versions    ContentVersion[]
+
+  @@index([workspaceId, resellerId, createdAt])
+  @@index([brandId, status])
+}
+
+model GeneratedContent {
+  id          String   @id @default(cuid())
+  automationKey String? @unique
+  workspaceId String
+  resellerId  String?
+  brandId     String
+  request     String?  @db.Text
+  contentJson Json
+  provider    String
+  model       String?
+  status      String   @default("COMPLETED")
+  inGallery   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  versions    ContentVersion[]
+
+  @@index([workspaceId, resellerId, createdAt])
+  @@index([brandId, createdAt])
+}
+
+model ContentVersion {
+  id                 String   @id @default(cuid())
+  workspaceId        String
+  generatedContentId String?
+  designId           String?
+  version            Int
+  snapshot           Json
+  createdById        String?
+  note               String?
+  createdAt          DateTime @default(now())
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  generatedContent   GeneratedContent? @relation(fields: [generatedContentId], references: [id], onDelete: Cascade)
+  design             Design?  @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@unique([generatedContentId, version])
+  @@unique([designId, version])
+  @@index([workspaceId, createdAt])
+}
+
+model ContentSet {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  brandId     String
+  name        String
+  brief       String   @db.Text
+  platforms   Json
+  contentIds  Json
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resellerId, createdAt], map: "ContentSet_workspace_created_idx")
+  @@index([brandId, createdAt], map: "ContentSet_brand_created_idx")
+}
+
+model ContentPlan {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  brandId     String
+  name        String
+  startsAt    DateTime
+  endsAt      DateTime
+  planJson    Json
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resellerId, startsAt])
+  @@index([brandId, startsAt])
+}
+
+model Post {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  brandId     String
+  designId    String?
+  title       String?
+  caption     String   @db.Text
+  hashtags    Json?
+  status      String   @default("DRAFT")
+  scheduledAt DateTime?
+  timezone    String   @default("UTC")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  targets     PostTarget[]
+  publishJobs PublishJob[]
+  approvals   Approval[]
+  comments    Comment[]
+  analytics   AnalyticsSnapshot[]
+
+  @@index([workspaceId, resellerId, status, scheduledAt])
+  @@index([brandId, scheduledAt])
+}
+
+model PostTarget {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  resellerId     String?
+  postId         String
+  platform       String
+  socialAccountId String?
+  captionOverride String? @db.Text
+  media          Json?
+  mediaAssetId   String?
+  platformPostId String?
+  publishedUrl   String?
+  status         String   @default("PENDING")
+  publishedAt    DateTime?
+  error          String?  @db.Text
+  createdAt      DateTime @default(now())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post           Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  mediaAsset     MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  publishJobs    PublishJob[]
+
+  @@index([workspaceId, resellerId, status])
+  @@index([postId, platform])
+  @@index([mediaAssetId])
+}
+
+model PublishJob {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  postId      String
+  targetId    String?
+  status      String   @default("QUEUED")
+  attempts    Int      @default(0)
+  runAt       DateTime
+  lockedAt    DateTime?
+  lastError   String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  target      PostTarget? @relation(fields: [targetId], references: [id], onDelete: SetNull)
+
+  @@index([status, runAt, lockedAt])
+  @@index([workspaceId, resellerId, status])
+}
+
+model Approval {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  postId      String
+  reviewerId  String?
+  status      String   @default("PENDING")
+  comment     String?  @db.Text
+  emailTokenHash String? @unique @db.VarChar(64)
+  emailTokenExpiresAt DateTime?
+  emailSentAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resellerId, status])
+  @@index([postId, status])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  postId      String
+  authorId    String?
+  body        String   @db.Text
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, resellerId, createdAt])
+  @@index([postId, createdAt])
+}
+
+model AnalyticsSnapshot {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  postId      String?
+  accountId   String?
+  capturedAt  DateTime @default(now())
+  metrics     Json
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post        Post?     @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, resellerId, capturedAt])
+  @@index([postId, capturedAt])
+}
+
+model InboxItem {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resellerId  String?
+  accountId   String?
+  platform    String
+  externalId  String
+  itemType    String
+  content     String   @db.Text
+  status      String   @default("OPEN")
+  assignedTo  String?
+  receivedAt  DateTime
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, externalId])
+  @@index([workspaceId, resellerId, status, receivedAt])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  kind        String
+  title       String
+  body        String   @db.Text
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, userId, readAt, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  actorId     String?
+  action      String
+  targetType  String
+  targetId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model MarketingRecommendation {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  brandId         String
+  recommendationKey String
+  reasonFingerprint String
+  title           String
+  explanation     String   @db.Text
+  actionLabel     String
+  actionHref      String
+  kind            String
+  status          String   @default("ACTIVE")
+  snoozedUntil    DateTime?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand           Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, brandId, recommendationKey, reasonFingerprint], map: "MarketingRecommendation_unique_reason")
+  @@index([workspaceId, brandId, status, createdAt], map: "MarketingRecommendation_brand_status_idx")
+  @@index([workspaceId, status, snoozedUntil], map: "MarketingRecommendation_snooze_idx")
+}
+
+model ContactMessage {
+  id         String   @id @default(cuid())
+  resellerId String?
+  name       String
+  email      String
+  subject    String?
+  message    String   @db.Text
+  status     String   @default("NEW")
+  createdAt  DateTime @default(now())
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  @@index([resellerId, status, createdAt])
+}
+
+model DemoRequest {
+  id             String   @id @default(cuid())
+  resellerId     String?
+  name           String
+  email          String
+  company        String
+  teamSize       String?
+  platforms      Json?
+  preferredTime  String?
+  status         String   @default("NEW")
+  createdAt      DateTime @default(now())
+  reseller       Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  @@index([resellerId, status, createdAt])
+}
+
+model PartnerApplication {
+  id         String   @id @default(cuid())
+  resellerId String?
+  name       String
+  email      String
+  company    String
+  details    String?  @db.Text
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+
+  @@index([resellerId, status, createdAt])
+}
+
+model NewsletterSubscriber {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  source     String   @default("website")
+  confirmedAt DateTime?
+  createdAt  DateTime @default(now())
+}
