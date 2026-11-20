@@ -523,7 +523,17 @@ export function WorkspaceShell({
           </div>
         </div>
         {sidebarCollapsed && sidebarTooltip && <span className="sidebar-hover-tooltip" role="tooltip" style={{ top: sidebarTooltip.top }}>{sidebarTooltip.label}</span>}
-        <button className="sidebar-theme-toggle" type="button" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} aria-pressed={theme === "dark"} onClick={toggleTheme}>
+        <button
+          className="sidebar-theme-toggle"
+          type="button"
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          aria-pressed={theme === "dark"}
+          onMouseEnter={(event) => showSidebarTooltip(`Switch to ${theme === "dark" ? "light" : "dark"} theme`, event.currentTarget)}
+          onMouseLeave={() => setSidebarTooltip(null)}
+          onFocus={(event) => showSidebarTooltip(`Switch to ${theme === "dark" ? "light" : "dark"} theme`, event.currentTarget)}
+          onBlur={() => setSidebarTooltip(null)}
+          onClick={toggleTheme}
+        >
           <SunMoon size={20} strokeWidth={2.1} aria-hidden="true" />
           <span>Theme</span>
           <span className="theme-mode">{theme === "dark" ? "Dark" : "Light"}</span>

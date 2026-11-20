@@ -64,6 +64,15 @@ const loginSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
 });
+const inviteSignupSchema = z.object({
+  token: z.string().min(32).max(128),
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  password: z.string().min(12).max(72).refine(
+    (value) => Buffer.byteLength(value, "utf8") <= 72,
+    "Password must not exceed 72 bytes.",
+  ),
+});
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
   newPassword: z.string().min(12).max(72).refine(
@@ -109,6 +118,156 @@ function setSessionCookies(res: Response, accessToken: string, refreshToken: str
     maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 }
+
+router.get("/invite/:token", async (req, res, next) => {
+  try {
+    const token = z.string().min(32).max(128).parse(req.params.token);
+    const invite = await prisma.teamInvite.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: {
+        email: true,
+        role: true,
+        expiresAt: true,
+        acceptedAt: true,
+        workspace: { select: { name: true, status: true } },
+      },
+    });
+    if (!invite || invite.acceptedAt || invite.expiresAt <= new Date() || invite.workspace.status !== "ACTIVE" || invite.role === "OWNER") {
+      res.status(410).json({ error: "This invitation is invalid, expired, or already used. Ask the workspace owner for a new link." });
+      return;
+    }
+    res.json({
+      invite: {
+        email: invite.email,
+        role: invite.role,
+        workspaceName: invite.workspace.name,
+        expiresAt: invite.expiresAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/signup-invite", async (req, res, next) => {
+  try {
+    const input = inviteSignupSchema.parse(req.body);
+    const emailDomain = input.email.split("@")[1];
+    if (!emailDomain || disposableDomains.has(emailDomain)) {
+      res.status(400).json({ error: "Please use a non-disposable email address." });
+      return;
+    }
+
+    const tokenHash = hashToken(input.token);
+    const invite = await prisma.teamInvite.findUnique({
+      where: { tokenHash },
+      select: {
+        email: true,
+        role: true,
+        expiresAt: true,
+        acceptedAt: true,
+        workspace: { select: { id: true, name: true, status: true } },
+      },
+    });
+    if (!invite || invite.acceptedAt || invite.expiresAt <= new Date() || invite.workspace.status !== "ACTIVE" || invite.role === "OWNER") {
+      res.status(410).json({ error: "This invitation is invalid, expired, or already used. Ask the workspace owner for a new link." });
+      return;
+    }
+    if (input.email !== invite.email.toLowerCase()) {
+      res.status(403).json({ error: `Use ${invite.email} to create the account for this invitation.` });
+      return;
+    }
+    if (await prisma.user.findUnique({ where: { email: input.email }, select: { id: true } })) {
+      res.status(409).json({ error: "An account with this email already exists. Sign in with it to accept the invitation." });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const joinResult = await prisma.$transaction(async (tx) => {
+      const currentInvite = await tx.teamInvite.findUnique({
+        where: { tokenHash },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          expiresAt: true,
+          acceptedAt: true,
+          workspace: { select: { id: true, name: true, status: true } },
+        },
+      });
+      if (!currentInvite || currentInvite.acceptedAt || currentInvite.expiresAt <= new Date() ||
+        currentInvite.workspace.status !== "ACTIVE" || currentInvite.role === "OWNER") {
+        return { kind: "unavailable" as const };
+      }
+      if (input.email !== currentInvite.email.toLowerCase()) {
+        return { kind: "email_mismatch" as const, email: currentInvite.email };
+      }
+      if (await tx.user.findUnique({ where: { email: input.email }, select: { id: true } })) {
+        return { kind: "account_exists" as const };
+      }
+
+      const claimed = await tx.teamInvite.updateMany({
+        where: { id: currentInvite.id, acceptedAt: null, expiresAt: { gt: new Date() } },
+        data: { acceptedAt: new Date() },
+      });
+      if (claimed.count !== 1) return { kind: "unavailable" as const };
+
+      const user = await tx.user.create({
+        data: { name: input.name, email: input.email, passwordHash },
+        select: { id: true, email: true },
+      });
+      await tx.membership.create({
+        data: { userId: user.id, workspaceId: currentInvite.workspace.id, role: currentInvite.role },
+      });
+      await tx.auditLog.create({
+        data: {
+          workspaceId: currentInvite.workspace.id,
+          actorId: user.id,
+          action: "team.invite.accepted",
+          targetType: "team-invite",
+          targetId: currentInvite.id,
+          metadata: { role: currentInvite.role, signup: true },
+        },
+      });
+      return {
+        kind: "joined" as const,
+        user,
+        workspace: { id: currentInvite.workspace.id, name: currentInvite.workspace.name },
+        role: currentInvite.role,
+      };
+    });
+
+    if (joinResult.kind === "unavailable") {
+      res.status(410).json({ error: "This invitation is invalid, expired, or already used. Ask the workspace owner for a new link." });
+      return;
+    }
+    if (joinResult.kind === "email_mismatch") {
+      res.status(403).json({ error: `Use ${joinResult.email} to create the account for this invitation.` });
+      return;
+    }
+    if (joinResult.kind === "account_exists") {
+      res.status(409).json({ error: "An account with this email already exists. Sign in with it to accept the invitation." });
+      return;
+    }
+
+    const refreshToken = issueSessionCookies(res, joinResult.user.id);
+    await prisma.refreshToken.create({
+      data: {
+        userId: joinResult.user.id,
+        tokenHash: hashToken(refreshToken),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    res.status(201).json({
+      accepted: true,
+      user: joinResult.user,
+      workspace: joinResult.workspace,
+      role: joinResult.role,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.post("/signup", async (req, res, next) => {
   try {
@@ -466,4 +625,4 @@ router.post("/accept-invite", requireAuth, async (req, res, next) => {
   }
 });
 
-export { router as authRouter, deleteAccountSchema, signupSchema };
+export { router as authRouter, deleteAccountSchema, inviteSignupSchema, signupSchema };

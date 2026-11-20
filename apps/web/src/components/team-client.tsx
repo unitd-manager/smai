@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 type Role = "OWNER" | "ADMIN" | "EDITOR" | "CONTRIBUTOR" | "VIEWER";
 type Member = {
@@ -239,9 +240,9 @@ export function TeamClient() {
               <p>An invitation email is sent automatically to the selected email address. You can also copy the private invitation link as a backup. It expires in seven days.</p>
               <form className="team-invite-form" onSubmit={(event) => void createInvite(event)}>
                 <label>Email address<input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="teammate@example.com" /></label>
-                <label>Workspace role<select value={role} onChange={(event) => setRole(event.target.value as Exclude<Role, "OWNER">)}>
+                <label>Workspace role<CompactSelect aria-label="Workspace role" value={role} onChange={(event) => setRole(event.target.value as Exclude<Role, "OWNER">)}>
                   {roles.filter((item) => data.currentRole === "OWNER" || item !== "ADMIN").map((item) => <option key={item} value={item}>{item.toLowerCase()}</option>)}
-                </select></label>
+                </CompactSelect></label>
                 <button type="submit" className="button button-primary" disabled={busy === "invite"}>{busy === "invite" ? "Sending…" : "Send invitation"}</button>
               </form>
               {inviteUrl && <div className="team-invite-link"><label>Backup invitation link<input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /></label><button className="button button-outline" type="button" onClick={() => void copyInvite()}>Copy link</button><p className="team-invite-activation-note">They must sign in or create an account using the exact invited email, then accept the invitation. For testing, use an email you can access that is not already a member of this workspace.</p></div>}
@@ -256,9 +257,9 @@ export function TeamClient() {
                 return <article className="team-member-row" key={member.id}>
                   <div className="team-member-avatar" aria-hidden="true">{member.user.name.trim().slice(0, 1).toUpperCase()}</div>
                   <div className="team-member-identity"><strong>{member.user.name}</strong><span>{member.user.email}</span><small>{descriptions[member.role]}</small></div>
-                  {canManageMember ? <label className="team-role-control">Role<select aria-label={`Role for ${member.user.name}`} value={member.role} disabled={busy === member.id} onChange={(event) => void updateRole(member, event.target.value as Exclude<Role, "OWNER">)}>
+                  {canManageMember ? <label className="team-role-control">Role<CompactSelect aria-label={`Role for ${member.user.name}`} value={member.role} disabled={busy === member.id} onChange={(event) => void updateRole(member, event.target.value as Exclude<Role, "OWNER">)}>
                     {roles.filter((item) => data.currentRole === "OWNER" || item !== "ADMIN").map((item) => <option key={item} value={item}>{item.toLowerCase()}</option>)}
-                  </select></label> : <span className="team-role-badge">{member.role.toLowerCase()}</span>}
+                  </CompactSelect></label> : <span className="team-role-badge">{member.role.toLowerCase()}</span>}
                   {data.currentRole === "OWNER" && member.role !== "OWNER" && <button className="button button-outline" type="button" disabled={busy === member.id} onClick={() => void transferOwnership(member)}>Transfer ownership</button>}
                   {canManageMember && <button className="button button-outline" type="button" disabled={busy === member.id} onClick={() => void removeMember(member)}>Remove</button>}
                 </article>;

@@ -99,11 +99,16 @@ export function InstagramAutopilotClient() {
 
   return (
     <section className="dashboard-content instagram-autopilot-page">
-      <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
-      <h1>Autopilot</h1>
-      <p className="dashboard-lead">
-        Generate a weekly batch from your saved brand profile, email it for approval, and queue approved posts in your brand time zone. Autopilot selects connected channels automatically; Instagram is currently the only live publishing integration.
-      </p>
+      <header className="instagram-autopilot-heading">
+        <div>
+          <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
+          <h1>Autopilot</h1>
+          <p className="dashboard-lead">
+            Generate a weekly batch from your saved brand profile, email it for approval, and queue approved posts in your brand time zone. Autopilot selects connected channels automatically; Instagram is currently the only live publishing integration.
+          </p>
+        </div>
+        <span className="instagram-autopilot-approval-badge">Approval-first scheduling</span>
+      </header>
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
@@ -126,10 +131,59 @@ export function InstagramAutopilotClient() {
       </article>
 
       <section className="instagram-autopilot-config" aria-labelledby="autopilot-mix-heading">
-        <div className="instagram-autopilot-config-heading"><div><h2 id="autopilot-mix-heading">Schedule and content mix</h2><p>Choose zero for formats you do not want. Posts are spread across your selected dates in the brand time zone. Weekly Autopilot reuses this mix and campaign focus.</p></div><label>Number of days<input type="number" min={1} max={30} value={days} onChange={(event) => setDays(Math.min(30, Math.max(1, Number(event.target.value) || 1)))} /></label></div>
-        <label className="instagram-autopilot-campaign">Campaign focus (optional)<textarea rows={2} maxLength={500} value={campaignGoal} onChange={(event) => setCampaignGoal(event.target.value)} placeholder="For example: World AIDS Day awareness, a service launch, or this month's confirmed offer" /><small>Autopilot uses this only when it fits your saved business profile. It will not invent prices or claims.</small></label>
-        <div className="instagram-autopilot-format-grid">{formatOptions.map((format) => <label key={format.id}><span>{format.label}<small>{format.channel}</small></span><input type="number" min={0} max={30} value={counts[format.id]} onChange={(event) => setCounts((current) => ({ ...current, [format.id]: Math.min(30, Math.max(0, Number(event.target.value) || 0)) }))} aria-label={`${format.label} count`} /></label>)}</div>
-        <p className="instagram-autopilot-total"><strong>{postCount}</strong> posts · {days} days</p>
+        <div className="instagram-autopilot-config-heading">
+          <div>
+            <p className="eyebrow">BATCH SETTINGS</p>
+            <h2 id="autopilot-mix-heading">Schedule and content mix</h2>
+            <p>Choose the formats and timing for this batch. Posts are spread across your selected dates in the brand time zone.</p>
+          </div>
+          <label className="instagram-autopilot-days">
+            <span>Number of days</span>
+            <div className="instagram-autopilot-days-input">
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={days}
+                aria-label="Number of days"
+                onChange={(event) => setDays(Math.min(30, Math.max(1, Number(event.target.value) || 1)))}
+              />
+              <span>days</span>
+            </div>
+            <small>Schedule from 1 to 30 days</small>
+          </label>
+        </div>
+        <label className="instagram-autopilot-campaign">
+          Campaign focus <span>(optional)</span>
+          <textarea
+            rows={2}
+            maxLength={500}
+            value={campaignGoal}
+            onChange={(event) => setCampaignGoal(event.target.value)}
+            placeholder="For example: World AIDS Day awareness, a service launch, or this month's confirmed offer"
+          />
+          <small>Autopilot uses this only when it fits your saved business profile. It will not invent prices or claims.</small>
+        </label>
+        <div className="instagram-autopilot-formats-heading">
+          <h3>Content formats</h3>
+          <span>Set the number of items for each format</span>
+        </div>
+        <div className="instagram-autopilot-format-grid">
+          {formatOptions.map((format) => (
+            <label key={format.id}>
+              <span>{format.label}<small>{format.channel}</small></span>
+              <input
+                type="number"
+                min={0}
+                max={30}
+                value={counts[format.id]}
+                onChange={(event) => setCounts((current) => ({ ...current, [format.id]: Math.min(30, Math.max(0, Number(event.target.value) || 0)) }))}
+                aria-label={`${format.label} count`}
+              />
+            </label>
+          ))}
+        </div>
+        <p className="instagram-autopilot-total"><span>Batch total</span><strong>{postCount}</strong> posts <span>across</span> {days} days</p>
         {requestsVideo && <p className="notice notice-gold" role="note">This batch sends {videoCount} video request{videoCount === 1 ? "" : "s"} to Magic Hour and uses its account credits. Check the available balance in Video Studio before generating.</p>}
         {requestsVideo && videoBlockers && videoBlockers.length > 0 ? <div className="notice notice-gold" role="status"><strong>Magic Hour video setup:</strong><ul>{videoBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div> : null}
         {requestsVideo && !videoBlockers && <p className="notice notice-gold" role="status">Video setup status is unavailable. Restart the API and refresh this page before generating videos.</p>}

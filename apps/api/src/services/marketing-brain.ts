@@ -213,7 +213,7 @@ export async function getMarketingIntelligence(workspaceId: string, brandId: str
     prisma.brand.findFirst({ where: { id: brandId, workspaceId }, select: { name: true, profile: { select: { industry: true, description: true, products: true, audience: true, tone: true, goals: true, preferredPlatforms: true, competitors: true, offers: true, country: true } } } }),
     prisma.post.findMany({ where: { workspaceId, brandId, createdAt: { gte: thirtyDaysAgo } }, select: { status: true, createdAt: true, scheduledAt: true } }),
     prisma.generatedContent.findMany({ where: { workspaceId, brandId, createdAt: { gte: thirtyDaysAgo } }, select: { contentJson: true, createdAt: true } }),
-    prisma.contentPlan.findMany({ where: { workspaceId, brandId, status: { not: "ARCHIVED" } }, select: { name: true, status: true, startsAt: true, endsAt: true }, orderBy: { startsAt: "asc" }, take: 5 }),
+    prisma.contentPlan.findMany({ where: { workspaceId, brandId, status: { not: "ARCHIVED" } }, select: { id: true, name: true, status: true, startsAt: true, endsAt: true }, orderBy: { startsAt: "asc" }, take: 5 }),
     prisma.socialAccount.findMany({ where: { workspaceId, status: "CONNECTED" }, select: { provider: true, displayName: true } }),
     prisma.analyticsSnapshot.count({ where: { workspaceId, capturedAt: { gte: thirtyDaysAgo } } }),
     refreshMarketingRecommendations(workspaceId, brandId),

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Search, Sparkles } from "lucide-react";
 import { createDesignDocument, renderDesignPageSvg } from "@united-technologies/shared/design-document";
 import { ApiError, apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 const aiDesignFormats = [
   ["flyer", "Flyer"], ["brochure", "Brochure"], ["poster", "Poster"], ["post", "Social post"],
@@ -338,14 +339,14 @@ export function TemplatesClient() {
           </label>
           <div className="ai-artwork-controls">
             <label>Design format
-              <select value={aiFormat} onChange={(event) => setAiFormat(event.target.value)}>
+              <CompactSelect aria-label="Design format" value={aiFormat} onChange={(event) => setAiFormat(event.target.value)}>
                 {aiDesignFormats.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              </CompactSelect>
             </label>
             <label>Composition style
-              <select value={artworkLayout} onChange={(event) => setArtworkLayout(event.target.value)}>
+              <CompactSelect aria-label="Composition style" value={artworkLayout} onChange={(event) => setArtworkLayout(event.target.value)}>
                 {aiDesignLayouts.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
+              </CompactSelect>
             </label>
             <label className="ai-artwork-reference"><span>Style reference <small>Optional</small></span>
               <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setReferenceFile(event.target.files?.[0] ?? null)} />
@@ -376,16 +377,16 @@ export function TemplatesClient() {
 
       <div className="template-browse-toolbar">
         <label>Format
-          <select value={format} onChange={(event) => setFormat(event.target.value)}>
+          <CompactSelect aria-label="Format filter" value={format} onChange={(event) => setFormat(event.target.value)}>
             <option value="all">All formats</option>
             {formats.map((item) => <option key={item} value={item}>{item.replaceAll("-", " ")}</option>)}
-          </select>
+          </CompactSelect>
         </label>
         <label>Category
-          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <CompactSelect aria-label="Category filter" value={category} onChange={(event) => setCategory(event.target.value)}>
             <option value="all">All categories</option>
             {categories.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
+          </CompactSelect>
         </label>
         <span>{visibleTemplates.length} templates</span>
       </div>

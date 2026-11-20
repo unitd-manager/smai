@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 type Approval = {
   id: string;
@@ -75,9 +76,9 @@ export function ApprovalsClient() {
       <p className="dashboard-lead">Review posts and captions across your selected social channels, then approve them or request changes.</p>
       <div className="posts-toolbar approvals-toolbar">
         <label>Review status
-          <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
+          <CompactSelect aria-label="Review status" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
             {reviewFilters.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}
-          </select>
+          </CompactSelect>
         </label>
         <Link className="button button-outline" href="/dashboard/posts">Open posts and queue</Link>
         <span>{approvals.length} requests</span>

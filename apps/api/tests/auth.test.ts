@@ -5,7 +5,7 @@ process.env.DATABASE_URL ??= "mysql://root:root@localhost:3306/united_technologi
 process.env.JWT_ACCESS_SECRET ??= "a-development-access-secret-with-more-than-32-characters";
 process.env.JWT_REFRESH_SECRET ??= "a-development-refresh-secret-with-more-than-32-characters";
 
-const { deleteAccountSchema, signupSchema } = await import("../src/routes/auth.js");
+const { deleteAccountSchema, inviteSignupSchema, signupSchema } = await import("../src/routes/auth.js");
 
 test("business signup requires a website unless the user declares they do not have one", () => {
   const base = {
@@ -47,6 +47,30 @@ test("signup rejects non-http website protocols and short passwords", () => {
   });
 
   assert.equal(result.success, false);
+});
+
+test("invite signup validates the invited account credentials and normalizes email", () => {
+  const result = inviteSignupSchema.safeParse({
+    token: "a".repeat(43),
+    name: "Taylor Sample",
+    email: "Taylor@Example.org",
+    password: "a secure password",
+  });
+
+  assert.equal(result.success, true);
+  if (result.success) assert.equal(result.data.email, "taylor@example.org");
+  assert.equal(inviteSignupSchema.safeParse({
+    token: "short",
+    name: "Taylor Sample",
+    email: "taylor@example.org",
+    password: "a secure password",
+  }).success, false);
+  assert.equal(inviteSignupSchema.safeParse({
+    token: "a".repeat(43),
+    name: "Taylor Sample",
+    email: "taylor@example.org",
+    password: "short",
+  }).success, false);
 });
 
 test("account deletion requires the explicit confirmation phrase", () => {

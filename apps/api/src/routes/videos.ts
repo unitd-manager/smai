@@ -376,7 +376,13 @@ router.get("/publishing-readiness", async (req, res, next) => {
       select: { displayName: true, tokenExpiresAt: true },
     });
     if (!account) {
-      res.json({ ready: false, platform: "Instagram", accountName: null, message: "Connect an Instagram Professional account before publishing this video." });
+      res.json({
+        ready: false,
+        platform: "Instagram",
+        accountName: null,
+        connectionAction: "connect",
+        message: "Connect an Instagram Professional account before publishing this video.",
+      });
       return;
     }
     if (!isInstagramConfigured()) {
@@ -384,7 +390,13 @@ router.get("/publishing-readiness", async (req, res, next) => {
       return;
     }
     if (account.tokenExpiresAt && account.tokenExpiresAt.getTime() <= Date.now()) {
-      res.json({ ready: false, platform: "Instagram", accountName: account.displayName, message: "The Instagram connection has expired. Reconnect the account before publishing." });
+      res.json({
+        ready: false,
+        platform: "Instagram",
+        accountName: account.displayName,
+        connectionAction: "reconnect",
+        message: "The Instagram connection has expired. Reconnect the account before publishing.",
+      });
       return;
     }
     try {

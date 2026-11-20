@@ -10,6 +10,7 @@ import { apiBaseUrl, apiRequest } from "@/lib/api";
 import { downloadDesign, downloadDesignPages, type DesignDownloadFormat } from "@/lib/download-design";
 import { getDateTimeInputValue, getTimezoneLabel, localDateTimeToIso } from "@/lib/timezone";
 import { SocialFeedPreview } from "@/components/social-feed-preview";
+import { CompactSelect } from "@/components/compact-select";
 
 const formats = [
   ["post", "Social post"],
@@ -602,16 +603,17 @@ export function CreateClient() {
         </fieldset>
         {selectedFormats.includes("carousel") && (
           <label className="create-template-select">Carousel slides
-            <select value={carouselSlideCount} onChange={(event) => setCarouselSlideCount(Number(event.target.value))}>
+            <CompactSelect aria-label="Carousel slides" value={carouselSlideCount} onChange={(event) => setCarouselSlideCount(Number(event.target.value))}>
               {Array.from({ length: 9 }, (_value, index) => index + 2).map((count) => (
                 <option value={count} key={count}>{count} slides</option>
               ))}
-            </select>
+            </CompactSelect>
             <small>Each slide is designed with a headline, supporting line, and body copy.</small>
           </label>
         )}
         <label className="create-template-select">Design template
-          <select
+          <CompactSelect
+            aria-label="Design template"
             value={templateId}
             onChange={(event) => {
               const selected = templates.find((template) => template.id === event.target.value);
@@ -624,7 +626,7 @@ export function CreateClient() {
             {templates.filter((template) => selectedFormats.includes(template.format) || template.format === "video" && selectedFormats.includes("thumbnail")).map((template) => (
               <option value={template.id} key={template.id}>{template.name} · {template.format.replaceAll("-", " ")}</option>
             ))}
-          </select>
+          </CompactSelect>
           <small>{templateLoadError || (templateId ? `Using “${templateName}” from your in-app template library.` : "Choose a built-in design for this format, or leave it empty to generate three layout options. Designs stay crisp and editable in the app.")}</small>
         </label>
         {!templateId && <label className="create-check"><input type="checkbox" checked={useBrandTemplate} onChange={(event) => setUseBrandTemplate(event.target.checked)} /> Use my preferred Brand Kit template</label>}
@@ -636,14 +638,14 @@ export function CreateClient() {
         </fieldset>
         <div className="create-select-grid">
           <label>Tone
-            <select value={tone} onChange={(event) => setTone(event.target.value)}>
+            <CompactSelect aria-label="Tone" value={tone} onChange={(event) => setTone(event.target.value)}>
               {["Warm and confident", "Playful", "Premium", "Helpful", "Bold", "Professional"].map((item) => <option key={item}>{item}</option>)}
-            </select>
+            </CompactSelect>
           </label>
           <label>Language
-            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+            <CompactSelect aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>
               {["English", "Hindi", "Tamil", "Bengali", "Marathi", "Telugu"].map((item) => <option key={item}>{item}</option>)}
-            </select>
+            </CompactSelect>
           </label>
         </div>
         {error && <p className="form-error" role="alert">{error}</p>}

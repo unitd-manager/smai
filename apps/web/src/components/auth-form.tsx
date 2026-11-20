@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { brand } from "@/config/brand";
+import { CompactSelect } from "@/components/compact-select";
 
 type AuthFormProps = { mode: "signup" | "login" };
 type AccountType = "business" | "agency" | "creator" | "personal";
@@ -117,7 +118,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         <>
           <label>
             What will you use {brand.productName} for?
-            <select
+            <CompactSelect
+              aria-label={`What will you use ${brand.productName} for?`}
               value={accountType}
               onChange={(event) => {
                 setAccountType(event.target.value as AccountType);
@@ -128,7 +130,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               <option value="agency">Agency</option>
               <option value="creator">Creator or influencer</option>
               <option value="personal">Personal use</option>
-            </select>
+            </CompactSelect>
           </label>
           {accountType !== "personal" && (
             <>

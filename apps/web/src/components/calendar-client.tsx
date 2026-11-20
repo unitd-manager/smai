@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { apiRequest, postsUpdatedEvent } from "@/lib/api";
 import { getDateTimeInputValue, localDateTimeToIso } from "@/lib/timezone";
+import { CompactSelect } from "@/components/compact-select";
 
 type CalendarPost = {
   id: string;
@@ -231,16 +232,16 @@ export function CalendarClient() {
       </div>
       <div className="calendar-filters">
         <label>Platform
-          <select value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)}>
+          <CompactSelect aria-label="Platform filter" value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)}>
             <option value="all">All platforms</option>
             {platformOptions.map((platform) => <option key={platform} value={platform}>{platform}</option>)}
-          </select>
+          </CompactSelect>
         </label>
         <label>Status
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <CompactSelect aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="all">All statuses</option>
             {statusOptions.map((status) => <option key={status} value={status}>{status.toLowerCase().replaceAll("_", " ")}</option>)}
-          </select>
+          </CompactSelect>
         </label>
         {(platformFilter !== "all" || statusFilter !== "all") && <button type="button" onClick={() => { setPlatformFilter("all"); setStatusFilter("all"); }}>Clear filters</button>}
         <span className="calendar-filter-count">{filteredPosts.length} {filteredPosts.length === 1 ? "post" : "posts"}</span>

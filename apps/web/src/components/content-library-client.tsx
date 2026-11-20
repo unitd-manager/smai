@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Files } from "lucide-react";
 import { apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 type LibraryItem = {
   id: string;
@@ -206,10 +207,10 @@ export function ContentLibraryClient() {
       {notice && <p className="form-success" role="status">{notice}</p>}
       <div className="library-toolbar">
         <label className="library-search">Search content<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, brief or brand" /></label>
-        <label>Format<select value={formatFilter} onChange={(event) => setFormatFilter(event.target.value)}><option value="all">All formats</option>{["post", "carousel", "story", "poster", "brochure", "flyer", "thumbnail", "video"].map((format) => <option key={format}>{format}</option>)}</select></label>
-        <label>Platform<select value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)}><option value="all">All platforms</option>{["Instagram", "Facebook", "LinkedIn", "TikTok", "YouTube", "Pinterest", "X"].map((platform) => <option key={platform}>{platform}</option>)}</select></label>
-        <label>Status<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="completed">Completed</option></select></label>
-        <label>Brand<select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select></label>
+        <label>Format<CompactSelect aria-label="Format filter" value={formatFilter} onChange={(event) => setFormatFilter(event.target.value)}><option value="all">All formats</option>{["post", "carousel", "story", "poster", "brochure", "flyer", "thumbnail", "video"].map((format) => <option key={format}>{format}</option>)}</CompactSelect></label>
+        <label>Platform<CompactSelect aria-label="Platform filter" value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)}><option value="all">All platforms</option>{["Instagram", "Facebook", "LinkedIn", "TikTok", "YouTube", "Pinterest", "X"].map((platform) => <option key={platform}>{platform}</option>)}</CompactSelect></label>
+        <label>Status<CompactSelect aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="completed">Completed</option></CompactSelect></label>
+        <label>Brand<CompactSelect aria-label="Brand filter" value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</CompactSelect></label>
       </div>
       {loading ? <p className="loading-label">Loading your content library…</p> : items.length === 0 ? (
         <article className="section-empty-state"><span className="section-empty-icon"><Files size={22} aria-hidden="true" /></span><h2>No content saved yet</h2><p>Create a caption, carousel, story or video script to add it to this library.</p><Link className="button button-gold" href="/dashboard/create">Create content</Link></article>

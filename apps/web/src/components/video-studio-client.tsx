@@ -4,8 +4,9 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { ChevronDown, Play, X } from "lucide-react";
+import { ChevronDown, MoreVertical, Play, X } from "lucide-react";
 import { ApiError, apiBaseUrl, apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 import { getDateTimeInputValue, getTimezoneLabel, localDateTimeToIso } from "@/lib/timezone";
 import { videoPlatformLimits } from "@/config/video-platform-limits";
 
@@ -77,6 +78,7 @@ type PublishingReadiness = {
   platform: string;
   accountName: string | null;
   message: string;
+  connectionAction?: "connect" | "reconnect";
 };
 
 type MagicHourConfig = { configured?: boolean; credits?: number | null; accounts?: Array<{ slot: number; credits: number | null; status: "available" | "unavailable"; error?: string }>; voices?: Array<{ id: string; name: string; avatarUrl: string | null }>; voicesUnavailable?: boolean; error?: string };
@@ -276,7 +278,9 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
       <label>Video title (optional)<input maxLength={120} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Generated from your product or script" /></label>
       {isProduct ? <>
         {workflow === "product-image" && <>
-          {galleryChoices.length > 0 && <label>Choose a product photo<select value={selectedGalleryAssetId} onChange={(event) => { setSelectedGalleryAssetId(event.target.value); setSourceFile(null); if (sourceInputRef.current) sourceInputRef.current.value = ""; }}><option value="">Upload or take a photo</option>{galleryChoices.map((asset) => <option value={asset.id} key={asset.id}>{asset.fileName}</option>)}</select></label>}
+          {galleryChoices.length > 0 && <label>Choose a product photo
+            <CompactSelect aria-label="Choose a product photo" value={selectedGalleryAssetId} options={[{ value: "", label: "Upload or take a photo" }, ...galleryChoices.map((asset) => ({ value: asset.id, label: asset.fileName }))]} onValueChange={(value) => { setSelectedGalleryAssetId(value); setSourceFile(null); if (sourceInputRef.current) sourceInputRef.current.value = ""; }} />
+          </label>}
           {!selectedGalleryAssetId && <label>Product photo<input ref={sourceInputRef} required type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setSourceFile(event.target.files?.[0] ?? null)} /></label>}
           {(sourceFile || selectedSourceAsset) && <div className="video-selected-source"><p>Selected photo: {sourceFile?.name ?? selectedSourceAsset?.fileName}</p><div><button className="button button-secondary" type="button" onClick={clearSourceSelection}>Clear photo</button>{selectedSourceAsset && <button className="button button-outline" type="button" onClick={() => void deleteSelectedGalleryImage()}>Delete from Gallery</button>}</div></div>}
         </>}
@@ -284,10 +288,19 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
         <label>What should viewers see?<textarea maxLength={1800} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the product and its main benefit. Keep claims accurate." /></label>
         <details className="video-advanced-workflows"><summary>Add an offer or change visual style</summary>
           <label>Offer (optional)<input maxLength={500} value={promotion} onChange={(event) => setPromotion(event.target.value)} placeholder="Limited time offer" /></label>
-          <label>Visual style<select value={style} onChange={(event) => setStyle(event.target.value)}><option value="commercial">Commercial</option><option value="realistic">Realistic</option><option value="cinematic">Cinematic</option><option value="animated">Animated</option></select></label>
+          <label>Visual style
+            <CompactSelect aria-label="Visual style" value={style} options={[
+              { value: "commercial", label: "Commercial" },
+              { value: "realistic", label: "Realistic" },
+              { value: "cinematic", label: "Cinematic" },
+              { value: "animated", label: "Animated" },
+            ]} onValueChange={setStyle} />
+          </label>
         </details>
       </> : <>
-        {galleryChoices.length > 0 && <label>{workflow === "lip-sync" ? "Choose a video from Gallery" : "Choose a face photo from Gallery"}<select value={selectedGalleryAssetId} onChange={(event) => { setSelectedGalleryAssetId(event.target.value); setSourceFile(null); if (sourceInputRef.current) sourceInputRef.current.value = ""; }}><option value="">Upload a new file instead</option>{galleryChoices.map((asset) => <option value={asset.id} key={asset.id}>{asset.fileName}</option>)}</select></label>}
+        {galleryChoices.length > 0 && <label>{workflow === "lip-sync" ? "Choose a video from Gallery" : "Choose a face photo from Gallery"}
+          <CompactSelect aria-label={workflow === "lip-sync" ? "Choose a video from Gallery" : "Choose a face photo from Gallery"} value={selectedGalleryAssetId} options={[{ value: "", label: "Upload a new file instead" }, ...galleryChoices.map((asset) => ({ value: asset.id, label: asset.fileName }))]} onValueChange={(value) => { setSelectedGalleryAssetId(value); setSourceFile(null); if (sourceInputRef.current) sourceInputRef.current.value = ""; }} />
+        </label>}
         {!selectedGalleryAssetId && <label>{workflow === "lip-sync" ? "Video to lip sync" : "Face photo"}<input ref={sourceInputRef} required={!sourceFile} type="file" accept={uploadAccept} onChange={(event) => setSourceFile(event.target.files?.[0] ?? null)} /></label>}
         {workflow === "talking-photo" && <div className="video-camera-capture">
           <p>Choose a clear, front-facing photo with one visible face, or take a photo now.</p>
@@ -299,24 +312,51 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
           {(sourceFile?.type.startsWith("image/") || selectedSourceAsset) && <div className="video-selected-source"><p>Selected photo: {sourceFile?.name ?? selectedSourceAsset?.fileName}</p><div><button className="button button-secondary" type="button" onClick={clearSourceSelection}>Clear photo</button>{selectedSourceAsset && <button className="button button-outline" type="button" onClick={() => void deleteSelectedGalleryImage()}>Delete from Gallery</button>}</div></div>}
         </div>}
         <label>What should the presenter say?<textarea required maxLength={4000} rows={3} value={script} onChange={(event) => setScript(event.target.value)} placeholder="Write the product explanation or a short script" /></label>
-        {voiceMode === "preset" || workflow === "lip-sync" ? <label>Voice<select required value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>{config?.voices?.map((voice) => <option value={voice.id} key={voice.id}>{voice.name}</option>)}{!config?.voices?.length && <option value="">Configure Magic Hour to load voices</option>}</select></label> : <>
-          {voiceSampleChoices.length > 0 && <label>Saved voice sample<select value={selectedVoiceSampleAssetId} onChange={(event) => { setSelectedVoiceSampleAssetId(event.target.value); setVoiceSampleFile(null); }}><option value="">Upload a new sample</option>{voiceSampleChoices.map((asset) => <option key={asset.id} value={asset.id}>{asset.fileName}</option>)}</select></label>}
+        {voiceMode === "preset" || workflow === "lip-sync" ? <label>Voice
+          <CompactSelect aria-label="Voice" value={voiceName} options={config?.voices?.length
+            ? config.voices.map((voice) => ({ value: voice.id, label: voice.name }))
+            : [{ value: "", label: "Configure Magic Hour to load voices" }]} onValueChange={setVoiceName} />
+        </label> : <>
+          {voiceSampleChoices.length > 0 && <label>Saved voice sample
+            <CompactSelect aria-label="Saved voice sample" value={selectedVoiceSampleAssetId} options={[{ value: "", label: "Upload a new sample" }, ...voiceSampleChoices.map((asset) => ({ value: asset.id, label: asset.fileName }))]} onValueChange={(value) => { setSelectedVoiceSampleAssetId(value); setVoiceSampleFile(null); }} />
+          </label>}
           {!selectedVoiceSampleAssetId && <label>Your voice sample (MP3 or WAV)<input required type="file" accept="audio/mpeg,audio/wav,.mp3,.wav" onChange={(event) => { setSelectedVoiceSampleAssetId(""); setVoiceSampleFile(event.target.files?.[0] ?? null); }} /></label>}
           <label className="video-consent"><input type="checkbox" checked={voiceConsent} onChange={(event) => setVoiceConsent(event.target.checked)} /> I own this voice or have permission to use it for generated speech.</label>
           <p>Magic Hour creates speech from your sample and script. Its voice-cloner charges credits based on script length.</p>
         </>}
-        <label>Voice language<select value={language} onChange={(event) => setLanguage(event.target.value)}>{[["english", "English"], ["hindi", "Hindi"], ["tamil", "Tamil"], ["spanish", "Spanish"], ["french", "French"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Voice language
+          <CompactSelect aria-label="Voice language" value={language} options={[["english", "English"], ["hindi", "Hindi"], ["tamil", "Tamil"], ["spanish", "Spanish"], ["french", "French"]].map(([value, label]) => ({ value, label }))} onValueChange={setLanguage} />
+        </label>
         <details className="video-advanced-workflows"><summary>Voice and lip-sync options</summary>
-          {workflow === "talking-photo" && <label>Voice source<select value={voiceMode} onChange={(event) => setVoiceMode(event.target.value as "preset" | "custom")}><option value="preset">Built-in voice</option><option value="custom">Use my own voice sample</option></select></label>}
+          {workflow === "talking-photo" && <label>Voice source
+            <CompactSelect aria-label="Voice source" value={voiceMode} options={[{ value: "preset", label: "Built-in voice" }, { value: "custom", label: "Use my own voice sample" }]} onValueChange={(value) => setVoiceMode(value as "preset" | "custom")} />
+          </label>}
           {workflow === "talking-photo" && <button className="button button-outline" type="button" onClick={() => { setWorkflow("lip-sync"); clearSourceSelection(); }}>Lip sync an existing video</button>}
           {workflow === "lip-sync" && <button className="button button-outline" type="button" onClick={() => { setWorkflow("talking-photo"); clearSourceSelection(); }}>Back to talking photo</button>}
           {workflow === "lip-sync" && <label>Video to lip sync<input ref={sourceInputRef} required={!sourceFile && !selectedGalleryAssetId} type="file" accept="video/mp4" onChange={(event) => setSourceFile(event.target.files?.[0] ?? null)} /></label>}
-          {workflow === "lip-sync" && <label>Lip-sync style<select value={style} onChange={(event) => setStyle(event.target.value)}><option value="realistic">Realistic</option><option value="commercial">Lite</option></select></label>}
+          {workflow === "lip-sync" && <label>Lip-sync style
+            <CompactSelect aria-label="Lip-sync style" value={style} options={[{ value: "realistic", label: "Realistic" }, { value: "commercial", label: "Lite" }]} onValueChange={setStyle} />
+          </label>}
         </details>
       </>}
-      {workflow !== "lip-sync" && <label>Aspect ratio<select value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}><option value="9:16">Instagram Reels / YouTube Shorts Â· 9:16</option><option value="1:1">Square Â· 1:1</option><option value="16:9">Landscape Â· 16:9</option></select></label>}
-      <label>Resolution<select value={resolution} onChange={(event) => setResolution(event.target.value)}><option value="480p">480p · fastest</option><option value="720p">720p · sharper</option><option value="1080p">1080p · premium</option></select><small>Higher resolutions can use more Magic Hour credits.</small></label>
-      <label>Length<select value={durationSeconds} onChange={(event) => setDurationSeconds(Number(event.target.value))}>{[5, 10, 15].map((seconds) => <option key={seconds} value={seconds}>{seconds} seconds</option>)}</select></label>
+      {workflow !== "lip-sync" && <label>Aspect ratio
+        <CompactSelect aria-label="Aspect ratio" value={aspectRatio} options={[
+          { value: "9:16", label: "Instagram Reels / YouTube Shorts · 9:16" },
+          { value: "1:1", label: "Square · 1:1" },
+          { value: "16:9", label: "Landscape · 16:9" },
+        ]} onValueChange={setAspectRatio} />
+      </label>}
+      <label>Resolution
+        <CompactSelect aria-label="Resolution" value={resolution} options={[
+          { value: "480p", label: "480p · fastest" },
+          { value: "720p", label: "720p · sharper" },
+          { value: "1080p", label: "1080p · premium" },
+        ]} onValueChange={setResolution} />
+        <small>Higher resolutions can use more Magic Hour credits.</small>
+      </label>
+      <label>Length
+        <CompactSelect aria-label="Length" value={String(durationSeconds)} options={[5, 10, 15].map((seconds) => ({ value: String(seconds), label: `${seconds} seconds` }))} onValueChange={(value) => setDurationSeconds(Number(value))} />
+      </label>
       <p className="video-credit-notice">Generation uses Magic Hour credits. Check the displayed balance before generating.</p>
       <button type="submit" className="button button-gold" disabled={busy || !config?.configured || (workflow !== "product-text" && !sourceFile && !selectedGalleryAssetId) || (workflow.includes("product") && !title.trim() && !productName.trim() && !description.trim())}>{busy ? "Queuing videoâ€¦" : "Generate video"}</button>
       </Fragment>
@@ -392,6 +432,7 @@ export function VideoStudioClient() {
   const [scheduleAt, setScheduleAt] = useState<Record<string, string>>({});
   const [timezone, setTimezone] = useState("UTC");
   const [selectedVideoId, setSelectedVideoId] = useState("");
+  const [videoOptionsOpen, setVideoOptionsOpen] = useState(false);
   const [editingJob, setEditingJob] = useState("");
   const [editedScenes, setEditedScenes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -815,21 +856,21 @@ export function VideoStudioClient() {
             <textarea required minLength={10} maxLength={2400} value={topic} onChange={(event) => setTopic(event.target.value)} rows={3} placeholder="Example: Create a polished ad for our beverage. Show a man and woman chatting at a cafÃ© table, then demonstrate the bottle clearly. Use only facts from my brand profile." />
           </label>
           <div className="video-duration-controls">
-            <label>Duration<select value={ideaDuration} onChange={(event) => setIdeaDuration(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((minutes) => <option key={minutes} value={minutes * 60}>{minutes} minute{minutes > 1 ? "s" : ""}</option>)}</select></label>
-            <label>Language<select value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</select></label>
-            <label>Format<select value={ideaAspectRatio} onChange={(event) => setIdeaAspectRatio(event.target.value as "vertical" | "landscape")}><option value="vertical">Vertical Â· 1080 Ã— 1920</option><option value="landscape">Horizontal Â· 1920 Ã— 1080</option></select></label>
-            <label>Voice<select value={ideaVoice} onChange={(event) => setIdeaVoice(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</select></label>
-          <label>Conversation tone<select value={ideaConversationStyle} onChange={(event) => setIdeaConversationStyle(event.target.value as VideoConversationStyle)}><option value="story-driven">Story-driven</option><option value="warm">Warm and friendly</option><option value="playful">Playful</option><option value="dramatic">Dramatic</option><option value="product-demo">Professional product demonstration</option></select></label>
-            <label>Characters<select value={ideaCastSize} onChange={(event) => setIdeaCastSize(Number(event.target.value) as 2 | 3)}><option value={2}>Two people</option><option value={3}>Three people</option></select></label>
+            <label>Duration<CompactSelect aria-label="Duration" value={ideaDuration} onChange={(event) => setIdeaDuration(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((minutes) => <option key={minutes} value={minutes * 60}>{minutes} minute{minutes > 1 ? "s" : ""}</option>)}</CompactSelect></label>
+            <label>Language<CompactSelect aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</CompactSelect></label>
+            <label>Format<CompactSelect aria-label="Format" value={ideaAspectRatio} onChange={(event) => setIdeaAspectRatio(event.target.value as "vertical" | "landscape")}><option value="vertical">Vertical Â· 1080 Ã— 1920</option><option value="landscape">Horizontal Â· 1920 Ã— 1080</option></CompactSelect></label>
+            <label>Voice<CompactSelect aria-label="Voice" value={ideaVoice} onChange={(event) => setIdeaVoice(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</CompactSelect></label>
+          <label>Conversation tone<CompactSelect aria-label="Conversation tone" value={ideaConversationStyle} onChange={(event) => setIdeaConversationStyle(event.target.value as VideoConversationStyle)}><option value="story-driven">Story-driven</option><option value="warm">Warm and friendly</option><option value="playful">Playful</option><option value="dramatic">Dramatic</option><option value="product-demo">Professional product demonstration</option></CompactSelect></label>
+            <label>Characters<CompactSelect aria-label="Characters" value={ideaCastSize} onChange={(event) => setIdeaCastSize(Number(event.target.value) as 2 | 3)}><option value={2}>Two people</option><option value={3}>Three people</option></CompactSelect></label>
           </div>
           <label>Character B voice
-            <select value={ideaVoiceB} onChange={(event) => setIdeaVoiceB(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</select>
+            <CompactSelect aria-label="Character B voice" value={ideaVoiceB} onChange={(event) => setIdeaVoiceB(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</CompactSelect>
           </label>
           {ideaCastSize === 3 && <label>Character C voice
-            <select value={ideaVoiceC} onChange={(event) => setIdeaVoiceC(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</select>
+            <CompactSelect aria-label="Character C voice" value={ideaVoiceC} onChange={(event) => setIdeaVoiceC(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</CompactSelect>
           </label>}
           <label>Character animation
-            <select value={avatarStyle} onChange={(event) => setAvatarStyle(event.target.value as "3d" | "illustrated")}><option value="3d">Procedural 3D characters</option><option value="illustrated">Illustrated fallback style</option></select>
+            <CompactSelect aria-label="Character animation" value={avatarStyle} onChange={(event) => setAvatarStyle(event.target.value as "3d" | "illustrated")}><option value="3d">Procedural 3D characters</option><option value="illustrated">Illustrated fallback style</option></CompactSelect>
           </label>
           <p className="video-music-license">Review the generated characters, scene captions, dialogue, and product actions before rendering. Choose two people for a focused conversation or three for a group scene.</p>
           {language !== "en-US" && <p className="notice notice-gold" role="status">The included Piper voice models speak US English. Other selected languages are used for the plan and subtitles, but spoken pronunciation may be limited.</p>}
@@ -904,12 +945,19 @@ export function VideoStudioClient() {
               setStoryType(storyTypes[Math.floor(Math.random() * storyTypes.length)]![0]);
             }}>Surprise me</button>
           </div></details>
-          <label>Story type<select value={storyType} onChange={(event) => setStoryType(event.target.value)}>{storyTypes.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-          <label>Video length<select value={durationSeconds} onChange={(event) => setDurationSeconds(Number(event.target.value))}>{videoDurations.map((seconds) => <option key={seconds} value={seconds}>{formatDuration(seconds)}</option>)}</select></label>
-          <label>Platform<select value={contentPlatform} onChange={(event) => setContentPlatform(event.target.value)}><option>Instagram</option><option>YouTube Shorts</option><option>TikTok</option></select></label>
+          <label>Story type<CompactSelect aria-label="Story type" value={storyType} onChange={(event) => setStoryType(event.target.value)}>{storyTypes.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</CompactSelect></label>
+          <label className="video-length-select-label">Video length
+            <CompactSelect
+              aria-label="Video length"
+              value={String(durationSeconds)}
+              options={videoDurations.map((seconds) => ({ value: String(seconds), label: formatDuration(seconds) }))}
+              onValueChange={(value) => setDurationSeconds(Number(value))}
+            />
+          </label>
+          <label>Platform<CompactSelect aria-label="Platform" value={contentPlatform} onChange={(event) => setContentPlatform(event.target.value)}><option>Instagram</option><option>YouTube Shorts</option><option>TikTok</option></CompactSelect></label>
           {platformLimitWarning && <p className="notice notice-gold" role="alert">{platformLimitWarning} Platform targets last reviewed {videoPlatformLimits.lastReviewed}; confirm current rules in the linked documentation.</p>}
-          <label>Visual style<select value={visualStyle} onChange={(event) => setVisualStyle(event.target.value)}><option value="product-demo">Product demonstration</option><option value="b-roll">B-roll</option><option value="talking-head">Talking head</option><option value="kinetic-type">Kinetic type</option></select></label>
-          <label>Language<select value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</select></label>
+          <label>Visual style<CompactSelect aria-label="Visual style" value={visualStyle} onChange={(event) => setVisualStyle(event.target.value)}><option value="product-demo">Product demonstration</option><option value="b-roll">B-roll</option><option value="talking-head">Talking head</option><option value="kinetic-type">Kinetic type</option></CompactSelect></label>
+          <label>Language<CompactSelect aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</CompactSelect></label>
           <button type="submit" className="button button-gold" disabled={busy || !topic.trim() || durationSeconds < 15 || !aiConfigured}>{busy ? "Workingâ€¦" : "Generate video script"}</button>
           {scriptRetryAvailable && <button type="button" className="button button-outline" disabled={busy || !topic.trim() || !aiConfigured} onClick={() => void generateScript()}>Retry video script</button>}
         </form>
@@ -957,23 +1005,23 @@ export function VideoStudioClient() {
             </div>
           </label>
           <p className="video-music-license">Target length: {formatDuration(durationSeconds)}. {platformLimitWarning || `Platform targets last reviewed ${videoPlatformLimits.lastReviewed}; confirm current rules in the linked documentation.`}</p>
-          <label>Video format<select value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}><option value="vertical">Vertical Â· 9:16</option><option value="square">Square Â· 1:1</option><option value="landscape">Landscape Â· 16:9</option></select></label>
-          <label>Narration<select value={narration} onChange={(event) => setNarration(event.target.value)}><option value="voiceover">Voiceover</option><option value="on-camera">Presenter voiceover</option><option value="text-only">Text only (no TTS)</option></select></label>
+          <label>Video format<CompactSelect aria-label="Video format" value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}><option value="vertical">Vertical Â· 9:16</option><option value="square">Square Â· 1:1</option><option value="landscape">Landscape Â· 16:9</option></CompactSelect></label>
+          <label>Narration<CompactSelect aria-label="Narration" value={narration} onChange={(event) => setNarration(event.target.value)}><option value="voiceover">Voiceover</option><option value="on-camera">Presenter voiceover</option><option value="text-only">Text only (no TTS)</option></CompactSelect></label>
           {narration !== "text-only" && <>
             <label>Narration voice
-              <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+              <CompactSelect aria-label="Narration voice" value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
                 {(config?.tts.voices ?? []).map((voice) => <option value={voice.id} key={voice.id}>{voice.label} Â· {voice.description}</option>)}
-              </select>
+              </CompactSelect>
             </label>
             <p className="video-music-license">Each option uses a different speaker from the free local Piper multi-speaker model. The available voices are US English.</p>
           </>}
           <label>Music track
-            <select value={musicId} onChange={(event) => setMusicId(event.target.value)}><option value="">Automatic soft bed</option>{config?.music.map((track) => <option value={track.id} key={track.id}>{track.title} Â· {track.mood}</option>)}</select>
+            <CompactSelect aria-label="Music track" value={musicId} onChange={(event) => setMusicId(event.target.value)}><option value="">Automatic soft bed</option>{config?.music.map((track) => <option value={track.id} key={track.id}>{track.title} Â· {track.mood}</option>)}</CompactSelect>
           </label>
           {musicId && <label>Music treatment
-            <select value={musicStyle} onChange={(event) => setMusicStyle(event.target.value)}>
+            <CompactSelect aria-label="Music treatment" value={musicStyle} onChange={(event) => setMusicStyle(event.target.value)}>
               {(config?.musicStyles ?? []).map((style) => <option value={style.id} key={style.id}>{style.label} Â· {style.description}</option>)}
-            </select>
+            </CompactSelect>
           </label>}
           {musicTrack && <>
             <audio className="video-music-preview" controls preload="none" src={`${apiBaseUrl}/api/videos/music/${musicTrack.id}`} crossOrigin="use-credentials" />
@@ -1022,6 +1070,7 @@ export function VideoStudioClient() {
       </section>
       {selectedVideo && createPortal(
         <div className="design-lightbox-backdrop video-detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedVideoId(""); }}>
+          <button type="button" className="media-post-preview-close" aria-label="Close video preview" onClick={() => setSelectedVideoId("")}><X size={24} /></button>
           <section className="design-post-lightbox video-detail-lightbox" role="dialog" aria-modal="true" aria-label={`${selectedVideo.inputJson.title ?? "Video"} details`}>
             <div className="design-post-visual video-detail-preview">
               {selectedVideo.videoUrl
@@ -1029,10 +1078,28 @@ export function VideoStudioClient() {
                 : <p>{selectedVideo.status === "FAILED" || selectedVideo.status === "TIMED_OUT" ? "This video did not render." : selectedVideo.status === "CANCELLED" ? "This render was cancelled." : selectedVideo.status === "QUEUED" ? "Waiting for a render worker to start this video." : "Rendering video. You can close this panel while it completes."}</p>}
             </div>
             <aside className="design-post-details video-detail-details">
-              <header>
-                <div><h2>{selectedVideo.inputJson.title ?? "Branded video"}</h2><p>{selectedVideo.inputJson.aspectRatio ?? "vertical"} format Â· {selectedVideo.status.toLowerCase()} Â· {new Date(selectedVideo.createdAt).toLocaleString()}</p></div>
-                <button type="button" aria-label="Close video details" onClick={() => setSelectedVideoId("")}><X size={22} /></button>
+              <header className="design-post-toolbar">
+                <span className="media-post-preview-avatar" aria-hidden="true">{(selectedVideo.inputJson.brandName ?? "V").trim().charAt(0).toUpperCase()}</span>
+                <div className="media-post-preview-identity">
+                  <h2>{selectedVideo.inputJson.brandName ?? "Branded video"}</h2>
+                  <p>{selectedVideo.inputJson.aspectRatio ?? "vertical"} video · {selectedVideo.status.toLowerCase()}</p>
+                </div>
+                <div className="design-post-header-actions">
+                  <div className="design-post-menu-wrap">
+                    <button type="button" className="design-post-menu-trigger" aria-label="Video options" aria-expanded={videoOptionsOpen} onClick={() => setVideoOptionsOpen((open) => !open)}><MoreVertical size={18} /></button>
+                    {videoOptionsOpen && <div className="design-post-menu" role="menu" aria-label="Video options">
+                      {selectedVideo.videoUrl && <a role="menuitem" href={`${apiBaseUrl}${selectedVideo.videoUrl}?download=true`}>Download MP4</a>}
+                      {selectedVideo.videoUrl && <button type="button" role="menuitem" onClick={() => { setVideoOptionsOpen(false); void regenerate(selectedVideo); }}>Regenerate</button>}
+                      {selectedVideo.videoUrl && <button type="button" role="menuitem" onClick={() => { setVideoOptionsOpen(false); setEditingJob(selectedVideo.id); setEditedScenes(selectedVideo.inputJson.sourceScenes ?? []); }}>Edit text</button>}
+                      {selectedVideo.status !== "PROCESSING" && selectedVideo.status !== "QUEUED" && <button type="button" role="menuitem" onClick={() => { setVideoOptionsOpen(false); void deleteJob(selectedVideo); }}>Delete video</button>}
+                    </div>}
+                  </div>
+                </div>
               </header>
+              <div className="design-post-heading-copy">
+                <h2>{selectedVideo.inputJson.title ?? "Branded video"}</h2>
+                <p>{selectedVideo.inputJson.aspectRatio ?? "vertical"} format Â· {selectedVideo.status.toLowerCase()} Â· {new Date(selectedVideo.createdAt).toLocaleString()}</p>
+              </div>
               <div className="design-post-copy">
                 <p className="design-post-date">{selectedVideo.inputJson.brandName ?? "Branded video"}{selectedVideo.inputJson.language ? ` Â· ${selectedVideo.inputJson.language}` : ""} Â· {selectedVideo.inputJson.scenePlan ? "AI-cast animated characters" : "Classic scene render"}</p>
                 {!selectedVideo.inputJson.scenePlan && <div className="notice notice-gold" role="note">
@@ -1042,13 +1109,13 @@ export function VideoStudioClient() {
                 {selectedVideo.videoUrl && <section className="video-publish-settings" aria-label="Video publishing settings">
                   <h3>Publish this video</h3>
                   <label>Platform
-                    <select value={platform} onChange={(event) => setPlatform(event.target.value)}>
+                    <CompactSelect aria-label="Publish platform" value={platform} onChange={(event) => setPlatform(event.target.value)}>
                       <option value="Instagram">Instagram Reels</option>
                       <option value="YouTube" disabled>YouTube Â· not available yet</option>
                       <option value="Facebook" disabled>Facebook Â· not available yet</option>
                       <option value="LinkedIn" disabled>LinkedIn Â· not available yet</option>
                       <option value="TikTok" disabled>TikTok Â· not available yet</option>
-                    </select>
+                    </CompactSelect>
                   </label>
                   <label className="video-detail-schedule">Schedule date and time
                     <input type="datetime-local" min={getDateTimeInputValue(new Date(), timezone)} value={scheduleAt[selectedVideo.id] ?? ""} onChange={(event) => setScheduleAt((current) => ({ ...current, [selectedVideo.id]: event.target.value }))} />
@@ -1058,9 +1125,9 @@ export function VideoStudioClient() {
                     {checkingReadiness ? "Checking Instagram connection and video hostingâ€¦" : publishingReadiness?.message ?? "Checking Instagram connectionâ€¦"}
                     {publishingReadiness?.accountName ? ` Â· ${publishingReadiness.accountName}` : ""}
                   </p>
-                  {!checkingReadiness && !publishingReadiness?.ready && <Link href="/dashboard/social-accounts/instagram">Connect or fix Instagram account â†’</Link>}
+                  {!checkingReadiness && publishingReadiness?.connectionAction && <Link href="/dashboard/social-accounts/instagram">{publishingReadiness.connectionAction === "reconnect" ? "Reconnect Instagram account" : "Connect Instagram account"} â†’</Link>}
                   <button type="button" className="video-check-connection" onClick={() => void checkPublishingReadiness()} disabled={checkingReadiness || busy}>
-                    {checkingReadiness ? "Checkingâ€¦" : "Check connection"}
+                    {checkingReadiness ? "Checkingâ€¦" : "Recheck publishing readiness"}
                   </button>
                 </section>}
                 {selectedVideo.inputJson.sourceScenes?.length

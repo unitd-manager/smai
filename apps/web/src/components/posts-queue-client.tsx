@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { PlatformIcon } from "@/components/platform-icon";
 import { apiRequest, postsUpdatedEvent } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 type Post = {
   id: string;
@@ -109,9 +110,9 @@ export function PostsQueueClient({ calendar = false }: { calendar?: boolean }) {
       <h1>{calendar ? "Calendar" : "Posts and Queue"}</h1>
       <p className="dashboard-lead">{calendar ? "Review scheduled content and publishing results for every brand." : "Track drafts, scheduled posts, and publishing results in one place."}</p>
       <div className="posts-toolbar">
-        <label>Status<select value={status} onChange={(event) => {
+        <label>Status<CompactSelect aria-label="Status filter" value={status} onChange={(event) => {
           setStatus(event.target.value);
-        }}>{statuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></label>
+        }}>{statuses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</CompactSelect></label>
         <Link className="button button-gold" href="/dashboard/create">Create a post</Link>
         <span>{posts.length} posts</span>
       </div>

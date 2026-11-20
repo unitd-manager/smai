@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DesignDocument } from "@united-technologies/shared/design-document";
 import { apiBaseUrl, apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 import { DesignDocumentPreview, DesignImagePreview } from "@/components/design-document-preview";
 
 type DesignAsset = {
@@ -56,6 +57,55 @@ type MediaAsset =
   | { kind: "content"; id: string; title: string; description: string; brand: string; createdAt: string; previewUrl: null; status: string; caption: string; hashtags: string[] }
   | { kind: "video"; id: string; title: string; description: string; brand: string; createdAt: string; videoUrl: string; status: string }
   | { kind: "upload"; id: string; title: string; description: string; brand: string; createdAt: string; fileUrl: string; mimeType: string; contentId: string | null; status: string };
+
+function AuthenticatedMediaImage({ src, alt, width, height, className }: {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  className?: string;
+}) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let currentObjectUrl: string | null = null;
+    const headers = new Headers();
+    const workspaceId = window.localStorage.getItem("united-technologies.workspaceId");
+    if (workspaceId) headers.set("x-workspace-id", workspaceId);
+
+    void fetch(src, { credentials: "include", headers })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Image request failed (${response.status}).`);
+        return response.blob();
+      })
+      .then((blob) => {
+        const nextObjectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(nextObjectUrl);
+          return;
+        }
+        currentObjectUrl = nextObjectUrl;
+        setObjectUrl(nextObjectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+
+    return () => {
+      cancelled = true;
+      if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    };
+  }, [src]);
+
+  if (loadError) {
+    return <span className="media-image-preview-error" role="img" aria-label={`${alt}: preview unavailable`}>Image preview unavailable</span>;
+  }
+  if (!objectUrl) return <span className="media-image-preview-loading" role="status">Loading image…</span>;
+
+  return <Image src={objectUrl} alt={alt} width={width} height={height} unoptimized className={className} />;
+}
 
 export function MediaLibraryClient({ importMode = false, galleryMode = false }: { importMode?: boolean; galleryMode?: boolean }) {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
@@ -353,13 +403,13 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
       <div className="media-toolbar">
         <label>Search assets<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, brief or brand" /></label>
         <label>Asset type
-          <select value={filter} onChange={(event) => setFilter(event.target.value)}>
+          <CompactSelect aria-label="Asset type filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
             <option value="all">All saved assets</option>
             <option value="design">Designs</option>
             <option value="content">Content and scripts</option>
             <option value="video">Rendered videos and scripts</option>
             <option value="upload">Imported files</option>
-          </select>
+          </CompactSelect>
         </label>
         <span>{visibleAssets.length} assets</span>
       </div>
@@ -381,7 +431,7 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
                   : asset.kind === "upload" && asset.mimeType.startsWith("video/")
                     ? <button type="button" className="media-asset-open-trigger" onClick={() => setDetailAsset(asset)} aria-label={`Open ${asset.title}`}><video src={`${apiBaseUrl}${asset.fileUrl}`} crossOrigin="use-credentials" muted preload="metadata" /></button>
                   : asset.kind === "upload" && asset.mimeType.startsWith("image/")
-                    ? <button type="button" className="media-asset-open-trigger" onClick={() => setDetailAsset(asset)} aria-label={`Open ${asset.title}`}><Image src={`${apiBaseUrl}${asset.fileUrl}`} width={600} height={600} unoptimized crossOrigin="use-credentials" alt={asset.title} /></button>
+                    ? <button type="button" className="media-asset-open-trigger" onClick={() => setDetailAsset(asset)} aria-label={`Open ${asset.title}`}><AuthenticatedMediaImage src={asset.fileUrl} width={600} height={600} alt={asset.title} /></button>
                   : asset.kind === "upload"
                     ? <button type="button" className="media-asset-open-trigger media-asset-preview-copy" onClick={() => setDetailAsset(asset)} aria-label={`Open ${asset.title}`}><span className="media-asset-copy-preview"><strong>PDF document</strong><span>{asset.title}</span></span></button>
                   : asset.kind === "design" && asset.document
@@ -431,53 +481,66 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
       )}
       <p className="demo-banner" role="note">Imported videos and images are stored in your workspace database and can be prepared for Instagram scheduling. PDFs are saved for reference only. Other platforms remain demo-only unless a live integration is configured.</p>
       {detailAsset && detailAsset.kind !== "design" && createPortal(
-        <div className="design-lightbox-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailAsset(null); }}>
-          <section className="design-lightbox design-post-lightbox" role="dialog" aria-modal="true" aria-label={`${detailAsset.title} details`}>
-            <div className="design-post-visual media-asset-detail-content">
+        <div className="design-lightbox-backdrop media-post-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailAsset(null); }}>
+          <button type="button" className="media-post-preview-close" aria-label="Close preview" onClick={() => setDetailAsset(null)}><X size={24} /></button>
+          <section className="media-post-preview-dialog" role="dialog" aria-modal="true" aria-label={`${detailAsset.title} details`}>
+            <div className="media-post-preview-media">
               {detailAsset.kind === "video"
                 ? <video src={`${apiBaseUrl}${detailAsset.videoUrl}`} controls autoPlay />
                 : detailAsset.kind === "upload" && detailAsset.mimeType.startsWith("video/")
                   ? <video src={`${apiBaseUrl}${detailAsset.fileUrl}`} controls autoPlay crossOrigin="use-credentials" />
                   : detailAsset.kind === "upload" && detailAsset.mimeType.startsWith("image/")
-                    ? <Image src={`${apiBaseUrl}${detailAsset.fileUrl}`} width={1200} height={900} unoptimized crossOrigin="use-credentials" alt={detailAsset.title} />
+                    ? <AuthenticatedMediaImage className="media-post-preview-image" src={detailAsset.fileUrl} width={1200} height={900} alt={detailAsset.title} />
                     : detailAsset.kind === "upload" && detailAsset.mimeType === "application/pdf"
                       ? <iframe src={`${apiBaseUrl}${detailAsset.fileUrl}`} title={detailAsset.title} />
                       : <div className="media-asset-copy-preview"><strong>{detailAsset.title}</strong><span>{detailAsset.description}</span></div>}
             </div>
-            <aside className="design-post-details">
-              <header><div><h2>{detailAsset.title}</h2><p>{detailAsset.description} · {detailAsset.brand} · {new Date(detailAsset.createdAt).toLocaleDateString()}</p></div><button type="button" aria-label="Close details" onClick={() => setDetailAsset(null)}><X size={22} /></button></header>
-              <div className="design-post-copy">
-                {detailAsset.kind === "content"
-                  ? <><p>{detailAsset.caption || detailAsset.description}</p>{detailAsset.hashtags.length > 0 && <p className="design-post-hashtags">{detailAsset.hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}</p>}</>
-                  : <p>{detailAsset.description}</p>}
-                {error && <p className="form-error" role="alert">{error}</p>}
-              </div>
-              <div className="design-post-menu-wrap">
-                <button type="button" className="design-post-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
-                {menuOpen && <div className="design-post-menu" role="menu" aria-label="Post options">
-                  <strong>Actions</strong>
-                  {detailAsset.kind === "video"
-                    ? <>
-                        <a role="menuitem" href={`${apiBaseUrl}${detailAsset.videoUrl}?download=true`}>Download MP4</a>
-                          <button type="button" role="menuitem" onClick={() => void moveAsset(detailAsset)}>{galleryMode ? "Move to Media Library" : "Move to Gallery"}</button>
-                          <button type="button" role="menuitem" onClick={() => void deleteAsset(detailAsset)}>Delete video</button>
-                        </>
-                    : detailAsset.kind === "upload"
+            <aside className="media-post-preview-panel">
+              <header className="media-post-preview-header">
+                <span className="media-post-preview-avatar" aria-hidden="true">{detailAsset.brand.trim().charAt(0).toUpperCase()}</span>
+                <div className="media-post-preview-identity">
+                  <h2>{detailAsset.brand}</h2>
+                  <p>{detailAsset.kind === "video" ? "Video · Original audio" : "AI content"}</p>
+                </div>
+                <div className="media-post-preview-menu-wrap">
+                  <button type="button" className="media-post-preview-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
+                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options">
+                      <strong>Actions</strong>
+                      {detailAsset.kind === "video"
                         ? <>
-                            {detailAsset.contentId && <Link href={`/dashboard/create?importedContentId=${encodeURIComponent(detailAsset.contentId)}`} role="menuitem">Prepare post</Link>}
-                            <a role="menuitem" href={`${apiBaseUrl}${detailAsset.fileUrl}`} download={detailAsset.title}>Download file</a>
+                            <a role="menuitem" href={`${apiBaseUrl}${detailAsset.videoUrl}?download=true`}>Download MP4</a>
                             <button type="button" role="menuitem" onClick={() => void moveAsset(detailAsset)}>{galleryMode ? "Move to Media Library" : "Move to Gallery"}</button>
-                            <button type="button" role="menuitem" onClick={() => void deleteAsset(detailAsset)}>Delete file</button>
-                        </>
-                    : <>
-                          <button type="button" role="menuitem" onClick={() => void moveAsset(detailAsset)}>{galleryMode ? "Move to Media Library" : "Move to Gallery"}</button>
-                          {detailAsset.kind === "content" && <Link href={`/dashboard/create?importedContentId=${encodeURIComponent(detailAsset.id)}`} role="menuitem">Prepare post</Link>}
-                          <Link href={`/dashboard/content?edit=${encodeURIComponent(detailAsset.id)}`} role="menuitem">Edit content</Link>
-                        <button type="button" role="menuitem" onClick={() => void duplicateAsset(detailAsset)}>Duplicate content</button>
-                        <button type="button" role="menuitem" onClick={() => void deleteAsset(detailAsset)}>Delete content</button>
-                      </>}
-                </div>}
+                            <button type="button" role="menuitem" onClick={() => void deleteAsset(detailAsset)}>Delete video</button>
+                          </>
+                        : detailAsset.kind === "upload"
+                          ? <>
+                              {detailAsset.contentId && <Link href={`/dashboard/create?importedContentId=${encodeURIComponent(detailAsset.contentId)}`} role="menuitem">Prepare post</Link>}
+                              <a role="menuitem" href={`${apiBaseUrl}${detailAsset.fileUrl}`} download={detailAsset.title}>Download file</a>
+                              <button type="button" role="menuitem" onClick={() => void moveAsset(detailAsset)}>{galleryMode ? "Move to Media Library" : "Move to Gallery"}</button>
+                              <button type="button" role="menuitem" onClick={() => void deleteAsset(detailAsset)}>Delete file</button>
+                            </>
+                          : <>
+                              <button type="button" role="menuitem" onClick={() => void moveAsset(detailAsset)}>{galleryMode ? "Move to Media Library" : "Move to Gallery"}</button>
+                              {detailAsset.kind === "content" && <Link href={`/dashboard/create?importedContentId=${encodeURIComponent(detailAsset.id)}`} role="menuitem">Prepare post</Link>}
+                              <Link href={`/dashboard/content?edit=${encodeURIComponent(detailAsset.id)}`} role="menuitem">Edit content</Link>
+                              <button type="button" role="menuitem" onClick={() => void duplicateAsset(detailAsset)}>Duplicate content</button>
+                              <button type="button" role="menuitem" onClick={() => void deleteAsset(detailAsset)}>Delete content</button>
+                            </>}
+                  </div>}
+                </div>
+              </header>
+              <div className="media-post-preview-caption">
+                <span className="media-post-preview-avatar media-post-preview-avatar-small" aria-hidden="true">{detailAsset.brand.trim().charAt(0).toUpperCase()}</span>
+                <div>
+                  <p><strong>{detailAsset.brand}</strong> {detailAsset.kind === "content" ? detailAsset.caption || detailAsset.description : detailAsset.description}</p>
+                  {detailAsset.kind === "content" && detailAsset.hashtags.length > 0 && <p className="media-post-preview-hashtags">{detailAsset.hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}</p>}
+                  {error && <p className="form-error" role="alert">{error}</p>}
+                </div>
               </div>
+              <footer className="media-post-preview-footer">
+                <span>{new Date(detailAsset.createdAt).toLocaleDateString()}</span>
+                <span>{detailAsset.title}</span>
+              </footer>
             </aside>
           </section>
         </div>,

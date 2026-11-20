@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DesignDocument, DesignLayer } from "@united-technologies/shared/design-document";
 import { apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 import { DesignDocumentPreview } from "@/components/design-document-preview";
 
 type Design = {
@@ -291,13 +292,13 @@ export function DesignsClient() {
       <p className="dashboard-lead">Each card is a saved creative. Carousel pages stay together; a selected template saves one matched design instead of extra layout copies.</p>
       <div className="design-toolbar">
         <label className="design-search">Search designs<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, brand, or platform" /></label>
-        <label>Format<select value={format} onChange={(event) => setFormat(event.target.value)}><option value="all">All formats</option>{formats.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-        <label>Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option></select></label>
-        <label>Platform<select value={platform} onChange={(event) => setPlatform(event.target.value)}><option value="all">All platforms</option>{platforms.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-        <label>Brand<select value={brandFilter} onChange={(event) => {
+        <label>Format<CompactSelect aria-label="Format filter" value={format} onChange={(event) => setFormat(event.target.value)}><option value="all">All formats</option>{formats.map((item) => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
+        <label>Status<CompactSelect aria-label="Status filter" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option></CompactSelect></label>
+        <label>Platform<CompactSelect aria-label="Platform filter" value={platform} onChange={(event) => setPlatform(event.target.value)}><option value="all">All platforms</option>{platforms.map((item) => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
+        <label>Brand<CompactSelect aria-label="Brand filter" value={brandFilter} onChange={(event) => {
           const value = event.target.value;
           setBrandFilter(value);
-        }}><option value="active">Current brand</option><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select></label>
+        }}><option value="active">Current brand</option><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</CompactSelect></label>
         <label className="design-favorites-filter"><input type="checkbox" checked={favoritesOnly} onChange={(event) => setFavoritesOnly(event.target.checked)} /> Favorites</label>
         <span>{visibleSets.length} design sets · {designs.length} saved designs</span>
       </div>

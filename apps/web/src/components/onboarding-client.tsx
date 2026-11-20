@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useRouter } from "next/navigation";
 import { colors } from "@/config/brand";
 import { apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 type BrandProfile = {
   id: string;
@@ -371,7 +372,7 @@ export function OnboardingClient() {
               <label>Competitors<input value={form.competitors} onChange={(event) => updateField("competitors", event.target.value)} placeholder="Optional, comma separated" /></label>
               <label>Goals<input required value={form.goals} onChange={(event) => updateField("goals", event.target.value)} placeholder="e.g. Awareness, enquiries" /></label>
               <label>Preferred platforms <small>Optional planning guidance. Autopilot selects from connected channels automatically.</small><input value={form.preferredPlatforms} onChange={(event) => updateField("preferredPlatforms", event.target.value)} placeholder="Optional, e.g. Instagram, LinkedIn" /></label>
-              <label>Publishing time zone<select value={timezone} onChange={(event) => setTimezone(event.target.value)}>{["UTC", ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC")].map((zone) => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</select><small>Autopilot uses this time zone for weekday slots at 10:00 and 15:00. New batches use the latest saved time zone.</small></label>
+              <label>Publishing time zone<CompactSelect aria-label="Publishing time zone" value={timezone} onChange={(event) => setTimezone(event.target.value)}>{["UTC", ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC")].map((zone) => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</CompactSelect><small>Autopilot uses this time zone for weekday slots at 10:00 and 15:00. New batches use the latest saved time zone.</small></label>
             </div>
             <label className="autopilot-toggle">
               <input
@@ -393,13 +394,13 @@ export function OnboardingClient() {
                 <span className="brand-kit-field-title">Brand logo</span>
                 <small>Upload a PNG, JPEG, WebP, or SVG up to 4 MB, or select an existing workspace image. SVG files are converted to PNG for safe previews.</small>
                 <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" disabled={uploadingLogo} onChange={(event) => void uploadLogo(event)} />
-                <select value={selectedLogoId} onChange={(event) => {
+                <CompactSelect aria-label="Brand logo" value={selectedLogoId} onChange={(event) => {
                   setSelectedLogoId(event.target.value);
                   setLogoPreviewFailed(false);
                 }}>
                   <option value="">No logo selected</option>
                   {logoAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.fileName}</option>)}
-                </select>
+                </CompactSelect>
                 {selectedLogoId && (logoPreviewFailed ? (
                   <span className="brand-kit-logo-unavailable" role="status">
                     <ImageOff size={20} aria-hidden="true" />
@@ -430,7 +431,8 @@ export function OnboardingClient() {
                 {brandTemplateFormats.map((format) => (
                   <label key={format}>
                     <span className="brand-kit-field-title">{format.replaceAll("-", " ")}</span>
-                    <select
+                    <CompactSelect
+                      aria-label={`${format.replaceAll("-", " ")} preferred template`}
                       value={preferredTemplateIds.find((id) => availableTemplates.some((template) => template.id === id && template.format === format)) ?? ""}
                       onChange={(event) => setPreferredTemplateIds((current) => [
                         ...current.filter((id) => !availableTemplates.some((template) => template.id === id && template.format === format)),
@@ -439,7 +441,7 @@ export function OnboardingClient() {
                     >
                       <option value="">Use the standard template</option>
                       {availableTemplates.filter((template) => template.format === format).map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
-                    </select>
+                    </CompactSelect>
                   </label>
                 ))}
               </div>

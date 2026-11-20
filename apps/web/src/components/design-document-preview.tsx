@@ -48,23 +48,37 @@ export function DesignImagePreview({
         <Image src={previewUrl} alt={title} fill unoptimized sizes="(max-width: 700px) 100vw, 600px" />
       </button>
       {viewerOpen && createPortal(
-        <div className="design-lightbox-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewerOpen(false); }}>
-          <section className="design-lightbox design-post-lightbox" role="dialog" aria-modal="true" aria-label={`${title} preview`}>
-            <div className="design-post-visual"><div className="design-image-lightbox-frame"><Image className="design-image-lightbox-image" src={previewUrl} alt={title} fill unoptimized sizes="(max-width: 700px) 100vw, 700px" /></div></div>
-            <aside className="design-post-details">
-              <header><div><h2>{title}</h2><p>{subtitle}</p></div><button type="button" aria-label="Close preview" onClick={() => setViewerOpen(false)}><X size={22} /></button></header>
-              <div className="design-post-copy">{modalDetails ?? <p>Saved design preview</p>}</div>
-              <div className="design-post-menu-wrap">
-                <button type="button" className="design-post-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
-                {menuOpen && <div className="design-post-menu" role="menu" aria-label="Post options">
-                  <strong>Download</strong>
-                  <button type="button" role="menuitem" onClick={() => void download("png")}>PNG</button>
-                  <button type="button" role="menuitem" onClick={() => void download("jpg")}>JPEG</button>
-                  <button type="button" role="menuitem" onClick={() => void download("pdf")}>PDF</button>
-                  {modalActions}
-                </div>}
+        <div className="design-lightbox-backdrop media-post-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewerOpen(false); }}>
+          <button type="button" className="media-post-preview-close" aria-label="Close preview" onClick={() => setViewerOpen(false)}><X size={24} /></button>
+          <section className="media-post-preview-dialog" role="dialog" aria-modal="true" aria-label={`${title} preview`}>
+            <div className="media-post-preview-media"><div className="design-image-lightbox-frame"><Image className="design-image-lightbox-image" src={previewUrl} alt={title} fill unoptimized sizes="(max-width: 700px) 100vw, 700px" /></div></div>
+            <aside className="media-post-preview-panel">
+              <header className="media-post-preview-header">
+                <span className="media-post-preview-avatar" aria-hidden="true">{(subtitle || title).trim().charAt(0).toUpperCase()}</span>
+                <div className="media-post-preview-identity">
+                  <h2>{subtitle?.split(" · ")[0] || title}</h2>
+                  <p>Design preview</p>
+                </div>
+                <div className="media-post-preview-menu-wrap">
+                  <button type="button" className="media-post-preview-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
+                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options">
+                      <strong>Download</strong>
+                      <button type="button" role="menuitem" onClick={() => void download("png")}>PNG</button>
+                      <button type="button" role="menuitem" onClick={() => void download("jpg")}>JPEG</button>
+                      <button type="button" role="menuitem" onClick={() => void download("pdf")}>PDF</button>
+                      {modalActions}
+                  </div>}
+                </div>
+              </header>
+              <div className="media-post-preview-caption">
+                <span className="media-post-preview-avatar media-post-preview-avatar-small" aria-hidden="true">{(subtitle || title).trim().charAt(0).toUpperCase()}</span>
+                <div>
+                  <p><strong>{subtitle?.split(" · ")[0] || title}</strong> {title}</p>
+                  {modalDetails ?? <p>Saved design preview</p>}
+                  {error && <p className="form-error" role="alert">{error}</p>}
+                </div>
               </div>
-              {error && <p className="form-error" role="alert">{error}</p>}
+              <footer className="media-post-preview-footer"><span>{subtitle?.split(" · ").slice(1).join(" · ") || "Design preview"}</span><span>{title}</span></footer>
             </aside>
           </section>
         </div>,
@@ -164,9 +178,10 @@ export function DesignDocumentPreview({
       </div>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {viewerOpen && createPortal(
-        <div className="design-lightbox-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewerOpen(false); }}>
-          <section className="design-lightbox design-post-lightbox" role="dialog" aria-modal="true" aria-label={`${title} preview`}>
-            <div className="design-post-visual">
+        <div className="design-lightbox-backdrop media-post-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewerOpen(false); }}>
+          <button type="button" className="media-post-preview-close" aria-label="Close preview" onClick={() => setViewerOpen(false)}><X size={24} /></button>
+          <section className="media-post-preview-dialog media-design-preview-dialog" role="dialog" aria-modal="true" aria-label={`${title} preview`}>
+            <div className="media-post-preview-media media-design-preview-media">
               <div className="design-lightbox-stage">
                 {document.pages.length > 1 && <button type="button" className="design-lightbox-arrow is-previous" aria-label="Previous page" disabled={pageIndex === 0} onClick={() => setActivePage((current) => Math.max(0, current - 1))}><ChevronLeft size={28} /></button>}
                 <div className="design-lightbox-image" style={{ aspectRatio: `${page.width} / ${page.height}` }}>
@@ -176,22 +191,35 @@ export function DesignDocumentPreview({
               </div>
               {document.pages.length > 1 && <nav className="design-lightbox-pages" aria-label="Carousel pages">{document.pages.map((item, index) => <button type="button" key={item.id} aria-current={index === pageIndex ? "page" : undefined} onClick={() => setActivePage(index)}>{index + 1}</button>)}</nav>}
             </div>
-            <aside className="design-post-details">
-              <header><div><h2>{title}</h2><p>{subtitle ? `${subtitle} · ` : ""}{document.pages.length > 1 ? `Page ${pageIndex + 1} of ${document.pages.length}` : "Design preview"}</p></div><button type="button" aria-label="Close preview" onClick={() => setViewerOpen(false)}><X size={22} /></button></header>
-              {modalDetails && <div className="design-post-copy">{modalDetails}</div>}
-              <div className="design-post-menu-wrap">
-                <button type="button" className="design-post-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
-                {menuOpen && <div className="design-post-menu" role="menu" aria-label="Post options">
-                  <strong>Download current page</strong>
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("png"); }}>PNG</button>
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("jpg"); }}>JPEG</button>
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("svg"); }}>SVG</button>
-                  <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("pdf"); }}>PDF</button>
-                  {document.pages.length > 1 && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadAllPages(); }}>Download carousel · PDF</button>}
-                  {modalActions}
-                </div>}
+            <aside className="media-post-preview-panel">
+              <header className="media-post-preview-header">
+                <span className="media-post-preview-avatar" aria-hidden="true">{(subtitle || title).trim().charAt(0).toUpperCase()}</span>
+                <div className="media-post-preview-identity">
+                  <h2>{subtitle?.split(" · ")[0] || title}</h2>
+                  <p>Design preview · Page {pageIndex + 1} of {document.pages.length}</p>
+                </div>
+                <div className="media-post-preview-menu-wrap">
+                  <button type="button" className="media-post-preview-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
+                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options">
+                      <strong>Download current page</strong>
+                      <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("png"); }}>PNG</button>
+                      <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("jpg"); }}>JPEG</button>
+                      <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("svg"); }}>SVG</button>
+                      <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("pdf"); }}>PDF</button>
+                      {document.pages.length > 1 && <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadAllPages(); }}>Download carousel · PDF</button>}
+                      {modalActions}
+                  </div>}
+                </div>
+              </header>
+              <div className="media-post-preview-caption">
+                <span className="media-post-preview-avatar media-post-preview-avatar-small" aria-hidden="true">{(subtitle || title).trim().charAt(0).toUpperCase()}</span>
+                <div>
+                  <p><strong>{subtitle?.split(" · ")[0] || title}</strong> {title}</p>
+                  {modalDetails}
+                  {error && <p className="form-error" role="alert">{error}</p>}
+                </div>
               </div>
-              {error && <p className="form-error" role="alert">{error}</p>}
+              <footer className="media-post-preview-footer"><span>{subtitle?.split(" · ").slice(1).join(" · ") || "Design preview"}</span><span>Page {pageIndex + 1} of {document.pages.length}</span></footer>
             </aside>
           </section>
         </div>,

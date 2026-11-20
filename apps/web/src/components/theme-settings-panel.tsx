@@ -9,6 +9,7 @@ import {
   type ThemeSettings,
 } from "@/lib/theme-settings";
 import { apiRequest } from "@/lib/api";
+import { CompactSelect } from "@/components/compact-select";
 
 type ThemeSettingsResponse = { userSettings: unknown; workspaceSettings: unknown };
 
@@ -192,9 +193,9 @@ export function ThemeSettingsPanel() {
               <div><h2>Color theme</h2><p>Select a preset or define your own brand colors.</p></div>
               <label className="theme-setting-field">
                 <span>Color mode</span>
-                <select value={settings.mode} onChange={(event) => changeSettings({ ...settings, mode: event.target.value as ThemeSettings["mode"] })}>
+                <CompactSelect aria-label="Color mode" value={settings.mode} onChange={(event) => changeSettings({ ...settings, mode: event.target.value as ThemeSettings["mode"] })}>
                   <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
-                </select>
+                </CompactSelect>
               </label>
             </div>
             <div className="theme-preset-grid">

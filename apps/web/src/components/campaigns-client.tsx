@@ -6,8 +6,24 @@ import { platformSpecs } from "@united-technologies/shared/platform-specs";
 import type { DesignDocument } from "@united-technologies/shared/design-document";
 import { apiRequest } from "@/lib/api";
 import { DesignDocumentPreview } from "@/components/design-document-preview";
+import { CompactSelect } from "@/components/compact-select";
 
 const platforms = Object.keys(platformSpecs);
+const campaignObjectives = [
+  "Brand Awareness",
+  "Audience Growth",
+  "Lead Generation",
+  "Sales & Conversions",
+  "Product/Service Launch",
+  "Website Traffic",
+  "Engagement & Community Building",
+  "Event Promotion",
+  "Customer Retention",
+  "Re-engagement",
+  "Upselling & Cross-selling",
+  "Referral Generation",
+  "Seasonal/Promotional Campaign",
+] as const;
 const campaignFormats = [
   "post",
   "carousel",
@@ -41,6 +57,69 @@ const formatLabels: Record<CampaignFormat, string> = {
   "festival-greeting": "Festival greeting",
   "offer-sale": "Offer / sale",
 };
+
+type CampaignConcept = {
+  name: string;
+  idea: string;
+  rationale: string;
+  audienceFit: number;
+  originality: number;
+  feasibility: number;
+  potentialImpact: number;
+  risks: string[];
+};
+type CampaignTask = {
+  title: string;
+  description: string;
+  priority: "high" | "medium" | "low";
+  dueDay: number;
+  dependsOn: string[];
+  status: "NOT_STARTED" | "IN_PROGRESS" | "DONE" | "BLOCKED";
+  assignee: string;
+  deliverable: string;
+};
+type CampaignStrategy = {
+  concepts: CampaignConcept[];
+  recommendedConcept: string;
+  audience: {
+    idealCustomerProfile: string;
+    demographics: string;
+    interestsAndBehaviors: string[];
+    motivations: string[];
+    painPoints: string[];
+    objections: string[];
+    buyingTriggers: string[];
+    contentPreferences: string[];
+    awarenessLevel: string;
+    journeyStage: string;
+    segments: Array<{ name: string; description: string; intent: "high" | "medium" | "low"; message: string }>;
+    decisionFactors: string[];
+  };
+  positioning: {
+    coreMessage: string;
+    uniqueSellingProposition: string;
+    valueProposition: string;
+    differentiation: string;
+    narrative: string;
+    theme: string;
+    visualDirection: string;
+    tone: string;
+    offer: { recommendation: string; confirmationRequired: boolean; safeguard: string };
+    hooks: string[];
+    primaryCta: string;
+    secondaryCta: string;
+    contentPillars: Array<{ name: string; purpose: string }>;
+  };
+  channelStrategy: Array<{ platform: string; role: string; format: string; frequency: string; distribution: string; paidApproach: "organic" | "optional-paid-test"; reason: string }>;
+  funnel: Array<{ stage: "Awareness" | "Consideration" | "Conversion" | "Retention"; purpose: string; contentApproach: string; callToAction: string }>;
+  timeline: Array<{ phase: string; startDay: number; endDay: number; objective: string }>;
+  contentSequence: Array<{ day: number; phase: string; funnelStage: string; pillar: string; topic: string; hook: string; callToAction: string }>;
+  tasks: Array<{ title: string; description: string; priority: "high" | "medium" | "low"; dueDay: number; dependsOn: string[] }>;
+  paidMedia: { recommended: boolean; rationale: string; lowBudgetTest: string; balanced: string; scaleOption: string; measurement: string[] };
+  experiments: Array<{ variable: string; hypothesis: string; metric: string; duration: string; decisionRule: string }>;
+  trackingRecommendations: string[];
+  assumptions: string[];
+};
 type GeneratedItem = {
   id: string;
   contentJson: { title: string; format: string; platforms: string[]; caption: string };
@@ -51,8 +130,50 @@ type CampaignResponse = {
   usage: { used: number; limit: number | null };
   items: GeneratedItem[];
 };
+type CampaignReadiness = {
+  score: number;
+  ready: boolean;
+  checks: Array<{ key: string; label: string; complete: boolean; critical: boolean }>;
+  blockers: string[];
+};
+type PersistedCampaign = {
+  id: string;
+  brandId: string;
+  name: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  itemCount: number;
+  readiness: CampaignReadiness;
+  campaign: {
+    objective: string;
+    primaryKpi: { metric: string; target: string };
+    lifecycle: string;
+    provider: string;
+    strategy: CampaignStrategy;
+    tasks: CampaignTask[];
+    analyticsAvailable: boolean;
+    research: { limitations: string[]; externalResearchConnected: boolean };
+  };
+};
 type ContentPlanResponse = {
-  plan: { id: string; name: string };
+  campaign: PersistedCampaign;
+};
+
+const defaultKpi: Record<string, string> = {
+  "Brand Awareness": "Reach",
+  "Audience Growth": "New followers",
+  "Lead Generation": "Qualified leads",
+  "Sales & Conversions": "Conversions",
+  "Product/Service Launch": "Qualified launch actions",
+  "Website Traffic": "Website sessions",
+  "Engagement & Community Building": "Meaningful engagements",
+  "Event Promotion": "Registrations",
+  "Customer Retention": "Repeat purchases",
+  "Re-engagement": "Reactivated customers",
+  "Upselling & Cross-selling": "Upsell conversions",
+  "Referral Generation": "Qualified referrals",
+  "Seasonal/Promotional Campaign": "Conversions",
 };
 
 function localDateOffset(days: number) {
@@ -61,58 +182,51 @@ function localDateOffset(days: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-const dailyAngles = [
-  "Introduce the business and the problem it helps solve",
-  "Answer a useful question customers commonly ask",
-  "Explain one product or service benefit using confirmed brand facts",
-  "Share a practical tip the audience can use today",
-  "Show a simple behind-the-scenes process without inventing a customer",
-  "Explain how to choose between common options",
-  "Address a common misconception in the industry",
-  "Break down one step in how the service works",
-  "Highlight a product detail and why it matters",
-  "Share a short checklist related to the audience's needs",
-  "Explain a common mistake and a helpful alternative",
-  "Describe the brand's approach using the saved profile",
-  "Offer a concise how-to with clear steps",
-  "Answer a second frequently asked question from a new angle",
-  "Explain what to consider before buying or booking",
-  "Share a relevant use case without making a testimonial claim",
-  "Compare two approaches fairly and practically",
-  "Describe a routine or habit that supports the audience",
-  "Explain one detail customers might overlook",
-  "Share a short educational myth-versus-fact post",
-  "Introduce a team or craft detail only when known from the brief",
-  "Give a seasonal or timely idea without inventing an event or offer",
-  "Summarize a useful lesson from the campaign topic",
-  "Share a simple planning or preparation tip",
-  "Answer an objection honestly using only supplied facts",
-  "Explain a safe, low-effort first step for the audience",
-  "Highlight a confirmed offer only if the brand brief includes one",
-  "Share a short glossary or explain an industry term",
-  "Recap the audience problem and the brand's relevant solution",
-  "Invite the audience to take one clear, natural next step",
-];
+function createDateRange(startDate: string, durationDays: number) {
+  const start = new Date(`${startDate}T09:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + durationDays - 1);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
 
-function getDailyAngle(day: number) {
-  return dailyAngles[(day - 1) % dailyAngles.length]!;
+function downloadCampaign(campaign: PersistedCampaign) {
+  const blob = new Blob([JSON.stringify(campaign, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${campaign.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-|-$/g, "") || "campaign"}.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export function CampaignsClient() {
   const [name, setName] = useState("");
+  const [objective, setObjective] = useState<(typeof campaignObjectives)[number]>("Brand Awareness");
   const [goal, setGoal] = useState("");
   const [audience, setAudience] = useState("");
+  const [primaryKpi, setPrimaryKpi] = useState("Reach");
+  const [primaryTarget, setPrimaryTarget] = useState("");
+  const [budget, setBudget] = useState("");
   const [formats, setFormats] = useState<CampaignFormat[]>(["post", "carousel"]);
   const [selectedPlatforms, setSelectedPlatforms] = useState(["Instagram", "LinkedIn"]);
-  const [startDate, setStartDate] = useState("");
-  const [durationDays, setDurationDays] = useState(30);
+  const [startDate, setStartDate] = useState(() => localDateOffset(1));
+  const [durationDays, setDurationDays] = useState(14);
+  const [campaignId, setCampaignId] = useState("");
+  const [campaignLifecycle, setCampaignLifecycle] = useState("");
+  const [strategy, setStrategy] = useState<CampaignStrategy | null>(null);
+  const [tasks, setTasks] = useState<CampaignTask[]>([]);
+  const [readiness, setReadiness] = useState<CampaignReadiness | null>(null);
   const [generated, setGenerated] = useState<CampaignResponse | null>(null);
-  const [savedPlan, setSavedPlan] = useState<ContentPlanResponse["plan"] | null>(null);
+  const [campaignHistory, setCampaignHistory] = useState<PersistedCampaign[]>([]);
+  const [savedPlan, setSavedPlan] = useState<{ id: string; name: string } | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [showAllDays, setShowAllDays] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [savingStrategy, setSavingStrategy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [historyError, setHistoryError] = useState("");
   const [geminiConfigured, setGeminiConfigured] = useState(false);
   const [configurationLoaded, setConfigurationLoaded] = useState(false);
   const [configurationError, setConfigurationError] = useState("");
@@ -125,9 +239,15 @@ export function CampaignsClient() {
       })
       .catch((requestError: unknown) => {
         setGeminiConfigured(false);
-        setConfigurationError(requestError instanceof Error ? requestError.message : "Could not check Gemini configuration.");
+        setConfigurationError(requestError instanceof Error ? requestError.message : "Could not check AI provider configuration.");
       })
       .finally(() => setConfigurationLoaded(true));
+    apiRequest<{ campaigns: PersistedCampaign[] }>("/api/campaigns")
+      .then(({ campaigns }) => {
+        setCampaignHistory(campaigns);
+        setHistoryError("");
+      })
+      .catch((requestError: unknown) => setHistoryError(requestError instanceof Error ? requestError.message : "Could not load campaign history."));
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const goalFromUrl = params.get("goal");
@@ -142,16 +262,99 @@ export function CampaignsClient() {
     setValues(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
   }
 
-  async function persistPlan(items: GeneratedItem[]) {
+  async function refreshHistory() {
+    try {
+      const { campaigns } = await apiRequest<{ campaigns: PersistedCampaign[] }>("/api/campaigns");
+      setCampaignHistory(campaigns);
+      setHistoryError("");
+    } catch (requestError) {
+      setHistoryError(requestError instanceof Error ? requestError.message : "Could not refresh campaign history.");
+    }
+  }
+
+  async function createCampaign(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    setError("");
+    setNotice("");
+    if (!startDate || startDate < localDateOffset(1)) {
+      setError("Choose a start date beginning tomorrow or later.");
+      return;
+    }
+    if (!goal.trim() || !primaryTarget.trim() || formats.length === 0 || selectedPlatforms.length === 0) {
+      setError("Add a campaign brief, measurable KPI target, at least one format, and at least one platform.");
+      return;
+    }
+    setCreating(true);
+    setGenerated(null);
+    setSavedPlan(null);
+    setStrategy(null);
+    setTasks([]);
+    setReadiness(null);
+    setGenerationProgress(0);
+    setShowAllDays(false);
+    try {
+      const { start, end } = createDateRange(startDate, durationDays);
+      const result = await apiRequest<{ campaign: PersistedCampaign }>("/api/campaigns", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          objective,
+          goal: goal.trim(),
+          audience: audience.trim(),
+          startsAt: start.toISOString(),
+          endsAt: end.toISOString(),
+          durationDays,
+          platforms: selectedPlatforms,
+          formats,
+          primaryKpi: { metric: primaryKpi, target: primaryTarget.trim() },
+          budget: budget.trim(),
+        }),
+      });
+      setCampaignId(result.campaign.id);
+      setCampaignLifecycle(result.campaign.campaign.lifecycle);
+      setStrategy(result.campaign.campaign.strategy);
+      setTasks(result.campaign.campaign.tasks);
+      setReadiness(result.campaign.readiness);
+      setSavedPlan({ id: result.campaign.id, name: result.campaign.name });
+      setNotice("Strategy saved. Review or edit it below before generating campaign assets.");
+      await refreshHistory();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not generate the campaign strategy.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function saveStrategy() {
+    if (!campaignId || !strategy) return;
+    setSavingStrategy(true);
+    setError("");
+    setNotice("");
+    try {
+      const updated = await apiRequest<ContentPlanResponse>(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: name.trim() || goal.trim().slice(0, 120),
+          strategy,
+        }),
+      });
+      setStrategy(updated.campaign.campaign.strategy);
+      setTasks(updated.campaign.campaign.tasks);
+      setCampaignLifecycle(updated.campaign.campaign.lifecycle);
+      setReadiness(updated.campaign.readiness);
+      setSavedPlan({ id: updated.campaign.id, name: updated.campaign.name });
+      setNotice("Campaign strategy and your edits are saved.");
+      await refreshHistory();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not save your strategy edits.");
+    } finally {
+      setSavingStrategy(false);
+    }
+  }
+
+  function campaignItems(items: GeneratedItem[]) {
     const start = new Date(`${startDate}T09:00:00`);
-    const end = new Date(start);
-    end.setDate(end.getDate() + durationDays - 1);
-    const baseName = name.trim() || goal.trim().slice(0, 100);
-    const partialSuffix = ` (${items.length}/${durationDays} days)`;
-    const planName = items.length < durationDays
-      ? `${baseName.slice(0, Math.max(2, 120 - partialSuffix.length)).trim()}${partialSuffix}`
-      : baseName;
-    const planItems = items.map((item, index) => {
+    return items.map((item, index) => {
       const scheduledAt = new Date(start);
       scheduledAt.setDate(start.getDate() + index);
       return {
@@ -161,174 +364,316 @@ export function CampaignsClient() {
         platforms: item.contentJson.platforms,
       };
     });
-    const planResult = await apiRequest<ContentPlanResponse>("/api/content-plans", {
-      method: "POST",
-      body: JSON.stringify({
-        name: planName,
-        goal,
-        audience,
-        startsAt: start.toISOString(),
-        endsAt: end.toISOString(),
-        platforms: selectedPlatforms,
-        items: planItems,
-      }),
+  }
+
+  async function persistItems(items: GeneratedItem[], lifecycle: "PRODUCTION" | "REVIEW") {
+    if (!campaignId) throw new Error("Save a campaign strategy before saving campaign assets.");
+    const updated = await apiRequest<ContentPlanResponse>(`/api/campaigns/${campaignId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ items: campaignItems(items), lifecycle }),
     });
-    setSavedPlan(planResult.plan);
-    setNotice(items.length < durationDays
-      ? `Saved a partial plan with ${items.length} of ${durationDays} daily drafts. Nothing was scheduled or published.`
-      : `${items.length} daily drafts were generated and saved in Content Plans. Nothing was scheduled or published.`);
+    setCampaignLifecycle(updated.campaign.campaign.lifecycle);
+    setReadiness(updated.campaign.readiness);
+    setSavedPlan({ id: updated.campaign.id, name: updated.campaign.name });
+    return updated;
   }
 
-  async function savePartialPlan() {
-    if (!generated || generated.items.length === 0) return;
-    setCreating(true);
-    setError("");
-    setNotice("");
-    try {
-      await persistPlan(generated.items);
-    } catch (requestError) {
-      setError(requestError instanceof Error
-        ? `Your drafts are still saved in Content, but the partial plan could not be saved: ${requestError.message}`
-        : "Your drafts are still saved in Content, but the partial plan could not be saved.");
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  async function createCampaign(event?: FormEvent<HTMLFormElement>, resume = false) {
-    event?.preventDefault();
-    setError("");
-    setNotice("");
-    if (!resume) {
-      setGenerated(null);
-      setSavedPlan(null);
-      setGenerationProgress(0);
-      setShowAllDays(false);
-    }
-    if (!startDate || startDate < localDateOffset(1)) {
-      setError("Choose a start date beginning tomorrow or later.");
+  async function generateAssets(resume = false) {
+    if (!campaignId || !strategy) {
+      setError("Generate and review the campaign strategy before creating assets.");
       return;
     }
-    if (!goal.trim() || formats.length === 0 || selectedPlatforms.length === 0) {
-      setError("Add a campaign goal, at least one format, and at least one platform.");
-      return;
-    }
+    setError("");
+    setNotice("");
     setCreating(true);
     const items = resume ? [...(generated?.items ?? [])] : [];
     setGenerationProgress(items.length);
     try {
+      await persistItems(items, "PRODUCTION");
       for (let dayIndex = items.length; dayIndex < durationDays; dayIndex += 1) {
         const format = formats[dayIndex % formats.length]!;
-        const dayNumber = dayIndex + 1;
-        const dailyBrief = `${goal.trim()}\n\nCreate day ${dayNumber} of a ${durationDays}-day campaign. Today's distinct content angle: ${getDailyAngle(dayNumber)}. Do not reuse the same hook or main point from the previous days. Use only confirmed business facts and offers.`;
+        const sequence = strategy.contentSequence[dayIndex];
+        if (!sequence) throw new Error(`The strategy is missing its day ${dayIndex + 1} content recommendation.`);
+        const concept = strategy.concepts.find((item) => item.name === strategy.recommendedConcept);
+        const dailyBrief = [
+          `Campaign objective: ${objective}.`,
+          `Campaign goal: ${goal.trim()}.`,
+          `Campaign audience: ${strategy.audience.idealCustomerProfile}.`,
+          `Recommended concept: ${concept?.name ?? strategy.recommendedConcept} - ${concept?.idea ?? ""}.`,
+          `Core message: ${strategy.positioning.coreMessage}.`,
+          `Theme and art direction: ${strategy.positioning.theme}; ${strategy.positioning.visualDirection}.`,
+          `Day ${sequence.day} of ${durationDays}; campaign phase: ${sequence.phase}; funnel stage: ${sequence.funnelStage}.`,
+          `Content pillar: ${sequence.pillar}. Topic: ${sequence.topic}.`,
+          `Use this opening angle: ${sequence.hook}. CTA: ${sequence.callToAction}.`,
+          `Use the confirmed campaign offer only when confirmed by the brand: ${strategy.positioning.offer.recommendation}.`,
+          "Make this asset distinct from the other campaign days, specific to the audience, and factually limited to the supplied brand brief. Do not invent testimonials, statistics, discounts, scarcity, guarantees, or product claims.",
+        ].join("\n");
         const dailyResponse = await apiRequest<CampaignResponse>("/api/content/generate", {
           method: "POST",
           body: JSON.stringify({
             idea: dailyBrief,
             formats: [format],
             platforms: selectedPlatforms,
-            tone: "Warm and confident",
+            tone: strategy.positioning.tone,
             language: "English",
             useBrandProfile: true,
           }),
         });
         items.push(...dailyResponse.items);
         setGenerated({ ...dailyResponse, items: [...items] });
-        setGenerationProgress(Math.min(items.length, durationDays));
+        setGenerationProgress(items.length);
+        await persistItems(items, "PRODUCTION");
       }
-      await persistPlan(items);
+      await persistItems(items, "REVIEW");
+      setNotice(`${items.length} campaign drafts are saved and ready for review. Nothing has been scheduled or published.`);
+      await refreshHistory();
     } catch (requestError) {
       setError(requestError instanceof Error
-        ? items.length === durationDays
-          ? `All ${durationDays} daily drafts are saved in Content, but the campaign plan could not be saved: ${requestError.message}`
-          : items.length
-            ? `${items.length} of ${durationDays} daily drafts are ready. Your generated drafts are saved in Content; continue the remaining days or save a partial plan: ${requestError.message}`
-            : requestError.message
-        : "Could not create this campaign.");
+        ? items.length
+          ? `${items.length} of ${durationDays} assets are saved. Continue generation or review the saved partial campaign: ${requestError.message}`
+          : requestError.message
+        : "Could not generate campaign assets.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function approveCampaign() {
+    if (!campaignId) return;
+    setError("");
+    setNotice("");
+    try {
+      const updated = await apiRequest<ContentPlanResponse>(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ lifecycle: "APPROVED" }),
+      });
+      setCampaignLifecycle(updated.campaign.campaign.lifecycle);
+      setReadiness(updated.campaign.readiness);
+      setNotice("Campaign approved. It is not published yet; use Content Plans to send the approved drafts into the existing publishing workflow.");
+      await refreshHistory();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Campaign approval failed.");
+    }
+  }
+
+  async function updateTask(index: number, status: CampaignTask["status"]) {
+    if (!campaignId) return;
+    setError("");
+    try {
+      const updated = await apiRequest<ContentPlanResponse>(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ taskUpdates: [{ index, status }] }),
+      });
+      setTasks(updated.campaign.campaign.tasks);
+      setReadiness(updated.campaign.readiness);
+      await refreshHistory();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not update the campaign task.");
+    }
+  }
+
+  async function duplicateCampaign(campaign: PersistedCampaign) {
+    setError("");
+    setNotice("");
+    try {
+      const { campaign: duplicate } = await apiRequest<{ campaign: PersistedCampaign }>(`/api/campaigns/${campaign.id}/duplicate`, { method: "POST" });
+      setNotice(`Created ${duplicate.name}. Its strategy was copied; new assets and dates still need review.`);
+      await refreshHistory();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not duplicate this campaign.");
     }
   }
 
   return (
     <section className="dashboard-content campaign-page">
       <p className="eyebrow">YOUR STUDIO · CAMPAIGNS</p>
-      <h1>Campaign builder</h1>
-      <p className="dashboard-lead">Plan daily content, preview each design, and review the schedule before publishing.</p>
+      <h1>Campaign intelligence</h1>
+      <p className="dashboard-lead">Build a goal-led strategy, review the audience and creative direction, generate a sequenced set of drafts, and check readiness before sending anything to publishing.</p>
       {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
+      <div className="campaign-capability-note" role="note">
+        Strategy and copy are AI recommendations based on your brief and saved brand profile. External market/trend research is not connected. Instagram is the only live social publisher in this project; other selected channels are content drafts, not live publishing. Metrics are shown only when actual campaign-attributed data is available.
+      </div>
       <form className="create-form campaign-form" onSubmit={(event) => void createCampaign(event)}>
-        <fieldset className="campaign-fields" disabled={creating || Boolean(generated && !savedPlan)}>
-        <label className="create-idea-field">Campaign goal and brief
-          <textarea required minLength={8} maxLength={1000} rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="What are you promoting, who is it for, and what should people do next?" />
-        </label>
-        <details className="campaign-optional-fields">
-          <summary>Campaign name and audience <span>Optional</span></summary>
-          <div className="campaign-optional-grid">
-            <label className="create-idea-field">Campaign name
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Optional: use a short campaign name" />
-            </label>
-            <label className="create-idea-field">Audience
-              <input value={audience} onChange={(event) => setAudience(event.target.value)} maxLength={500} placeholder="Who should this campaign reach?" />
-            </label>
-          </div>
-        </details>
-        <fieldset className="create-fieldset">
-          <legend>Content formats</legend>
-          <div className="create-option-grid">
-            {campaignFormats.map((format) => (
-              <label className="create-check" key={format}>
-                <input type="checkbox" checked={formats.includes(format)} onChange={() => toggle(format, formats, setFormats)} />
-                {formatLabels[format]}
-              </label>
-            ))}
-          </div>
-          <small className="campaign-format-help">Selected formats rotate through the daily schedule. Every day gets its own generated visual and draft.</small>
-        </fieldset>
-        <fieldset className="create-fieldset">
-          <legend>Platforms</legend>
-          <div className="create-option-grid create-platform-grid">
-            {platforms.map((platform) => (
-              <label className="create-check" key={platform}>
-                <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => toggle(platform, selectedPlatforms, setSelectedPlatforms)} />
-                {platform}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <div className="create-select-grid">
-          <label>Start date
-            <input required type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        <fieldset className="campaign-fields" disabled={creating || savingStrategy || Boolean(campaignId && !savedPlan)}>
+          <label className="create-idea-field">Primary campaign objective
+            <CompactSelect aria-label="Primary campaign objective" value={objective} onChange={(event) => {
+              const nextObjective = event.target.value as (typeof campaignObjectives)[number];
+              setObjective(nextObjective);
+              setPrimaryKpi(defaultKpi[nextObjective] ?? "Conversions");
+            }}>
+              {campaignObjectives.map((item) => <option key={item} value={item}>{item}</option>)}
+            </CompactSelect>
           </label>
-          <label>Campaign duration
-            <select value={durationDays} onChange={(event) => setDurationDays(Number(event.target.value))}>
-              <option value={7}>1 week</option><option value={14}>2 weeks</option><option value={30}>30 days</option>
-            </select>
+          <label className="create-idea-field">Campaign goal and brief
+            <textarea required minLength={8} maxLength={1000} rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="What are you promoting, what outcome do you want, and what should people do next?" />
           </label>
-        </div>
-        <small className="campaign-format-help">A 30-day plan uses 30 monthly AI generations. Nothing is scheduled or published automatically.</small>
+          <details className="campaign-optional-fields" open>
+            <summary>Campaign name, audience, success target, and budget</summary>
+            <div className="campaign-optional-grid">
+              <label className="create-idea-field">Campaign name
+                <input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} placeholder="Give this campaign a name" />
+              </label>
+              <label className="create-idea-field">Target audience
+                <input value={audience} onChange={(event) => setAudience(event.target.value)} maxLength={1000} placeholder="Optional if your brand profile already defines your audience" />
+              </label>
+              <label className="create-idea-field">Primary success metric
+                <input required value={primaryKpi} onChange={(event) => setPrimaryKpi(event.target.value)} maxLength={80} placeholder="e.g. qualified leads" />
+              </label>
+              <label className="create-idea-field">Target outcome
+                <input required value={primaryTarget} onChange={(event) => setPrimaryTarget(event.target.value)} maxLength={120} placeholder="e.g. 25 qualified leads by campaign end" />
+              </label>
+              <label className="create-idea-field">Optional budget and currency
+                <input value={budget} onChange={(event) => setBudget(event.target.value)} maxLength={80} placeholder="e.g. INR 10,000 total, or leave blank" />
+              </label>
+            </div>
+          </details>
+          <fieldset className="create-fieldset">
+            <legend>Content formats</legend>
+            <div className="create-option-grid">
+              {campaignFormats.map((format) => (
+                <label className="create-check" key={format}>
+                  <input type="checkbox" checked={formats.includes(format)} onChange={() => toggle(format, formats, setFormats)} />
+                  {formatLabels[format]}
+                </label>
+              ))}
+            </div>
+            <small className="campaign-format-help">The strategy recommends a daily sequence; selected formats rotate across the campaign. One content draft is generated per day.</small>
+          </fieldset>
+          <fieldset className="create-fieldset">
+            <legend>Distribution channels</legend>
+            <div className="create-option-grid create-platform-grid">
+              {platforms.map((platform) => (
+                <label className="create-check" key={platform}>
+                  <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => toggle(platform, selectedPlatforms, setSelectedPlatforms)} />
+                  {platform}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="create-select-grid">
+            <label>Start date
+              <input required type="date" min={localDateOffset(1)} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            </label>
+            <label>Campaign duration
+              <CompactSelect aria-label="Campaign duration" value={durationDays} onChange={(event) => setDurationDays(Number(event.target.value))}>
+                <option value={7}>1 week</option><option value={14}>2 weeks</option><option value={30}>30 days</option>
+              </CompactSelect>
+            </label>
+          </div>
         </fieldset>
         {error && <p className="form-error" role="alert">{error}</p>}
-        {error && generated && generated.items.length < durationDays && <button type="button" className="button button-outline" disabled={creating} onClick={() => void createCampaign(undefined, true)}>Continue remaining days</button>}
-        {error && generated && generated.items.length < durationDays && <button type="button" className="button button-outline" disabled={creating} onClick={() => void savePartialPlan()}>Save partial plan ({generated.items.length}/{durationDays})</button>}
-        {error && generated && generated.items.length === durationDays && !savedPlan && <button type="button" className="button button-outline" disabled={creating} onClick={() => void createCampaign(undefined, true)}>Save plan</button>}
-        {notice && <p className="form-success" role="status">{notice}{savedPlan && <> <Link href="/dashboard/content-plans">Open plan</Link></>}</p>}
-        <button type="submit" className="button button-gold" disabled={creating || formats.length === 0 || selectedPlatforms.length === 0 || Boolean(generated && !savedPlan)}>
-          {creating ? `Generating day ${Math.min(generationProgress + 1, durationDays)} of ${durationDays}…` : generated && !savedPlan ? "Continue or save the plan above" : `${generated ? "Regenerate" : "Generate"} ${durationDays}-day plan`}
+        {notice && <p className="form-success" role="status">{notice}{savedPlan && <> <Link href="/dashboard/content-plans">Open Content Plans</Link></>}</p>}
+        <button type="submit" className="button button-gold" disabled={creating || formats.length === 0 || selectedPlatforms.length === 0 || !primaryTarget.trim()}>
+          {creating ? "Building your campaign strategy…" : strategy ? "Generate a new campaign strategy" : "Build campaign strategy"}
         </button>
-        {creating && <progress className="campaign-generation-progress" max={durationDays} value={generationProgress} aria-label={`Generated ${generationProgress} of ${durationDays} daily drafts`} />}
-        {generated && <p className="create-usage">{generated.usage.limit === null ? `${generated.usage.used} generations used this month · Unlimited during trial` : `${generated.usage.used} of ${generated.usage.limit} generations used this month`} · Latest provider: {generated.provider}</p>}
       </form>
+
+      {strategy && campaignId && (
+        <section className="campaign-results campaign-intelligence-workspace" aria-label="Campaign strategy workspace">
+          <div className="created-results-heading">
+          <div><p className="card-kicker">CAMPAIGN WORKSPACE · {campaignLifecycle.replaceAll("_", " ")}</p><h2>{savedPlan?.name ?? (name || goal)}</h2><p>{objective} · {primaryKpi}: {primaryTarget} · {durationDays} days</p></div>
+            <button className="button button-outline" type="button" onClick={() => {
+              const campaign = campaignHistory.find((item) => item.id === campaignId);
+              if (campaign) downloadCampaign(campaign);
+            }}>Export saved campaign</button>
+          </div>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">1 · STRATEGIC CONCEPTS</p><h2>Choose the direction</h2><p>Scores are AI assessments, not market research or guaranteed outcomes.</p></div></div>
+            <div className="campaign-concept-grid">
+              {strategy.concepts.map((concept) => (
+                <label className={`campaign-concept-card${strategy.recommendedConcept === concept.name ? " is-selected" : ""}`} key={concept.name}>
+                  <span><input type="radio" name="campaign-concept" checked={strategy.recommendedConcept === concept.name} onChange={() => setStrategy({ ...strategy, recommendedConcept: concept.name })} />{concept.name}</span>
+                  <p>{concept.idea}</p><small>{concept.rationale}</small>
+                  <div className="campaign-score-row"><span>Audience {concept.audienceFit}</span><span>Originality {concept.originality}</span><span>Feasibility {concept.feasibility}</span><span>Impact {concept.potentialImpact}</span></div>
+                  {concept.risks.length > 0 && <small>Risks to check: {concept.risks.join("; ")}</small>}
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">2 · AUDIENCE INTELLIGENCE</p><h2>Audience and journey</h2></div></div>
+            <article className="campaign-insight-card">
+              <h3>Ideal customer profile</h3><p>{strategy.audience.idealCustomerProfile}</p>
+              {strategy.audience.demographics && <p><strong>Demographics (hypothesis):</strong> {strategy.audience.demographics}</p>}
+              <p><strong>Awareness:</strong> {strategy.audience.awarenessLevel} · <strong>Journey stage:</strong> {strategy.audience.journeyStage}</p>
+              <div className="campaign-insight-grid">
+                <div><h4>Motivations and triggers</h4><ul>{[...strategy.audience.motivations, ...strategy.audience.buyingTriggers].slice(0, 6).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul></div>
+                <div><h4>Pain points and objections</h4><ul>{[...strategy.audience.painPoints, ...strategy.audience.objections].slice(0, 6).map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}</ul></div>
+              </div>
+              <div className="campaign-segment-list">{strategy.audience.segments.map((segment) => <article key={segment.name}><strong>{segment.name}</strong><span>{segment.intent} intent</span><p>{segment.description}</p><small>{segment.message}</small></article>)}</div>
+            </article>
+          </section>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">3 · POSITIONING AND CREATIVE DIRECTION</p><h2>Review and edit the strategy</h2></div></div>
+            <div className="campaign-strategy-edit-grid">
+              <label>Core message<textarea rows={3} value={strategy.positioning.coreMessage} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, coreMessage: event.target.value } })} /></label>
+              <label>Unique value proposition<textarea rows={3} value={strategy.positioning.valueProposition} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, valueProposition: event.target.value } })} /></label>
+              <label>Campaign theme<input value={strategy.positioning.theme} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, theme: event.target.value } })} /></label>
+              <label>Visual direction<textarea rows={3} value={strategy.positioning.visualDirection} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, visualDirection: event.target.value } })} /></label>
+              <label>Offer recommendation<textarea rows={3} value={strategy.positioning.offer.recommendation} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, offer: { ...strategy.positioning.offer, recommendation: event.target.value } } })} /></label>
+              <label>Primary CTA<input value={strategy.positioning.primaryCta} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, primaryCta: event.target.value } })} /></label>
+              <label>Secondary CTA<input value={strategy.positioning.secondaryCta} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, secondaryCta: event.target.value } })} /></label>
+            </div>
+            <p className="campaign-caution-note">{strategy.positioning.offer.safeguard} {strategy.positioning.offer.confirmationRequired ? "Confirm any offer terms before publishing." : ""}</p>
+            <div className="campaign-hook-list"><strong>Suggested hooks</strong>{strategy.positioning.hooks.map((hook) => <p key={hook}>{hook}</p>)}</div>
+            <div className="campaign-pillars">{strategy.positioning.contentPillars.map((pillar) => <article key={pillar.name}><strong>{pillar.name}</strong><p>{pillar.purpose}</p></article>)}</div>
+            <button className="button button-outline" type="button" onClick={() => void saveStrategy()} disabled={savingStrategy || creating}>{savingStrategy ? "Saving strategy…" : "Save strategy edits"}</button>
+          </section>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">4 · CHANNEL AND FUNNEL PLAN</p><h2>Recommended distribution</h2></div></div>
+            <div className="campaign-channel-grid">{strategy.channelStrategy.map((channel) => <article className="campaign-insight-card" key={channel.platform}><h3>{channel.platform}</h3><p>{channel.reason}</p><p><strong>Role:</strong> {channel.role}</p><p><strong>Format/frequency:</strong> {channel.format} · {channel.frequency}</p><p><strong>Distribution:</strong> {channel.distribution}</p><small>{channel.paidApproach === "organic" ? "Organic recommendation" : "Optional paid test recommendation; no ad account is connected here."}</small></article>)}</div>
+            <div className="campaign-funnel-grid">{strategy.funnel.map((stage) => <article key={stage.stage}><strong>{stage.stage}</strong><p>{stage.purpose}</p><small>{stage.contentApproach}</small><p><strong>CTA:</strong> {stage.callToAction}</p></article>)}</div>
+          </section>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">5 · TIMELINE AND CALENDAR</p><h2>Sequenced campaign plan</h2><p>Recommended dates are drafts only. They are not queued or published.</p></div></div>
+            <div className="campaign-timeline">{strategy.timeline.map((phase) => <article key={`${phase.phase}-${phase.startDay}`}><span>Days {phase.startDay}–{phase.endDay}</span><strong>{phase.phase}</strong><p>{phase.objective}</p></article>)}</div>
+            <div className="campaign-sequence-list">{strategy.contentSequence.map((item) => <article key={item.day}><span>Day {item.day} · {item.funnelStage}</span><strong>{item.topic}</strong><p>{item.phase} · {item.pillar}</p><small>{item.hook} · CTA: {item.callToAction}</small></article>)}</div>
+          </section>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">6 · EXECUTION AND EXPERIMENTS</p><h2>Tasks and testing plan</h2></div></div>
+            <div className="campaign-task-list">{tasks.map((task, index) => <article key={`${index}-${task.title}`}><div><strong>{task.title}</strong><p>{task.description}</p><small>Due by day {task.dueDay} · {task.priority} priority{task.dependsOn.length ? ` · Depends on: ${task.dependsOn.join(", ")}` : ""}</small></div><CompactSelect aria-label={`Status for ${task.title}`} value={task.status} onChange={(event) => void updateTask(index, event.target.value as CampaignTask["status"])}><option value="NOT_STARTED">Not started</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option><option value="BLOCKED">Blocked</option></CompactSelect></article>)}</div>
+            <div className="campaign-insight-grid"><article className="campaign-insight-card"><h3>Optional paid media</h3><p>{strategy.paidMedia.rationale}</p><p><strong>Low-budget test:</strong> {strategy.paidMedia.lowBudgetTest}</p><p><strong>Balanced:</strong> {strategy.paidMedia.balanced}</p><p><strong>Scale option:</strong> {strategy.paidMedia.scaleOption}</p><small>Recommendations only. Ad campaigns are not launched by this app.</small></article><article className="campaign-insight-card"><h3>Experiments</h3>{strategy.experiments.map((experiment) => <p key={experiment.variable}><strong>{experiment.variable}:</strong> {experiment.hypothesis} Metric: {experiment.metric}. {experiment.duration}. Decide: {experiment.decisionRule}</p>)}</article></div>
+          </section>
+
+          <section className="campaign-strategy-section">
+            <div className="campaign-section-heading"><div><p className="card-kicker">7 · READINESS AND APPROVAL</p><h2>Launch readiness</h2></div><strong className="campaign-readiness-score">{readiness?.score ?? 0}%</strong></div>
+            <ul className="campaign-readiness-list">{readiness?.checks.map((check) => <li className={check.complete ? "is-complete" : "is-incomplete"} key={check.key}>{check.complete ? "Complete" : check.critical ? "Required" : "Recommended"} · {check.label}</li>)}</ul>
+            {readiness?.blockers.length ? <p className="campaign-caution-note">Before approval: {readiness.blockers.join("; ")}</p> : null}
+            <p className="campaign-caution-note">Tracking suggestions: {strategy.trackingRecommendations.join(" · ")}</p>
+            {strategy.assumptions.length > 0 && <details className="campaign-optional-fields"><summary>Assumptions and research limits</summary><ul>{strategy.assumptions.map((item) => <li key={item}>{item}</li>)}</ul><p>No external keyword, search-volume, competitor, or trend research is connected.</p></details>}
+            <div className="campaign-workflow-actions">
+              {!generated && <button className="button button-gold" type="button" onClick={() => void generateAssets()} disabled={creating || savingStrategy}>{creating ? `Generating day ${Math.min(generationProgress + 1, durationDays)} of ${durationDays}…` : `Generate ${durationDays} campaign assets`}</button>}
+              {generated && generated.items.length < durationDays && <button className="button button-outline" type="button" onClick={() => void generateAssets(true)} disabled={creating}>{creating ? `Generating day ${Math.min(generationProgress + 1, durationDays)} of ${durationDays}…` : `Continue remaining assets (${generated.items.length}/${durationDays})`}</button>}
+              {generated && generated.items.length > 0 && <button className="button button-outline" type="button" onClick={() => void persistItems(generated.items, "PRODUCTION")} disabled={creating}>Save partial campaign</button>}
+              {generated && generated.items.length > 0 && readiness?.ready && campaignLifecycle !== "APPROVED" && <button className="button button-gold" type="button" onClick={() => void approveCampaign()} disabled={creating}>Approve campaign for publishing workflow</button>}
+              {campaignLifecycle === "APPROVED" && <Link className="button button-outline" href="/dashboard/content-plans">Open Content Plans</Link>}
+            </div>
+            {creating && <progress className="campaign-generation-progress" max={durationDays} value={generationProgress} aria-label={`Generated ${generationProgress} of ${durationDays} daily assets`} />}
+            {generated && <p className="create-usage">{generated.usage.limit === null ? `${generated.usage.used} generations used this month · Unlimited during trial` : `${generated.usage.used} of ${generated.usage.limit} generations used this month`} · Latest provider: {generated.provider}</p>}
+            <p className="campaign-caution-note">{generated?.items.length ?? 0} generated drafts · actual campaign-attributed reach, engagement, leads, conversions, and return are unavailable until a connected source provides those metrics. No performance is estimated here.</p>
+          </section>
+        </section>
+      )}
+
       {generated && (
         <section className="campaign-results" aria-label="Generated campaign drafts">
-          <div className="created-results-heading"><div><p className="card-kicker">DAILY CONTENT · {generated.items.length}/{durationDays}</p><h2>{savedPlan?.name ?? (name || goal)}</h2><p>Open a day to inspect its artwork and copy.</p></div><Link href="/dashboard/content">Review all drafts →</Link></div>
+          <div className="created-results-heading"><div><p className="card-kicker">CAMPAIGN CALENDAR · {generated.items.length}/{durationDays}</p><h2>{savedPlan?.name ?? (name || goal)}</h2><p>These are editable saved drafts. Review content in the library and publish through the existing approvals workflow.</p></div><Link href="/dashboard/content">Review drafts</Link></div>
           <div className="campaign-draft-list">
             {(showAllDays ? generated.items : generated.items.slice(0, 6)).map((item, index) => {
               const scheduledDate = new Date(`${startDate}T09:00:00`);
               scheduledDate.setDate(scheduledDate.getDate() + index);
               const document = item.designs[0]?.designJson.document;
+              const sequence = strategy?.contentSequence[index];
               return (
                 <article className="campaign-draft-card" key={item.id}>
                   <header><span>DAY {String(index + 1).padStart(2, "0")}</span><time dateTime={scheduledDate.toISOString()}>{scheduledDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></header>
+                  {sequence && <small>{sequence.funnelStage} · {sequence.phase}</small>}
                   {document && <div className="campaign-draft-visual"><DesignDocumentPreview document={document} title={item.contentJson.title} compact /></div>}
                   <div className="campaign-draft-copy"><span>{item.contentJson.format.replaceAll("-", " ")}</span><h3>{item.contentJson.title}</h3></div>
                   <details className="campaign-draft-details">
@@ -343,6 +688,18 @@ export function CampaignsClient() {
           {generated.items.length > 6 && <button className="button button-outline campaign-show-days" type="button" onClick={() => setShowAllDays((visible) => !visible)}>{showAllDays ? "Show fewer days" : `Show all ${generated.items.length} days`}</button>}
         </section>
       )}
+
+      <section className="campaign-history-section">
+        <div className="created-results-heading"><div><p className="card-kicker">SAVED CAMPAIGNS</p><h2>Campaign history</h2><p>Strategies and planning data are persisted in the workspace. Duplicate to reuse strategy without copying campaign assets.</p></div><button className="button button-outline" type="button" onClick={() => void refreshHistory()}>Refresh</button></div>
+        {historyError && <p className="form-error" role="alert">{historyError}</p>}
+        {campaignHistory.length === 0 ? <p className="campaign-history-empty">Saved campaigns will appear here after a strategy is generated.</p> : <div className="campaign-history-list">{campaignHistory.map((campaign) => (
+          <article className="campaign-history-card" key={campaign.id}>
+            <div><span>{campaign.campaign.lifecycle.replaceAll("_", " ")}</span><h3>{campaign.name}</h3><p>{campaign.campaign.objective} · {campaign.campaign.primaryKpi.metric}: {campaign.campaign.primaryKpi.target}</p><small>{campaign.itemCount} assets · readiness {campaign.readiness.score}% · {new Date(campaign.startsAt).toLocaleDateString()}–{new Date(campaign.endsAt).toLocaleDateString()}</small></div>
+            <div className="campaign-history-actions"><button className="button button-outline" type="button" onClick={() => downloadCampaign(campaign)}>Export</button><button className="button button-outline" type="button" onClick={() => void duplicateCampaign(campaign)}>Duplicate</button><Link className="button button-outline" href="/dashboard/content-plans">Open plans</Link></div>
+            <details className="campaign-history-details"><summary>View strategy summary</summary><p>{campaign.campaign.strategy.positioning.coreMessage}</p><p><strong>Recommended concept:</strong> {campaign.campaign.strategy.recommendedConcept}</p><p><strong>Audience:</strong> {campaign.campaign.strategy.audience.idealCustomerProfile}</p><small>Provider: {campaign.campaign.provider} · External research {campaign.campaign.research.externalResearchConnected ? "connected" : "not connected"}</small></details>
+          </article>
+        ))}</div>}
+      </section>
     </section>
   );
 }

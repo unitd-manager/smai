@@ -5,6 +5,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { generateFirstWeekPlan } from "@/lib/first-week-plan";
+import { CompactSelect } from "@/components/compact-select";
 
 type Plan = {
   id: string;
@@ -160,9 +161,9 @@ export function ContentPlansClient() {
                   {openMenuPlanId === plan.id && <div className="content-plan-actions-popover" id={`content-plan-actions-${plan.id}`} role="group" aria-label="Content plan actions">
                     <Link href="/dashboard/content" onClick={() => setOpenMenuPlanId(null)}>Review drafts</Link>
                     {plan.status !== "SCHEDULED" && plan.status !== "IN_REVIEW" && <label className="content-plan-actions-status">Status
-                      <select value={plan.status} disabled={savingId === plan.id} onChange={(event) => { setOpenMenuPlanId(null); void updateStatus(plan, event.target.value as "DRAFT" | "ACTIVE" | "PAUSED" | "ARCHIVED"); }}>
+                      <CompactSelect aria-label={`Status for ${plan.name}`} value={plan.status} disabled={savingId === plan.id} onChange={(event) => { setOpenMenuPlanId(null); void updateStatus(plan, event.target.value as "DRAFT" | "ACTIVE" | "PAUSED" | "ARCHIVED"); }}>
                         <option value="DRAFT">Draft</option><option value="ACTIVE">Active</option><option value="PAUSED">Paused</option><option value="ARCHIVED">Archived</option>
-                      </select>
+                      </CompactSelect>
                     </label>}
                     {plan.status !== "SCHEDULED" && plan.status !== "IN_REVIEW" && plan.status !== "PAUSED" && plan.status !== "ARCHIVED" && <>
                       <button type="button" disabled={savingId === plan.id} onClick={() => { setOpenMenuPlanId(null); void executePlan(plan, "approval"); }}>Send to approvals</button>
