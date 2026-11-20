@@ -18,6 +18,7 @@ import {
   Palette,
   Send,
   Settings,
+  Search,
   Share2,
   Sparkles,
   Store,
@@ -148,6 +149,7 @@ export const appNavigation: AppNavGroup[] = [
     label: "GROW",
     items: [
       { label: "Marketing Brain", href: "/dashboard/marketing-brain", icon: Brain, description: "See clear, evidence-based ideas for your next marketing action." },
+      { label: "Competitor Intelligence", href: "/dashboard/competitors", icon: Search, description: "Compare competitors using sourced observations and turn evidence into differentiated content and campaign actions." },
       {
         label: "Inbox",
         href: "/dashboard/inbox",
@@ -319,7 +321,7 @@ export const workspaceNavigation: AppNavGroup[] = [
   workspaceGroup("CREATE", ["/dashboard/create", "/dashboard/campaigns", "/dashboard/content-plans", "/dashboard/videos", "/dashboard/templates"]),
   workspaceGroup("LIBRARY", ["/dashboard/gallery", "/dashboard/content", "/dashboard/content-sets", "/dashboard/instagram-autopilot", "/dashboard/designs", "/dashboard/media-library", "/dashboard/import-files"]),
   workspaceGroup("PUBLISH", ["/dashboard/calendar", "/dashboard/posts", "/dashboard/social-accounts", "/dashboard/approvals"]),
-  workspaceGroup("GROW", ["/dashboard/marketing-brain", "/dashboard/inbox", "/dashboard/analytics", "/dashboard/listening"]),
+  workspaceGroup("GROW", ["/dashboard/marketing-brain", "/dashboard/competitors", "/dashboard/inbox", "/dashboard/analytics", "/dashboard/listening"]),
   workspaceGroup("SETTINGS", ["/onboarding", "/dashboard/team", "/dashboard/settings"]),
   ...appNavigation.filter((group) => group.label === "WORKSPACE ADMIN" || group.label === "ADMIN"),
 ];

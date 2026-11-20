@@ -20,7 +20,11 @@ type BrainResponse = {
   metrics: { recentPosts: number; drafts: number; plannedCampaigns: number; connectedAccounts: number; analyticsAvailable: boolean };
   content: { formats: string[]; gaps: string[] };
   campaigns: Array<{ id: string; name: string; status: string; startsAt: string; endsAt: string }>;
-  competitors: { entries: string[]; status: string };
+  competitors: {
+    entries: string[];
+    status: string;
+    insights: Array<{ name: string; category: string; analyzedAt: string | null; summary: string | null; opportunities: string[] }>;
+  };
   performance: { status: string; evidence: string };
   priorities: string[];
   recommendations: Recommendation[];
@@ -116,7 +120,7 @@ export function MarketingBrainClient() {
         <section className="brain-intelligence-grid">
           <article><span className="card-kicker">CURRENT STRATEGY</span><h2>Direction for {data.brand.name}</h2><ul>{data.strategy.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></article>
           <article><span className="card-kicker">CONTENT OPPORTUNITIES</span><h2>Gaps to close</h2>{data.content.gaps.length ? <ul>{data.content.gaps.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : <p>Your current content foundation is balanced.</p>}<small>Formats used recently: {data.content.formats.join(", ") || "none"}.</small></article>
-          <article><span className="card-kicker">COMPETITOR INSIGHTS</span><h2>Positioning research</h2><p>{data.competitors.status}</p>{data.competitors.entries.length > 0 && <ul>{data.competitors.entries.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>}<Link href="/onboarding">Update competitor list</Link></article>
+          <article><span className="card-kicker">COMPETITOR INSIGHTS</span><h2>Positioning research</h2><p>{data.competitors.status}</p>{data.competitors.entries.length > 0 && <ul>{data.competitors.entries.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>}{data.competitors.insights.filter((item) => item.summary).slice(0, 3).map((item) => <details key={item.name}><summary>{item.name} · sourced analysis</summary><p>{item.summary}</p>{item.opportunities.length > 0 && <small>Opportunity hypotheses: {item.opportunities.join(" · ")}</small>}</details>)}<Link href="/dashboard/competitors">Open Competitor Intelligence</Link></article>
           <article><span className="card-kicker">CAMPAIGN PRIORITIES</span><h2>Plan before you publish</h2>{data.campaigns.length ? <ul>{data.campaigns.map((campaign, index) => <li key={`${campaign.id ?? campaign.name}-${index}`}><strong>{campaign.name}</strong> · {campaign.status}</li>)}</ul> : <p>No active campaign plan. Turn your highest priority into a reviewable plan.</p>}<Link href="/dashboard/campaigns">Open campaigns</Link></article>
         </section>
         <div className="brain-recommendations-heading">

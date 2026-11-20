@@ -159,7 +159,7 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
       return;
     }
 
-    const [existingDrafts, availableAssets, analyticsCount, connectedAccounts, existingPlans, marketingBrainInsights] = await Promise.all([
+    const [existingDrafts, availableAssets, analyticsCount, connectedAccounts, existingPlans, marketingBrainInsights, competitors] = await Promise.all([
       prisma.generatedContent.findMany({
         where: { workspaceId: req.workspace!.id, brandId: brand.id },
         orderBy: { createdAt: "desc" },
@@ -188,6 +188,19 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
         orderBy: { updatedAt: "desc" },
         take: 8,
         select: { title: true, explanation: true },
+      }),
+      prisma.competitor.findMany({
+        where: { workspaceId: req.workspace!.id, brandId: brand.id },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        select: {
+          name: true,
+          snapshots: {
+            orderBy: { observedAt: "desc" },
+            take: 8,
+            select: { analysisJson: true },
+          },
+        },
       }),
     ]);
 
@@ -237,6 +250,17 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
         analyticsAvailable: analyticsCount > 0,
       },
       marketingBrainInsights,
+      competitorInsights: competitors.flatMap((competitor) => {
+        const analysis = competitor.snapshots
+          .map((snapshot) => snapshot.analysisJson)
+          .find((value) => isJsonObject(value) && typeof value.summary === "string");
+        if (!isJsonObject(analysis) || typeof analysis.summary !== "string") return [];
+        const opportunityValues: unknown = analysis.opportunities;
+        const opportunities = Array.isArray(opportunityValues)
+          ? opportunityValues.flatMap((value) => isJsonObject(value) && typeof value.title === "string" ? [value.title] : []).slice(0, 5)
+          : [];
+        return [{ competitorName: competitor.name, summary: analysis.summary, opportunities }];
+      }),
       history: histories,
     } as const;
     let strategy: Awaited<ReturnType<typeof generateCampaignStrategy>>;

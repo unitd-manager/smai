@@ -86,6 +86,8 @@ model Workspace {
   generatedContents GeneratedContent[]
   contentSets    ContentSet[]
   contentPlans  ContentPlan[]
+  competitors   Competitor[]
+  competitorSnapshots CompetitorSnapshot[]
   posts         Post[]
   postTargets   PostTarget[]
   publishJobs   PublishJob[]
@@ -132,6 +134,8 @@ model Brand {
   generatedContents GeneratedContent[]
   contentSets  ContentSet[]
   contentPlans ContentPlan[]
+  competitors Competitor[]
+  competitorSnapshots CompetitorSnapshot[]
   marketingRecommendations MarketingRecommendation[]
   instagramAutopilotRuns InstagramAutopilotRun[]
   posts       Post[]
@@ -637,6 +641,50 @@ model MarketingRecommendation {
   @@unique([workspaceId, brandId, recommendationKey, reasonFingerprint], map: "MarketingRecommendation_unique_reason")
   @@index([workspaceId, brandId, status, createdAt], map: "MarketingRecommendation_brand_status_idx")
   @@index([workspaceId, status, snoozedUntil], map: "MarketingRecommendation_snooze_idx")
+}
+
+model Competitor {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  brandId       String
+  name          String
+  category      String   @default("direct")
+  industry      String?  @db.Text
+  websiteUrl    String?  @db.VarChar(2048)
+  location      String?  @db.Text
+  overview      String?  @db.Text
+  products      String?  @db.Text
+  audience      String?  @db.Text
+  uniqueValue   String?  @db.Text
+  brandVoice    String?  @db.Text
+  socialProfiles Json
+  keywords      Json
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand         Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  snapshots     CompetitorSnapshot[]
+
+  @@index([workspaceId, brandId, updatedAt])
+}
+
+model CompetitorSnapshot {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  brandId        String
+  competitorId   String
+  observedAt     DateTime
+  sources        Json
+  observations   Json
+  analysisJson   Json?
+  analysisProvider String?
+  createdAt      DateTime @default(now())
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand          Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  competitor     Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, brandId, competitorId, observedAt])
 }
 
 model ContactMessage {

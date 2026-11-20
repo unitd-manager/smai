@@ -38,6 +38,7 @@ const envSchema = z.object({
   FFMPEG_PATH: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   FFPROBE_PATH: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   PRODUCT_NAME: z.string().min(1).default(brand.productName),
+  TAVILY_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
   GOOGLE_AI_STUDIO_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   GOOGLE_AI_STUDIO_MODEL: z.string().min(1).default("gemini-3.5-flash-lite"),
   OPENAI_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),

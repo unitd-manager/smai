@@ -240,6 +240,8 @@ export function CreateClient() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
+        const competitorIdea = new URLSearchParams(window.location.search).get("idea");
+        if (competitorIdea) setIdea(competitorIdea);
         const requestedDate = new URLSearchParams(window.location.search).get("date");
         if (requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
           setCalendarDate(`${requestedDate}T09:00`);

@@ -1,0 +1,42 @@
+CREATE TABLE `Competitor` (
+    `id` VARCHAR(191) NOT NULL,
+    `workspaceId` VARCHAR(191) NOT NULL,
+    `brandId` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `category` VARCHAR(191) NOT NULL DEFAULT 'direct',
+    `industry` TEXT NULL,
+    `websiteUrl` VARCHAR(2048) NULL,
+    `location` TEXT NULL,
+    `overview` TEXT NULL,
+    `products` TEXT NULL,
+    `audience` TEXT NULL,
+    `uniqueValue` TEXT NULL,
+    `brandVoice` TEXT NULL,
+    `socialProfiles` JSON NOT NULL,
+    `keywords` JSON NOT NULL,
+    `notes` TEXT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    INDEX `Competitor_workspace_brand_updated_idx`(`workspaceId`, `brandId`, `updatedAt`),
+    PRIMARY KEY (`id`),
+    CONSTRAINT `Competitor_workspaceId_fkey` FOREIGN KEY (`workspaceId`) REFERENCES `Workspace`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `Competitor_brandId_fkey` FOREIGN KEY (`brandId`) REFERENCES `Brand`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE `CompetitorSnapshot` (
+    `id` VARCHAR(191) NOT NULL,
+    `workspaceId` VARCHAR(191) NOT NULL,
+    `brandId` VARCHAR(191) NOT NULL,
+    `competitorId` VARCHAR(191) NOT NULL,
+    `observedAt` DATETIME(3) NOT NULL,
+    `sources` JSON NOT NULL,
+    `observations` JSON NOT NULL,
+    `analysisJson` JSON NULL,
+    `analysisProvider` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX `CompetitorSnapshot_workspace_competitor_observed_idx`(`workspaceId`, `competitorId`, `observedAt`),
+    PRIMARY KEY (`id`),
+    CONSTRAINT `CompetitorSnapshot_workspaceId_fkey` FOREIGN KEY (`workspaceId`) REFERENCES `Workspace`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `CompetitorSnapshot_brandId_fkey` FOREIGN KEY (`brandId`) REFERENCES `Brand`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `CompetitorSnapshot_competitorId_fkey` FOREIGN KEY (`competitorId`) REFERENCES `Competitor`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

@@ -23,6 +23,10 @@ function contentFormat(value: unknown) {
   return typeof format === "string" ? format : undefined;
 }
 
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export function createRecommendationSuggestions(input: {
   now: Date;
   posts: Array<{ status: string; createdAt: Date; scheduledAt: Date | null }>;
@@ -209,7 +213,7 @@ function jsonStrings(value: unknown) {
 export async function getMarketingIntelligence(workspaceId: string, brandId: string) {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
-  const [brand, posts, generated, plans, accounts, analytics, recommendations] = await Promise.all([
+  const [brand, posts, generated, plans, accounts, analytics, recommendations, competitorRecords] = await Promise.all([
     prisma.brand.findFirst({ where: { id: brandId, workspaceId }, select: { name: true, profile: { select: { industry: true, description: true, products: true, audience: true, tone: true, goals: true, preferredPlatforms: true, competitors: true, offers: true, country: true } } } }),
     prisma.post.findMany({ where: { workspaceId, brandId, createdAt: { gte: thirtyDaysAgo } }, select: { status: true, createdAt: true, scheduledAt: true } }),
     prisma.generatedContent.findMany({ where: { workspaceId, brandId, createdAt: { gte: thirtyDaysAgo } }, select: { contentJson: true, createdAt: true } }),
@@ -217,12 +221,41 @@ export async function getMarketingIntelligence(workspaceId: string, brandId: str
     prisma.socialAccount.findMany({ where: { workspaceId, status: "CONNECTED" }, select: { provider: true, displayName: true } }),
     prisma.analyticsSnapshot.count({ where: { workspaceId, capturedAt: { gte: thirtyDaysAgo } } }),
     refreshMarketingRecommendations(workspaceId, brandId),
+    prisma.competitor.findMany({
+      where: { workspaceId, brandId },
+      orderBy: { updatedAt: "desc" },
+      take: 12,
+      select: {
+        name: true,
+        category: true,
+        snapshots: {
+          orderBy: { observedAt: "desc" },
+          take: 8,
+          select: { observedAt: true, analysisJson: true },
+        },
+      },
+    }),
   ]);
   if (!brand) throw new Error("The requested brand does not belong to this workspace.");
   const profile = brand.profile;
   const goals = jsonStrings(profile?.goals);
   const platforms = jsonStrings(profile?.preferredPlatforms);
   const competitors = jsonStrings(profile?.competitors);
+  const recordedCompetitors = competitorRecords.map((competitor) => {
+    const latest = competitor.snapshots.find((snapshot) => isJsonRecord(snapshot.analysisJson));
+    const analysis = latest && isJsonRecord(latest.analysisJson) ? latest.analysisJson : null;
+    const opportunityValues: unknown = analysis?.opportunities;
+    const opportunities = Array.isArray(opportunityValues)
+      ? opportunityValues.flatMap((value) => isJsonRecord(value) && typeof value.title === "string" ? [value.title] : []).slice(0, 3)
+      : [];
+    return {
+      name: competitor.name,
+      category: competitor.category,
+      analyzedAt: analysis ? latest?.observedAt.toISOString() ?? null : null,
+      summary: analysis && typeof analysis.summary === "string" ? analysis.summary : null,
+      opportunities,
+    };
+  });
   const formats = generated.map((item) => contentFormat(item.contentJson)).filter((item): item is string => Boolean(item));
   const uniqueFormats = new Set(formats);
   const recentPosts = posts.filter((item) => ["PUBLISHED", "SCHEDULED", "PROCESSING"].includes(item.status)).length;
@@ -257,7 +290,15 @@ export async function getMarketingIntelligence(workspaceId: string, brandId: str
     },
     content: { formats: Array.from(uniqueFormats), gaps: gaps.slice(0, 4) },
     campaigns: plans.map((plan) => ({ ...plan, startsAt: plan.startsAt.toISOString(), endsAt: plan.endsAt.toISOString() })),
-    competitors: { entries: competitors, status: competitors.length ? "Profiles saved for manual comparison. Public activity is not automatically claimed or scraped." : "Add competitor names or URLs in Brand Profile to compare positioning manually." },
+    competitors: {
+      entries: [...new Set([...competitors, ...competitorRecords.map((competitor) => competitor.name)])],
+      status: recordedCompetitors.some((competitor) => competitor.summary)
+        ? "Recent competitor analysis uses workspace-recorded public observations and labels AI interpretations as hypotheses. Automatic monitoring is not connected."
+        : competitorRecords.length || competitors.length
+          ? "Competitor profiles are recorded, but there is no analyzed, sourced observation yet. Add evidence in Competitor Intelligence."
+          : "Add competitor profiles and dated public observations in Competitor Intelligence; no automatic public data collection is connected.",
+      insights: recordedCompetitors,
+    },
     performance: analytics > 0 ? { status: "Analytics snapshots are available for connected records.", evidence: "Recommendations use available workspace analytics; unavailable platform metrics are not estimated." } : { status: "No connected analytics snapshots yet.", evidence: "Performance recommendations are limited to profile and workspace activity." },
     priorities: gaps.slice(0, 3),
     recommendations,
