@@ -78,6 +78,7 @@ type CampaignTask = {
   assignee: string;
   deliverable: string;
 };
+type TeamMember = { id: string; name: string; email: string };
 type CampaignStrategy = {
   concepts: CampaignConcept[];
   recommendedConcept: string;
@@ -127,7 +128,7 @@ type GeneratedItem = {
 };
 type CampaignResponse = {
   provider: string;
-  usage: { used: number; limit: number | null };
+  usage?: { used: number; limit: number | null };
   items: GeneratedItem[];
 };
 type CampaignReadiness = {
@@ -143,11 +144,15 @@ type PersistedCampaign = {
   startsAt: string;
   endsAt: string;
   status: string;
+  planJson?: Record<string, unknown>;
   itemCount: number;
   readiness: CampaignReadiness;
   campaign: {
     objective: string;
     primaryKpi: { metric: string; target: string };
+    budget: string;
+    durationDays: number;
+    formats: CampaignFormat[];
     lifecycle: string;
     provider: string;
     strategy: CampaignStrategy;
@@ -158,6 +163,12 @@ type PersistedCampaign = {
 };
 type ContentPlanResponse = {
   campaign: PersistedCampaign;
+};
+type CampaignDetailResponse = ContentPlanResponse & { items: GeneratedItem[]; publisherCapabilities: PublisherCapabilities };
+type PublisherCapabilities = {
+  instagramConnected: boolean;
+  instagramLivePublishingIntegrated: boolean;
+  otherSelectedPlatformsAreDraftOnly: string[];
 };
 
 const defaultKpi: Record<string, string> = {
@@ -190,6 +201,11 @@ function createDateRange(startDate: string, durationDays: number) {
   return { start, end };
 }
 
+function dateInputValue(value: string) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function downloadCampaign(campaign: PersistedCampaign) {
   const blob = new Blob([JSON.stringify(campaign, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -214,11 +230,13 @@ export function CampaignsClient() {
   const [durationDays, setDurationDays] = useState(14);
   const [campaignId, setCampaignId] = useState("");
   const [campaignLifecycle, setCampaignLifecycle] = useState("");
+  const [publisherCapabilities, setPublisherCapabilities] = useState<PublisherCapabilities | null>(null);
   const [strategy, setStrategy] = useState<CampaignStrategy | null>(null);
   const [tasks, setTasks] = useState<CampaignTask[]>([]);
   const [readiness, setReadiness] = useState<CampaignReadiness | null>(null);
   const [generated, setGenerated] = useState<CampaignResponse | null>(null);
   const [campaignHistory, setCampaignHistory] = useState<PersistedCampaign[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [savedPlan, setSavedPlan] = useState<{ id: string; name: string } | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [showAllDays, setShowAllDays] = useState(false);
@@ -227,6 +245,7 @@ export function CampaignsClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [historyError, setHistoryError] = useState("");
+  const [teamError, setTeamError] = useState("");
   const [geminiConfigured, setGeminiConfigured] = useState(false);
   const [configurationLoaded, setConfigurationLoaded] = useState(false);
   const [configurationError, setConfigurationError] = useState("");
@@ -248,6 +267,12 @@ export function CampaignsClient() {
         setHistoryError("");
       })
       .catch((requestError: unknown) => setHistoryError(requestError instanceof Error ? requestError.message : "Could not load campaign history."));
+    apiRequest<{ members: Array<{ user: TeamMember }> }>("/api/team")
+      .then(({ members }) => {
+        setTeamMembers(members.map(({ user }) => user));
+        setTeamError("");
+      })
+      .catch((requestError: unknown) => setTeamError(requestError instanceof Error ? requestError.message : "Could not load workspace team members."));
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const goalFromUrl = params.get("goal");
@@ -284,6 +309,9 @@ export function CampaignsClient() {
       setError("Add a campaign brief, measurable KPI target, at least one format, and at least one platform.");
       return;
     }
+    setCampaignId("");
+    setCampaignLifecycle("");
+    setPublisherCapabilities(null);
     setCreating(true);
     setGenerated(null);
     setSavedPlan(null);
@@ -294,7 +322,7 @@ export function CampaignsClient() {
     setShowAllDays(false);
     try {
       const { start, end } = createDateRange(startDate, durationDays);
-      const result = await apiRequest<{ campaign: PersistedCampaign }>("/api/campaigns", {
+      const result = await apiRequest<{ campaign: PersistedCampaign; publisherCapabilities: PublisherCapabilities }>("/api/campaigns", {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
@@ -311,6 +339,7 @@ export function CampaignsClient() {
         }),
       });
       setCampaignId(result.campaign.id);
+      setPublisherCapabilities(result.publisherCapabilities);
       setCampaignLifecycle(result.campaign.campaign.lifecycle);
       setStrategy(result.campaign.campaign.strategy);
       setTasks(result.campaign.campaign.tasks);
@@ -456,13 +485,33 @@ export function CampaignsClient() {
     }
   }
 
-  async function updateTask(index: number, status: CampaignTask["status"]) {
+  async function changeLifecycle(lifecycle: string) {
+    if (!campaignId) return;
+    setError("");
+    setNotice("");
+    try {
+      const updated = await apiRequest<ContentPlanResponse>(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ lifecycle }),
+      });
+      setCampaignLifecycle(updated.campaign.campaign.lifecycle);
+      setReadiness(updated.campaign.readiness);
+      setNotice(lifecycle === "PAUSED"
+        ? "Campaign paused. Existing drafts and strategy are preserved."
+        : "Campaign resumed for review. Approval is required again before the publishing workflow.");
+      await refreshHistory();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not update campaign status.");
+    }
+  }
+
+  async function updateTask(index: number, status: CampaignTask["status"], assignee?: string) {
     if (!campaignId) return;
     setError("");
     try {
       const updated = await apiRequest<ContentPlanResponse>(`/api/campaigns/${campaignId}`, {
         method: "PATCH",
-        body: JSON.stringify({ taskUpdates: [{ index, status }] }),
+        body: JSON.stringify({ taskUpdates: [{ index, status, ...(assignee !== undefined ? { assignee } : {}) }] }),
       });
       setTasks(updated.campaign.campaign.tasks);
       setReadiness(updated.campaign.readiness);
@@ -484,6 +533,39 @@ export function CampaignsClient() {
     }
   }
 
+  async function openCampaign(campaign: PersistedCampaign) {
+    setError("");
+    setNotice("");
+    try {
+      const result = await apiRequest<CampaignDetailResponse>(`/api/campaigns/${campaign.id}`);
+      const storedCampaign = result.campaign.campaign;
+      const planJson = result.campaign.planJson ?? {};
+      const storedObjective = campaignObjectives.find((item) => item === storedCampaign.objective);
+      setCampaignId(result.campaign.id);
+      setPublisherCapabilities(result.publisherCapabilities);
+      setCampaignLifecycle(storedCampaign.lifecycle);
+      setStrategy(storedCampaign.strategy);
+      setTasks(storedCampaign.tasks);
+      setReadiness(result.campaign.readiness);
+      setName(result.campaign.name);
+      setGoal(typeof planJson.goal === "string" ? planJson.goal : "");
+      setAudience(typeof planJson.audience === "string" ? planJson.audience : "");
+      setObjective(storedObjective ?? "Brand Awareness");
+      setPrimaryKpi(storedCampaign.primaryKpi.metric);
+      setPrimaryTarget(storedCampaign.primaryKpi.target);
+      setBudget(storedCampaign.budget);
+      setFormats(storedCampaign.formats);
+      setSelectedPlatforms(Array.isArray(planJson.platforms) ? planJson.platforms.filter((item): item is string => typeof item === "string") : []);
+      setStartDate(dateInputValue(result.campaign.startsAt));
+      setDurationDays(storedCampaign.durationDays);
+      setGenerated(result.items.length ? { provider: storedCampaign.provider, items: result.items } : null);
+      setSavedPlan({ id: result.campaign.id, name: result.campaign.name });
+      setNotice(`Loaded ${result.campaign.name}. Continue editing, generate remaining assets, or review its saved drafts.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not load this campaign.");
+    }
+  }
+
   return (
     <section className="dashboard-content campaign-page">
       <p className="eyebrow">YOUR STUDIO · CAMPAIGNS</p>
@@ -493,6 +575,14 @@ export function CampaignsClient() {
       <div className="campaign-capability-note" role="note">
         Strategy and copy are AI recommendations based on your brief and saved brand profile. External market/trend research is not connected. Instagram is the only live social publisher in this project; other selected channels are content drafts, not live publishing. Metrics are shown only when actual campaign-attributed data is available.
       </div>
+      {publisherCapabilities && <div className="campaign-capability-note" role="status">
+        {selectedPlatforms.includes("Instagram")
+          ? publisherCapabilities.instagramConnected
+            ? "An Instagram account is connected. Publishing still depends on Instagram permissions and public media-hosting readiness."
+            : "No Instagram account is connected to this workspace yet. Campaign drafts can still be created; connect an account before publishing."
+          : "Instagram is not selected for this campaign."}
+        {publisherCapabilities.otherSelectedPlatformsAreDraftOnly.length > 0 && ` Draft-only channels: ${publisherCapabilities.otherSelectedPlatformsAreDraftOnly.join(", ")}.`}
+      </div>}
       <form className="create-form campaign-form" onSubmit={(event) => void createCampaign(event)}>
         <fieldset className="campaign-fields" disabled={creating || savingStrategy || Boolean(campaignId && !savedPlan)}>
           <label className="create-idea-field">Primary campaign objective
@@ -637,7 +727,8 @@ export function CampaignsClient() {
 
           <section className="campaign-strategy-section">
             <div className="campaign-section-heading"><div><p className="card-kicker">6 · EXECUTION AND EXPERIMENTS</p><h2>Tasks and testing plan</h2></div></div>
-            <div className="campaign-task-list">{tasks.map((task, index) => <article key={`${index}-${task.title}`}><div><strong>{task.title}</strong><p>{task.description}</p><small>Due by day {task.dueDay} · {task.priority} priority{task.dependsOn.length ? ` · Depends on: ${task.dependsOn.join(", ")}` : ""}</small></div><CompactSelect aria-label={`Status for ${task.title}`} value={task.status} onChange={(event) => void updateTask(index, event.target.value as CampaignTask["status"])}><option value="NOT_STARTED">Not started</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option><option value="BLOCKED">Blocked</option></CompactSelect></article>)}</div>
+            {teamError && <p className="campaign-caution-note" role="status">Team assignments are unavailable: {teamError}</p>}
+            <div className="campaign-task-list">{tasks.map((task, index) => <article key={`${index}-${task.title}`}><div><strong>{task.title}</strong><p>{task.description}</p><small>Due by day {task.dueDay} · {task.priority} priority{task.dependsOn.length ? ` · Depends on: ${task.dependsOn.join(", ")}` : ""}</small><label className="campaign-task-assignee">Assigned to<CompactSelect aria-label={`Assignee for ${task.title}`} value={task.assignee ?? ""} onChange={(event) => void updateTask(index, task.status, event.target.value)}><option value="">Unassigned</option>{teamMembers.map((member) => <option value={member.id} key={member.id}>{member.name} ({member.email})</option>)}</CompactSelect></label></div><CompactSelect aria-label={`Status for ${task.title}`} value={task.status} onChange={(event) => void updateTask(index, event.target.value as CampaignTask["status"], task.assignee)}><option value="NOT_STARTED">Not started</option><option value="IN_PROGRESS">In progress</option><option value="DONE">Done</option><option value="BLOCKED">Blocked</option></CompactSelect></article>)}</div>
             <div className="campaign-insight-grid"><article className="campaign-insight-card"><h3>Optional paid media</h3><p>{strategy.paidMedia.rationale}</p><p><strong>Low-budget test:</strong> {strategy.paidMedia.lowBudgetTest}</p><p><strong>Balanced:</strong> {strategy.paidMedia.balanced}</p><p><strong>Scale option:</strong> {strategy.paidMedia.scaleOption}</p><small>Recommendations only. Ad campaigns are not launched by this app.</small></article><article className="campaign-insight-card"><h3>Experiments</h3>{strategy.experiments.map((experiment) => <p key={experiment.variable}><strong>{experiment.variable}:</strong> {experiment.hypothesis} Metric: {experiment.metric}. {experiment.duration}. Decide: {experiment.decisionRule}</p>)}</article></div>
           </section>
 
@@ -648,14 +739,17 @@ export function CampaignsClient() {
             <p className="campaign-caution-note">Tracking suggestions: {strategy.trackingRecommendations.join(" · ")}</p>
             {strategy.assumptions.length > 0 && <details className="campaign-optional-fields"><summary>Assumptions and research limits</summary><ul>{strategy.assumptions.map((item) => <li key={item}>{item}</li>)}</ul><p>No external keyword, search-volume, competitor, or trend research is connected.</p></details>}
             <div className="campaign-workflow-actions">
+              {campaignLifecycle === "PAUSED"
+                ? <button className="button button-outline" type="button" onClick={() => void changeLifecycle(generated?.items.length === durationDays ? "REVIEW" : generated?.items.length ? "PRODUCTION" : "PLANNING")} disabled={creating}>Resume campaign</button>
+                : campaignLifecycle !== "COMPLETED" && <button className="button button-outline" type="button" onClick={() => void changeLifecycle("PAUSED")} disabled={creating}>Pause campaign</button>}
               {!generated && <button className="button button-gold" type="button" onClick={() => void generateAssets()} disabled={creating || savingStrategy}>{creating ? `Generating day ${Math.min(generationProgress + 1, durationDays)} of ${durationDays}…` : `Generate ${durationDays} campaign assets`}</button>}
               {generated && generated.items.length < durationDays && <button className="button button-outline" type="button" onClick={() => void generateAssets(true)} disabled={creating}>{creating ? `Generating day ${Math.min(generationProgress + 1, durationDays)} of ${durationDays}…` : `Continue remaining assets (${generated.items.length}/${durationDays})`}</button>}
               {generated && generated.items.length > 0 && <button className="button button-outline" type="button" onClick={() => void persistItems(generated.items, "PRODUCTION")} disabled={creating}>Save partial campaign</button>}
-              {generated && generated.items.length > 0 && readiness?.ready && campaignLifecycle !== "APPROVED" && <button className="button button-gold" type="button" onClick={() => void approveCampaign()} disabled={creating}>Approve campaign for publishing workflow</button>}
+              {generated && generated.items.length === durationDays && readiness?.ready && campaignLifecycle !== "APPROVED" && <button className="button button-gold" type="button" onClick={() => void approveCampaign()} disabled={creating}>Approve campaign for publishing workflow</button>}
               {campaignLifecycle === "APPROVED" && <Link className="button button-outline" href="/dashboard/content-plans">Open Content Plans</Link>}
             </div>
             {creating && <progress className="campaign-generation-progress" max={durationDays} value={generationProgress} aria-label={`Generated ${generationProgress} of ${durationDays} daily assets`} />}
-            {generated && <p className="create-usage">{generated.usage.limit === null ? `${generated.usage.used} generations used this month · Unlimited during trial` : `${generated.usage.used} of ${generated.usage.limit} generations used this month`} · Latest provider: {generated.provider}</p>}
+            {generated?.usage && <p className="create-usage">{generated.usage.limit === null ? `${generated.usage.used} generations used this month · Unlimited during trial` : `${generated.usage.used} of ${generated.usage.limit} generations used this month`} · Latest provider: {generated.provider}</p>}
             <p className="campaign-caution-note">{generated?.items.length ?? 0} generated drafts · actual campaign-attributed reach, engagement, leads, conversions, and return are unavailable until a connected source provides those metrics. No performance is estimated here.</p>
           </section>
         </section>
@@ -695,7 +789,7 @@ export function CampaignsClient() {
         {campaignHistory.length === 0 ? <p className="campaign-history-empty">Saved campaigns will appear here after a strategy is generated.</p> : <div className="campaign-history-list">{campaignHistory.map((campaign) => (
           <article className="campaign-history-card" key={campaign.id}>
             <div><span>{campaign.campaign.lifecycle.replaceAll("_", " ")}</span><h3>{campaign.name}</h3><p>{campaign.campaign.objective} · {campaign.campaign.primaryKpi.metric}: {campaign.campaign.primaryKpi.target}</p><small>{campaign.itemCount} assets · readiness {campaign.readiness.score}% · {new Date(campaign.startsAt).toLocaleDateString()}–{new Date(campaign.endsAt).toLocaleDateString()}</small></div>
-            <div className="campaign-history-actions"><button className="button button-outline" type="button" onClick={() => downloadCampaign(campaign)}>Export</button><button className="button button-outline" type="button" onClick={() => void duplicateCampaign(campaign)}>Duplicate</button><Link className="button button-outline" href="/dashboard/content-plans">Open plans</Link></div>
+            <div className="campaign-history-actions"><button className="button button-outline" type="button" onClick={() => void openCampaign(campaign)}>Open</button><button className="button button-outline" type="button" onClick={() => downloadCampaign(campaign)}>Export</button><button className="button button-outline" type="button" onClick={() => void duplicateCampaign(campaign)}>Duplicate</button><Link className="button button-outline" href="/dashboard/content-plans">Open plans</Link></div>
             <details className="campaign-history-details"><summary>View strategy summary</summary><p>{campaign.campaign.strategy.positioning.coreMessage}</p><p><strong>Recommended concept:</strong> {campaign.campaign.strategy.recommendedConcept}</p><p><strong>Audience:</strong> {campaign.campaign.strategy.audience.idealCustomerProfile}</p><small>Provider: {campaign.campaign.provider} · External research {campaign.campaign.research.externalResearchConnected ? "connected" : "not connected"}</small></details>
           </article>
         ))}</div>}

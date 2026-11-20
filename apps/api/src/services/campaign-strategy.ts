@@ -159,6 +159,7 @@ export type CampaignStrategyRequest = {
     availableAssets: Array<{ fileName: string; mimeType: string }>;
     analyticsAvailable: boolean;
   };
+  marketingBrainInsights: Array<{ title: string; explanation: string }>;
   history: Array<{ name: string; objective: string; status: string }>;
 };
 
@@ -193,6 +194,7 @@ Rules:
 - Do not invent customer facts, demographics, offers, testimonials, product claims, competitor findings, market statistics, trends, search volumes, or historical performance. When evidence is absent, mark it as a hypothesis or assumption and recommend validation.
 - There is no external market, keyword, trend, or competitor research integration. State that limitation in assumptions. Never present model-generated market claims as researched facts.
 - Existing content and media are listed in contentAudit. Suggest reuse where relevant; do not claim performance without analytics.
+- Apply the supplied active Marketing Brain insights where relevant; do not turn recommendations into proven performance claims.
 - Offers are recommendations only. Set confirmationRequired=true for unverified discounts, scarcity, guarantees, and incentives. Never create artificial urgency or claim an unconfirmed offer exists.
 - Paid media is optional advice only. Do not imply campaigns can be launched through ad integrations. Use relative budget guidance, not a currency forecast.
 - Generate 3 to 5 non-repetitive hooks and 3 to 6 content pillars. Use the brand's tone and avoid banned words.

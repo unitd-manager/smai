@@ -2071,6 +2071,8 @@ html[data-app-theme="dark"] .country-picker-options p { color: var(--navy-200); 
 .campaign-task-list > article > div { min-width: 0; }
 .campaign-task-list p, .campaign-task-list small { margin: 5px 0; color: var(--navy-600); font-size: 12px; line-height: 1.5; }
 .campaign-task-list .compact-select { min-width: 130px; }
+.campaign-task-assignee { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; color: var(--navy-600); font-size: 11px; }
+.campaign-task-assignee input { min-height: 32px; border: 1px solid var(--ivory-300); border-radius: 6px; padding: 5px 8px; background: var(--ivory-50); color: var(--navy-800); font: inherit; }
 .campaign-readiness-score { color: var(--accent-700); font-size: 20px; }
 .campaign-readiness-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 7px 14px; margin: 0; padding: 0; list-style: none; }
 .campaign-readiness-list li { border-radius: 6px; padding: 8px 10px; background: var(--ivory-100); color: var(--navy-600); font-size: 12px; }
@@ -3194,7 +3196,8 @@ html[data-app-theme="dark"] .app-shell .campaign-task-list p,
 html[data-app-theme="dark"] .app-shell .campaign-task-list small,
 html[data-app-theme="dark"] .app-shell .campaign-history-card small { color: var(--navy-200); }
 html[data-app-theme="dark"] .app-shell .campaign-strategy-edit-grid input,
-html[data-app-theme="dark"] .app-shell .campaign-strategy-edit-grid textarea { border-color: var(--navy-600); background: var(--navy-900); color: var(--ivory-100); }
+html[data-app-theme="dark"] .app-shell .campaign-strategy-edit-grid textarea,
+html[data-app-theme="dark"] .app-shell .campaign-task-assignee input { border-color: var(--navy-600); background: var(--navy-900); color: var(--ivory-100); }
 html[data-app-theme="dark"] .app-shell .campaign-segment-list article,
 html[data-app-theme="dark"] .app-shell .campaign-readiness-list li { background: var(--navy-900); }
 html[data-app-theme="dark"] .app-shell .campaign-readiness-list li.is-complete,

@@ -1,5 +1,15 @@
 # United Technologies implementation progress
 
+## 2026-11-20 — Campaign intelligence workflow
+
+- [x] Add an authenticated, workspace-scoped campaign strategy endpoint with multi-provider AI fallback and strict strategy validation.
+- [x] Use the saved brand profile, content/media inventory, active Marketing Brain recommendations, and previous campaigns as campaign context; mark external research limitations instead of inventing facts.
+- [x] Persist strategy-first campaign plans in the existing ContentPlan model, with campaign lifecycle, task records, KPI target, content references, date sequence, readiness checks, duplication, and export data.
+- [x] Add campaign objectives, success target, audience, platform, format, duration, and optional budget inputs; review and edit strategic positioning before explicitly generating assets.
+- [x] Persist generated assets incrementally so partial campaigns can be reopened and continued; assign tasks to workspace members and gate approval on all planned assets and other critical readiness checks.
+- [x] Clearly distinguish Instagram publishing support from draft-only channels and avoid presenting non-attributed analytics as campaign performance.
+- [ ] Verify strategy generation and campaign lifecycle end-to-end with a configured AI provider and authenticated workspace. Real market research, paid ads, and campaign-attributed optimization/reporting still need external integrations and post-to-campaign attribution.
+
 ## 2026-11-16
 
 - [x] Remove app-level monthly AI generation caps during the active 14-day trial across content, caption regeneration, artwork, and video-plan generation. Trial expiry remains enforced; AI-provider rate limits and platform constraints still apply. The Create and Campaigns screens report trial generation usage as unlimited.
