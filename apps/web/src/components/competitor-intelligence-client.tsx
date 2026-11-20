@@ -208,10 +208,12 @@ function InsightList({ title, items, empty = "No sourced observations recorded y
 
 export function CompetitorIntelligenceClient() {
   const profileFormRef = useRef<HTMLFormElement>(null);
+  const automaticDiscoveryStarted = useRef(false);
   const [data, setData] = useState<CompetitorResponse | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState<ProfileForm>(emptyProfile);
   const [showProfileForm, setShowProfileForm] = useState(false);
+  const [profileFormPlacement, setProfileFormPlacement] = useState<"page" | "empty">("page");
   const [loading, setLoading] = useState(true);
   const [searchBusy, setSearchBusy] = useState(false);
   const [searchResults, setSearchResults] = useState<CompetitorWebsiteResult[]>([]);
@@ -273,7 +275,7 @@ export function CompetitorIntelligenceClient() {
     if (!formElement) return;
     formElement.scrollIntoView({ behavior: "smooth", block: "start" });
     formElement.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
-  }, [showProfileForm]);
+  }, [data?.competitors.length, profileFormPlacement, showProfileForm]);
 
   const selected = data?.competitors.find((competitor) => competitor.id === selectedId) ?? null;
   const latest = selected?.snapshots[0] ?? null;
@@ -301,6 +303,7 @@ export function CompetitorIntelligenceClient() {
 
   function editProfile(competitor: CompetitorProfile) {
     setSelectedId(competitor.id);
+    setProfileFormPlacement("page");
     setForm({
       name: competitor.name,
       category: competitor.category,
@@ -320,9 +323,10 @@ export function CompetitorIntelligenceClient() {
     setTab("overview");
   }
 
-  function startNewProfile(prefill?: Partial<ProfileForm>) {
+  function startNewProfile(prefill?: Partial<ProfileForm>, placement: "page" | "empty" = "page") {
     setSelectedId("");
     setForm({ ...emptyProfile, ...prefill });
+    setProfileFormPlacement(placement);
     setShowProfileForm(true);
     setTab("overview");
   }
@@ -380,6 +384,30 @@ export function CompetitorIntelligenceClient() {
     } finally {
       setBusy("");
     }
+  }
+
+  function renderProfileForm() {
+    return (
+      <form ref={profileFormRef} className="competitor-profile-form" onSubmit={(event) => void saveProfile(event)}>
+        <div className="created-results-heading"><div><p className="card-kicker">{selectedId ? "EDIT PROFILE" : "COMPETITOR DISCOVERY"}</p><h2>{selectedId ? "Update competitor profile" : "Add a competitor"}</h2><p>Enter known business and profile details. These fields are context, not independently verified facts.</p></div><button className="button button-outline" type="button" onClick={() => setShowProfileForm(false)}>Close</button></div>
+        <div className="competitor-form-grid">
+          <label>Business name<input required minLength={2} maxLength={191} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+          <label>Relationship<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as CompetitorCategory })}><option value="direct">Direct competitor</option><option value="indirect">Indirect competitor</option><option value="emerging">Emerging competitor</option><option value="industry-leader">Industry leader</option></select></label>
+          <label>Industry or category<input value={form.industry} maxLength={500} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></label>
+          <label>Website URL<input type="url" value={form.websiteUrl} maxLength={2048} placeholder="https://" onChange={(event) => setForm({ ...form, websiteUrl: event.target.value })} /></label>
+          <label>Location or target market<input value={form.location} maxLength={500} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
+          <label>Unique value proposition<textarea rows={2} value={form.uniqueValue} maxLength={2000} onChange={(event) => setForm({ ...form, uniqueValue: event.target.value })} /></label>
+          <label>Business overview<textarea rows={3} value={form.overview} maxLength={4000} onChange={(event) => setForm({ ...form, overview: event.target.value })} /></label>
+          <label>Products or services<textarea rows={3} value={form.products} maxLength={4000} onChange={(event) => setForm({ ...form, products: event.target.value })} /></label>
+          <label>Target audience<textarea rows={3} value={form.audience} maxLength={3000} onChange={(event) => setForm({ ...form, audience: event.target.value })} /></label>
+          <label>Brand voice or messaging<textarea rows={3} value={form.brandVoice} maxLength={2000} onChange={(event) => setForm({ ...form, brandVoice: event.target.value })} /></label>
+          <label>Research keywords<input value={form.keywords} maxLength={2000} placeholder="Separate keywords with commas" onChange={(event) => setForm({ ...form, keywords: event.target.value })} /></label>
+          <label>Research notes<textarea rows={3} value={form.notes} maxLength={4000} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+        </div>
+        <div className="competitor-social-fields"><h3>Public social profile links</h3><div className="competitor-form-grid">{socialPlatforms.map((platform) => <label key={platform}>{platform}<input type="url" value={form.socialProfiles[platform]} placeholder="https://" onChange={(event) => setForm({ ...form, socialProfiles: { ...form.socialProfiles, [platform]: event.target.value } })} /></label>)}</div></div>
+        <div className="campaign-workflow-actions"><button className="button button-gold" type="submit" disabled={busy === "profile"}>{busy === "profile" ? "Saving…" : selectedId ? "Save profile" : "Add competitor"}</button><button className="button button-outline" type="button" onClick={() => setShowProfileForm(false)}>Cancel</button></div>
+      </form>
+    );
   }
 
   async function removeCompetitor(competitor: CompetitorProfile) {
@@ -481,6 +509,70 @@ export function CompetitorIntelligenceClient() {
     }
   }
 
+  const discoverAndAnalyze = useCallback(async () => {
+    setBusy("discovery");
+    setError("");
+    setNotice("");
+    try {
+      const response = await apiRequest<{
+        discovered: Array<{ id: string; name: string; websiteUrl: string | null }>;
+        analysisQueue: Array<{ id: string; name: string }>;
+        message: string;
+      }>("/api/competitors/discover", {
+        method: "POST",
+        body: JSON.stringify({ maxCandidates: 3 }),
+      });
+      if (!response.analysisQueue.length) {
+        await load();
+        setNotice(response.message);
+        return;
+      }
+
+      const analyzed: string[] = [];
+      const failures: string[] = [];
+      for (const competitor of response.analysisQueue) {
+        try {
+          await apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}/analyze`, {
+            method: "POST",
+            body: JSON.stringify({}),
+          });
+          analyzed.push(competitor.name);
+        } catch (requestError) {
+          failures.push(`${competitor.name}: ${requestError instanceof Error ? requestError.message : "Analysis failed."}`);
+        }
+      }
+
+      await load(false);
+      setSelectedId(response.analysisQueue[0]!.id);
+      setTab("analysis");
+      setNotice(`${response.discovered.length} new competitor${response.discovered.length === 1 ? "" : "s"} discovered; ${analyzed.length} profile${analyzed.length === 1 ? "" : "s"} analyzed from public website evidence.${response.discovered.length ? " Review each candidate for relevance." : ""}`);
+      if (failures.length) setError(`Some analyses could not finish: ${failures.join(" ")}`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Automatic competitor discovery failed.");
+    } finally {
+      setBusy("");
+    }
+  }, [load]);
+
+  useEffect(() => {
+    if (loading || !data || !data.dataCollection.websiteSearchAvailable || automaticDiscoveryStarted.current) return;
+    const hasBrandContext = Boolean(data.brand.industry || data.brand.products || data.brand.description);
+    const hasWorkToDo = data.competitors.length === 0 || data.competitors.some((competitor) => !competitor.snapshots[0]?.analysisJson);
+    if (!hasBrandContext || !hasWorkToDo) return;
+
+    const storageKey = `competitor-auto-discovery:${data.brand.id}`;
+    try {
+      if (window.localStorage.getItem(storageKey)) return;
+      window.localStorage.setItem(storageKey, "started");
+    } catch {
+      window.setTimeout(() => setError("Automatic discovery could not start because this browser could not save its one-time run marker. Use Auto-discover & analyze to run it manually."), 0);
+      return;
+    }
+
+    automaticDiscoveryStarted.current = true;
+    window.setTimeout(() => void discoverAndAnalyze(), 0);
+  }, [data, discoverAndAnalyze, loading]);
+
   const searchQueries = data ? [
     {
       label: `${data.brand.industry || "Industry"} alternatives${data.brand.location ? ` · ${data.brand.location}` : ""}`,
@@ -524,28 +616,10 @@ export function CompetitorIntelligenceClient() {
       {notice && <p className="form-success" role="status">{notice}</p>}
       {loading && <p className="loading-label">Loading competitor research…</p>}
 
-      {showProfileForm && <form ref={profileFormRef} className="competitor-profile-form" onSubmit={(event) => void saveProfile(event)}>
-        <div className="created-results-heading"><div><p className="card-kicker">{selectedId ? "EDIT PROFILE" : "COMPETITOR DISCOVERY"}</p><h2>{selectedId ? "Update competitor profile" : "Add a competitor"}</h2><p>Enter known business and profile details. These fields are context, not independently verified facts.</p></div><button className="button button-outline" type="button" onClick={() => setShowProfileForm(false)}>Close</button></div>
-        <div className="competitor-form-grid">
-          <label>Business name<input required minLength={2} maxLength={191} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label>Relationship<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as CompetitorCategory })}><option value="direct">Direct competitor</option><option value="indirect">Indirect competitor</option><option value="emerging">Emerging competitor</option><option value="industry-leader">Industry leader</option></select></label>
-          <label>Industry or category<input value={form.industry} maxLength={500} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></label>
-          <label>Website URL<input type="url" value={form.websiteUrl} maxLength={2048} placeholder="https://" onChange={(event) => setForm({ ...form, websiteUrl: event.target.value })} /></label>
-          <label>Location or target market<input value={form.location} maxLength={500} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
-          <label>Unique value proposition<textarea rows={2} value={form.uniqueValue} maxLength={2000} onChange={(event) => setForm({ ...form, uniqueValue: event.target.value })} /></label>
-          <label>Business overview<textarea rows={3} value={form.overview} maxLength={4000} onChange={(event) => setForm({ ...form, overview: event.target.value })} /></label>
-          <label>Products or services<textarea rows={3} value={form.products} maxLength={4000} onChange={(event) => setForm({ ...form, products: event.target.value })} /></label>
-          <label>Target audience<textarea rows={3} value={form.audience} maxLength={3000} onChange={(event) => setForm({ ...form, audience: event.target.value })} /></label>
-          <label>Brand voice or messaging<textarea rows={3} value={form.brandVoice} maxLength={2000} onChange={(event) => setForm({ ...form, brandVoice: event.target.value })} /></label>
-          <label>Research keywords<input value={form.keywords} maxLength={2000} placeholder="Separate keywords with commas" onChange={(event) => setForm({ ...form, keywords: event.target.value })} /></label>
-          <label>Research notes<textarea rows={3} value={form.notes} maxLength={4000} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
-        </div>
-        <div className="competitor-social-fields"><h3>Public social profile links</h3><div className="competitor-form-grid">{socialPlatforms.map((platform) => <label key={platform}>{platform}<input type="url" value={form.socialProfiles[platform]} placeholder="https://" onChange={(event) => setForm({ ...form, socialProfiles: { ...form.socialProfiles, [platform]: event.target.value } })} /></label>)}</div></div>
-        <div className="campaign-workflow-actions"><button className="button button-gold" type="submit" disabled={busy === "profile"}>{busy === "profile" ? "Saving…" : selectedId ? "Save profile" : "Add competitor"}</button><button className="button button-outline" type="button" onClick={() => setShowProfileForm(false)}>Cancel</button></div>
-      </form>}
+      {showProfileForm && (profileFormPlacement === "page" || Boolean(data?.competitors.length)) && renderProfileForm()}
 
       <section className="competitor-discovery-section">
-        <div className="campaign-section-heading"><div><p className="card-kicker competitor-section-label"><Compass size={15} aria-hidden="true" /> DISCOVERY WORKSPACE</p><h2>Research leads for {data?.brand.name || "your brand"}</h2><p>Search suggestions use your saved business context. Verify each result before adding it.</p></div></div>
+        <div className="campaign-section-heading"><div><p className="card-kicker competitor-section-label"><Compass size={15} aria-hidden="true" /> DISCOVERY WORKSPACE</p><h2>Research leads for {data?.brand.name || "your brand"}</h2><p>Search suggestions use your saved business context. Verify each result before adding it.</p></div>{data?.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Discovering and analyzing…" : "Auto-discover & analyze"}</button>}</div>
         {searchQueries.length ? <div className="competitor-query-grid">{searchQueries.slice(0, 3).map(({ label, query }, index) => {
           const QueryIcon = [Compass, BarChart3, Building2][index] ?? Search;
           return <button key={query} type="button" onClick={() => void searchWebsites(query)} disabled={searchBusy}><span className="competitor-query-icon"><QueryIcon size={17} aria-hidden="true" /></span><span className="competitor-query-label">{label}</span><small>{searchBusy && activeSearchQuery === query ? "Searching…" : "Search public web"}<ArrowRight size={14} aria-hidden="true" /></small></button>;
@@ -570,8 +644,9 @@ export function CompetitorIntelligenceClient() {
       {data && data.competitors.length === 0 && <section className="competitor-empty-research">
         <div className="competitor-empty-art" aria-hidden="true"><Compass size={42} /><span /><span /><span /></div>
         <div className="competitor-empty-copy"><p className="card-kicker">YOUR RESEARCH SET STARTS HERE</p><h2>Start your competitive research set</h2><p>Add a competitor profile, then record sourced public observations. Intelligence and reports grow from dated evidence—not guessed statistics.</p>
-          <button className="button button-gold" type="button" onClick={() => startNewProfile()}>Add your first competitor <ArrowRight size={15} aria-hidden="true" /></button>
+          <button className="button button-gold" type="button" onClick={() => startNewProfile(undefined, "empty")}>Add your first competitor <ArrowRight size={15} aria-hidden="true" /></button>
         </div>
+        {showProfileForm && profileFormPlacement === "empty" && renderProfileForm()}
       </section>}
 
       {data && data.competitors.length > 0 && <section className="competitor-directory">

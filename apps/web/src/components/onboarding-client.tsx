@@ -354,25 +354,24 @@ export function OnboardingClient() {
                     </div>
                   </div>}
                 </div>
-                <small>Search for and select the country where your business is based.</small>
               </div>
               <label>What do you sell or offer?<textarea required value={form.products} onChange={(event) => updateField("products", event.target.value)} rows={3} placeholder="Products, services and what makes them useful" /></label>
               <label>Who is your audience?<textarea required value={form.audience} onChange={(event) => updateField("audience", event.target.value)} rows={3} placeholder="The people you want to reach" /></label>
               <label>Offers & unique strengths<textarea value={form.offers} onChange={(event) => updateField("offers", event.target.value)} rows={3} placeholder="Offers, differentiators or proof points" /></label>
               <label>Brand description<textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} rows={3} placeholder="A short introduction to your brand" /></label>
               <label>Tone of voice<input required value={form.tone} onChange={(event) => updateField("tone", event.target.value)} placeholder="e.g. Warm, assured and premium" /></label>
-              <label>Brand voice rules <small>Comma-separated guidance the AI should follow.</small><textarea value={form.brandVoiceRules} onChange={(event) => updateField("brandVoiceRules", event.target.value)} rows={2} placeholder="e.g. Use plain language, avoid jargon" /></label>
-              <label className="brand-banned-words-field">Banned words <small>Words or phrases the AI should avoid.</small><textarea value={form.bannedWords} onChange={(event) => updateField("bannedWords", event.target.value)} rows={2} placeholder="Comma-separated" /></label>
+              <label>Brand voice rules<textarea value={form.brandVoiceRules} onChange={(event) => updateField("brandVoiceRules", event.target.value)} rows={2} placeholder="Guidance for the AI, e.g. plain language, avoid jargon" /></label>
+              <label className="brand-banned-words-field">Banned words<textarea value={form.bannedWords} onChange={(event) => updateField("bannedWords", event.target.value)} rows={2} placeholder="Words or phrases to avoid, comma-separated" /></label>
             </div>
             <div className="form-section-heading">
               <span>02</span><div><h2>Content direction</h2><p>Set the context for thoughtful, relevant content.</p></div>
             </div>
             <div className="field-grid">
-              <label>Languages <small>Separate multiple values with commas.</small><input value={form.languages} onChange={(event) => updateField("languages", event.target.value)} /></label>
+              <label>Languages<input value={form.languages} onChange={(event) => updateField("languages", event.target.value)} placeholder="e.g. English, Hindi" /></label>
               <label>Competitors<input value={form.competitors} onChange={(event) => updateField("competitors", event.target.value)} placeholder="Optional, comma separated" /></label>
               <label>Goals<input required value={form.goals} onChange={(event) => updateField("goals", event.target.value)} placeholder="e.g. Awareness, enquiries" /></label>
-              <label>Preferred platforms <small>Optional planning guidance. Autopilot selects from connected channels automatically.</small><input value={form.preferredPlatforms} onChange={(event) => updateField("preferredPlatforms", event.target.value)} placeholder="Optional, e.g. Instagram, LinkedIn" /></label>
-              <label>Publishing time zone<CompactSelect aria-label="Publishing time zone" value={timezone} onChange={(event) => setTimezone(event.target.value)}>{["UTC", ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC")].map((zone) => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</CompactSelect><small>Autopilot uses this time zone for weekday slots at 10:00 and 15:00. New batches use the latest saved time zone.</small></label>
+              <label>Preferred platforms<input value={form.preferredPlatforms} onChange={(event) => updateField("preferredPlatforms", event.target.value)} placeholder="Optional, e.g. Instagram, LinkedIn" /></label>
+              <label>Publishing time zone<CompactSelect aria-label="Publishing time zone" value={timezone} onChange={(event) => setTimezone(event.target.value)}>{["UTC", ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC")].map((zone) => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</CompactSelect></label>
             </div>
             <label className="autopilot-toggle">
               <input
@@ -390,10 +389,19 @@ export function OnboardingClient() {
               <span>03</span><div><h2>Visual identity</h2><p>Start with your palette and preferred typefaces.</p></div>
             </div>
             <div className="field-grid brand-visual-grid">
-              <label className="brand-kit-logo-field">
+              <div className="brand-kit-logo-field">
                 <span className="brand-kit-field-title">Brand logo</span>
-                <small>Upload a PNG, JPEG, WebP, or SVG up to 4 MB, or select an existing workspace image. SVG files are converted to PNG for safe previews.</small>
-                <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" disabled={uploadingLogo} onChange={(event) => void uploadLogo(event)} />
+                <input aria-label="Upload brand logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" disabled={uploadingLogo || workspaceCanWrite !== true} onChange={(event) => void uploadLogo(event)} />
+                {workspaceCanWrite !== true && (
+                  <p className="profile-readonly-notice" role="status">
+                    {workspaceCanWrite === null
+                      ? "Checking workspace access…"
+                      : trialExpired
+                        ? "Your free trial has ended. Upgrade to upload a logo or save brand changes. "
+                        : "An active subscription is required to upload a logo or save brand changes. "}
+                    {workspaceCanWrite === false && <Link href="/dashboard/billing">View billing and plans</Link>}
+                  </p>
+                )}
                 <CompactSelect aria-label="Brand logo" value={selectedLogoId} onChange={(event) => {
                   setSelectedLogoId(event.target.value);
                   setLogoPreviewFailed(false);
@@ -410,11 +418,10 @@ export function OnboardingClient() {
                 ) : (
                   <Image className="brand-kit-logo-preview" src={`/api/media/uploads/${encodeURIComponent(selectedLogoId)}/file`} alt="Selected brand logo preview" width={220} height={100} unoptimized onError={() => setLogoPreviewFailed(true)} />
                 ))}
-              </label>
+              </div>
               <label className="brand-kit-color-field">
                 <span className="brand-kit-field-title">Brand colors</span>
-                <small>These colors guide generated design previews. Enter #RRGGBB values separated by commas.</small>
-                <input required value={form.brandColors} onChange={(event) => updateField("brandColors", event.target.value)} />
+                <input required value={form.brandColors} onChange={(event) => updateField("brandColors", event.target.value)} placeholder="#253746, #A8CBE5, #F8F5F0" />
               </label>
               <label className="brand-kit-font-field">
                 <span className="brand-kit-field-title">Fonts</span>
@@ -425,7 +432,6 @@ export function OnboardingClient() {
             <div className="brand-template-preferences">
               <div className="brand-template-heading">
                 <strong>Preferred design templates</strong>
-                <small>Choose one default per format. Content generation uses these automatically unless you choose a template for that request.</small>
               </div>
               <div className="field-grid">
                 {brandTemplateFormats.map((format) => (

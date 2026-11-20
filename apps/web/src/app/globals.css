@@ -3632,8 +3632,13 @@ html[data-app-theme="dark"] .app-shell .topbar-gallery-link:hover { background: 
 .content-version-list button, .design-version-list button, .design-history-actions button { min-height: 32px; border: 1px solid var(--ivory-300); border-radius: 7px; padding: 5px 9px; background: #fff; color: var(--navy-700); font-size: 11px; font-weight: 700; }
 .design-history-actions { display: flex; gap: 8px; margin: 10px 0; }
 .app-shell .brand-visual-grid { align-items: start; }
-.app-shell .brand-visual-grid > label,
+.app-shell .brand-visual-grid > :is(label, .brand-kit-logo-field),
 .app-shell .brand-template-preferences .field-grid > label { min-width: 0; }
+.app-shell .brand-visual-grid .brand-kit-logo-field {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
 .app-shell .brand-kit-field-title {
   display: block;
   min-width: 0;
@@ -5998,6 +6003,16 @@ html[data-theme-mode="light"] body .app-shell .user-menu-button[aria-expanded="t
   color: var(--workspace-muted);
 }
 
+html[data-theme-mode="light"] body .app-shell .user-popover {
+  right: 0;
+  width: min(240px, calc(100vw - 24px));
+  border-color: var(--workspace-border);
+  background: var(--workspace-surface);
+  color: var(--workspace-text);
+}
+html[data-theme-mode="light"] body .app-shell .user-popover :is(a, button) { color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .user-popover :is(a:hover, button:hover) { background: var(--workspace-surface-soft); }
+
 html[data-theme-preset] body .app-shell .notification-button { border-color: var(--ivory-300); background: var(--studio-panel); color: var(--foreground); }
 html[data-theme-preset] body .app-shell .notification-count { background: var(--action-primary); color: var(--action-primary-text); }
 html[data-theme-preset="midnight-blue-purple"] body .app-shell .nav-item.active,
@@ -6270,12 +6285,12 @@ html[data-theme-preset] body .app-shell .brand-profile-primary-card {
   border: 1px solid var(--ivory-300);
   border-radius: 14px;
   padding: 22px;
-  background: var(--studio-panel);
+  background: transparent;
 }
 html[data-theme-preset] body .app-shell .brand-template-preferences {
   border-color: var(--ivory-300);
   border-radius: 14px;
-  background: var(--studio-panel);
+  background: transparent;
 }
 html[data-theme-preset] body .app-shell .brand-kit-color-field input,
 html[data-theme-preset] body .app-shell .brand-kit-font-field input,
@@ -7270,13 +7285,21 @@ html[data-theme-preset] body .app-shell .analytics-recent-panel { margin-top: 14
 html[data-theme-preset] body .app-shell .onboarding-content {
   width: 100%;
   max-width: 1320px;
-  padding: 30px clamp(20px, 3vw, 42px) 60px;
+  box-sizing: border-box;
+  padding: 30px clamp(16px, 2vw, 32px) 60px;
 }
-html[data-theme-preset] body .app-shell .profile-form { gap: 20px; margin-top: 26px; }
+html[data-theme-preset] body .app-shell .profile-form {
+  width: 100%;
+  min-width: 0;
+  gap: 20px;
+  margin-top: 26px;
+}
 html[data-theme-preset] body .app-shell .brand-profile-primary-card {
+  min-width: 0;
   gap: 22px;
   padding: clamp(18px, 2vw, 26px);
 }
+html[data-theme-preset] body .app-shell .brand-template-preferences { min-width: 0; }
 html[data-theme-preset] body .app-shell .profile-form .field-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
@@ -9441,6 +9464,12 @@ html[data-theme-preset] body .app-shell .dashboard-content.competitor-page .comp
 
 html[data-theme-preset] body .app-shell .dashboard-content.competitor-page .competitor-query-grid > button:not(:first-child) {
   min-height: 132px;
+}
+
+html[data-theme-preset] body .app-shell .dashboard-content.competitor-page .competitor-empty-research > .competitor-profile-form {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
 }
 
 @media (max-width: 760px) {
