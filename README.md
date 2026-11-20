@@ -103,6 +103,8 @@ Requirements: Node.js 20 or newer, npm, and MySQL 8 or a compatible XAMPP MariaD
 
    In `apps\api\.env`, set `PUBLIC_API_URL` to that HTTPS API origin, `INSTAGRAM_REDIRECT_URI` to the callback above, `INSTAGRAM_APP_ID` and `INSTAGRAM_APP_SECRET` from Meta, and `SOCIAL_TOKEN_ENCRYPTION_KEY` to a new random 32-byte key encoded as 64 hexadecimal characters. For example, generate the encryption key in PowerShell with:
 
+   If your web app is hosted on a stable custom domain and proxies `/api/*` to the API, you can use the web domain as the public API origin instead. Set `PUBLIC_API_URL` to the web origin and `INSTAGRAM_REDIRECT_URI` to `https://YOUR_WEB_DOMAIN/api/social-accounts/instagram/callback`. The web deployment must proxy both `/api/*` and `/health` to the API; this project provides the `/health` proxy route for that setup.
+
    ```powershell
    $bytes = New-Object byte[] 32
    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
