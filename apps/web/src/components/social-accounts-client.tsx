@@ -13,6 +13,7 @@ const platforms = [
 
 type ConnectedAccount = {
   id: string;
+  provider: "instagram" | "facebook";
   displayName: string;
   status: string;
   tokenExpiresAt: string | null;
@@ -21,15 +22,17 @@ type ConnectedAccount = {
 type SocialAccountsResponse = {
   accounts: ConnectedAccount[];
   instagramConfigured: boolean;
+  facebookConfigured: boolean;
   mediaPublishingConfigured: boolean;
   mediaPublishingMessage: string;
 };
 
-type SocialAccountsClientProps = { detailPlatform?: "Instagram" };
+type SocialAccountsClientProps = { detailPlatform?: "Instagram" | "Facebook Pages" };
 
 export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientProps) {
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [instagramConfigured, setInstagramConfigured] = useState(false);
+  const [facebookConfigured, setFacebookConfigured] = useState(false);
   const [mediaPublishingConfigured, setMediaPublishingConfigured] = useState(false);
   const [mediaPublishingMessage, setMediaPublishingMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -42,6 +45,7 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
       const response = await apiRequest<SocialAccountsResponse>("/api/social-accounts");
       setAccounts(response.accounts);
       setInstagramConfigured(response.instagramConfigured);
+      setFacebookConfigured(response.facebookConfigured);
       setMediaPublishingConfigured(response.mediaPublishingConfigured);
       setMediaPublishingMessage(response.mediaPublishingMessage);
       setError("");
@@ -55,10 +59,14 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadAccounts();
-      const result = new URLSearchParams(window.location.search).get("instagram");
-      if (result === "connected") setNotice("Instagram account connected.");
-      if (result === "cancelled") setNotice("Instagram connection was cancelled.");
-      if (result === "failed") setError("Instagram could not be connected. Check the Meta app settings and try again.");
+      const params = new URLSearchParams(window.location.search);
+      const instagramResult = params.get("instagram");
+      const facebookResult = params.get("facebook");
+      const result = instagramResult ? { platform: "Instagram", status: instagramResult } :
+        facebookResult ? { platform: "Facebook", status: facebookResult } : null;
+      if (result?.status === "connected") setNotice(`${result.platform} ${result.platform === "Facebook" ? "Pages" : "account"} connected.`);
+      if (result?.status === "cancelled") setNotice(`${result.platform} connection was cancelled.`);
+      if (result?.status === "failed") setError(`${result.platform} could not be connected. Check the Meta app settings and try again.`);
       if (result) window.history.replaceState({}, "", window.location.pathname);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -76,90 +84,109 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
     };
   }, [loadAccounts]);
 
-  const connectedInstagram = accounts.find((account) => account.status === "CONNECTED");
+  const connectedInstagram = accounts.find((account) => account.provider === "instagram" && account.status === "CONNECTED");
+  const connectedFacebookPages = accounts.filter((account) => account.provider === "facebook" && account.status === "CONNECTED");
 
-  if (detailPlatform === "Instagram") {
+  if (detailPlatform === "Instagram" || detailPlatform === "Facebook Pages") {
+    const isFacebook = detailPlatform === "Facebook Pages";
+    const providerConfigured = isFacebook ? facebookConfigured : instagramConfigured;
+    const connectedAccounts = isFacebook ? connectedFacebookPages : connectedInstagram ? [connectedInstagram] : [];
     return (
       <section className="dashboard-content social-accounts-page">
         <Link className="social-account-back" href="/dashboard/social-accounts">← All social accounts</Link>
         <div className="social-account-detail-heading">
-          <PlatformIcon platform="Instagram" />
+          <PlatformIcon platform={detailPlatform} />
           <div>
             <p className="eyebrow">ACCOUNT CONNECTION</p>
-            <h1>Connect Instagram</h1>
+            <h1>{isFacebook ? "Connect Facebook Pages" : "Connect Instagram"}</h1>
           </div>
         </div>
-        <p className="dashboard-lead">Link one Instagram Professional account to this workspace. Everyone in the workspace, including your other browser tabs, shares this connection. Connect it once; you’ll sign in securely on Instagram and approve access there. United Technologies never asks for or stores your Instagram password.</p>
+        <p className="dashboard-lead">{isFacebook
+          ? "Connect every Facebook Page your account manages to this workspace. Access is shared only with workspace members. Sign in securely with Facebook and approve Page-list access there. This setup only saves and displays Page connections; publishing and insights are not included."
+          : "Link one Instagram Professional account to this workspace. Everyone in the workspace, including your other browser tabs, shares this connection. Connect it once; you’ll sign in securely on Instagram and approve access there. United Technologies never asks for or stores your Instagram password."}</p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="form-success" role="status">{notice}</p>}
 
         {loading ? (
-          <p className="loading-label">Checking Instagram connection…</p>
-        ) : connectedInstagram ? (
-          <article className="social-account-detail-card">
-            <p className="social-provider-status is-connected">Workspace account: {connectedInstagram.displayName}</p>
-            <p>This connection is shared with other members and browser tabs in this workspace.</p>
-            {connectedInstagram.tokenExpiresAt && <p>Access may need renewal after {new Date(connectedInstagram.tokenExpiresAt).toLocaleDateString()}.</p>}
-            <button className="social-provider-action" type="button" disabled={busy} onClick={() => void disconnectInstagram(connectedInstagram)}>
-              {busy ? "Disconnecting…" : "Disconnect account"}
-            </button>
-          </article>
+          <p className="loading-label">Checking {isFacebook ? "Facebook Pages" : "Instagram"} connection…</p>
+        ) : connectedAccounts.length ? (
+          <div className="social-account-detail-list">
+            {connectedAccounts.map((account) => (
+              <article className="social-account-detail-card" key={account.id}>
+                <p className="social-provider-status is-connected">{isFacebook ? "Connected Page" : "Workspace account"}: {account.displayName}</p>
+                <p>This connection is shared with other members of this workspace.</p>
+                {account.tokenExpiresAt && <p>Access may need renewal after {new Date(account.tokenExpiresAt).toLocaleDateString()}.</p>}
+                {!isFacebook && <button className="social-provider-action" type="button" disabled={busy} onClick={() => void connectAccount("instagram")}>
+                  {busy ? "Opening Instagram…" : "Reconnect to enable listening"}
+                </button>}
+                <button className="social-provider-action" type="button" disabled={busy} onClick={() => void disconnectAccount(account)}>
+                  {busy ? "Disconnecting…" : "Disconnect"}
+                </button>
+              </article>
+            ))}
+            {isFacebook && <button className="button button-gold" type="button" disabled={busy} onClick={() => void connectAccount("facebook")}>
+              {busy ? "Opening Facebook…" : "Connect or refresh Pages"}
+            </button>}
+          </div>
         ) : (
           <article className="social-account-detail-card">
-            <h2>{instagramConfigured ? "Ready to connect" : "Instagram setup is not complete"}</h2>
-            {instagramConfigured ? (
+            <h2>{providerConfigured ? "Ready to connect" : `${isFacebook ? "Facebook" : "Instagram"} setup is not complete`}</h2>
+            {providerConfigured ? (
               <>
-                <p>Select <strong>Continue to Instagram</strong> to open Instagram’s secure authorization page. Log in there with the Professional account you want to connect, then approve the requested permissions.</p>
-                <button className="button button-gold" type="button" disabled={busy} onClick={() => void connectInstagram()}>
-                  {busy ? "Opening Instagram…" : "Continue to Instagram"}
+                <p>{isFacebook
+                  ? "Continue to Facebook to review and authorize every Page available to your account."
+                  : <>Select <strong>Continue to Instagram</strong> to open Instagram’s secure authorization page. Log in there with the Professional account you want to connect, then approve the requested permissions.</>}</p>
+                <button className="button button-gold" type="button" disabled={busy} onClick={() => void connectAccount(isFacebook ? "facebook" : "instagram")}>
+                  {busy ? `Opening ${isFacebook ? "Facebook" : "Instagram"}…` : `Continue to ${isFacebook ? "Facebook" : "Instagram"}`}
                 </button>
               </>
             ) : (
-              <p>The workspace owner must first configure the Meta app ID, app secret, OAuth callback URL, and token encryption key on the API server. No Instagram password should be entered into this tool.</p>
+              <p>The workspace owner must first configure the Meta app ID, app secret, the matching OAuth callback URL, and token encryption key on the API server. Never enter a Facebook or Instagram password into this tool.</p>
             )}
-            <ol className="social-account-steps">
+            {!isFacebook && <ol className="social-account-steps">
               <li>Use an Instagram Professional account (Business or Creator).</li>
               <li>If the Meta app is in Development mode, add this Instagram account as a tester and accept the invitation.</li>
-              <li>After connecting, create an image post, select Instagram, and schedule it for a future time.</li>
-            </ol>
+              <li>Approve comment and insights access to use Listening for post comments, views, and reach.</li>
+              <li>Reconnect an existing account if it was connected before Listening permissions were added.</li>
+            </ol>}
           </article>
         )}
 
-        <div className="social-account-capabilities">
+        {!isFacebook && <div className="social-account-capabilities">
           <h2>What you can publish</h2>
           <p>Publish image posts, carousels, and Reels to a connected Instagram Professional account. Instagram must be able to fetch each image or video from this API over public HTTPS.</p>
           {!mediaPublishingConfigured && <p className="demo-banner" role="alert">Instagram publishing is blocked: {mediaPublishingMessage || "Checking whether the API media URL is reachable."}</p>}
           <p>Other listed channels are not connected for live publishing yet.</p>
-        </div>
+        </div>}
       </section>
     );
   }
 
-  async function connectInstagram() {
+  async function connectAccount(provider: "instagram" | "facebook") {
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const response = await apiRequest<{ authorizationUrl: string }>("/api/social-accounts/instagram/connect", {
+      const response = await apiRequest<{ authorizationUrl: string }>(`/api/social-accounts/${provider}/connect`, {
         method: "POST",
       });
       window.location.assign(response.authorizationUrl);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not start Instagram connection.");
+      setError(requestError instanceof Error ? requestError.message : `Could not start ${provider} connection.`);
       setBusy(false);
     }
   }
 
-  async function disconnectInstagram(account: ConnectedAccount) {
+  async function disconnectAccount(account: ConnectedAccount) {
     setBusy(true);
     setError("");
     setNotice("");
     try {
       await apiRequest(`/api/social-accounts/${encodeURIComponent(account.id)}`, { method: "DELETE" });
-      setNotice("Instagram account disconnected.");
+      setNotice(`${account.provider === "facebook" ? "Facebook Page" : "Instagram account"} disconnected.`);
       await loadAccounts();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Could not disconnect Instagram.");
+      setError(requestError instanceof Error ? requestError.message : "Could not disconnect social account.");
     } finally {
       setBusy(false);
     }
@@ -185,6 +212,17 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
               </div>
               <span className="social-provider-state">Open setup →</span>
             </Link>
+          ) : platform === "Facebook Pages" ? (
+            <Link className="social-provider-card social-provider-card-link" href="/dashboard/social-accounts/facebook" key={platform}>
+              <PlatformIcon platform={platform} />
+              <div>
+                <h2>{platform}</h2>
+                {connectedFacebookPages.length
+                  ? <p className="social-provider-status is-connected">{connectedFacebookPages.length} Page{connectedFacebookPages.length === 1 ? "" : "s"} connected</p>
+                  : <p className="social-provider-status">{loading ? "Checking connection…" : "Not connected"}</p>}
+              </div>
+              <span className="social-provider-state">Open setup →</span>
+            </Link>
           ) : (
             <article className="social-provider-card" key={platform}>
               <PlatformIcon platform={platform} />
@@ -197,9 +235,9 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
           )
         ))}
       </div>
-      {!instagramConfigured && <p className="demo-banner" role="note">To enable Instagram, set the Meta app ID and secret, OAuth callback URL, and token encryption key in the API environment. Use a public HTTPS API URL for live image publishing. Other listed platforms remain demo-only because their OAuth and publishing integrations are not enabled.</p>}
+      {!instagramConfigured && <p className="demo-banner" role="note">To enable Instagram, set the Meta app ID and secret, OAuth callback URL, and token encryption key in the API environment. Use a public HTTPS API URL for live image publishing.</p>}
       {instagramConfigured && !mediaPublishingConfigured && <p className="demo-banner" role="alert">Instagram is connected, but publishing is blocked: {mediaPublishingMessage || "The API media URL is not reachable."}</p>}
-      {instagramConfigured && mediaPublishingConfigured && <p className="demo-banner" role="note">{mediaPublishingMessage} Other listed platforms remain demo-only until their platform integrations are configured.</p>}
+      {instagramConfigured && mediaPublishingConfigured && <p className="demo-banner" role="note">{mediaPublishingMessage} Facebook Page connections only show connection status; publishing and insights are not enabled.</p>}
     </section>
   );
 }

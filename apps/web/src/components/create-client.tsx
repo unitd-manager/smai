@@ -11,6 +11,7 @@ import { downloadDesign, downloadDesignPages, type DesignDownloadFormat } from "
 import { getDateTimeInputValue, getTimezoneLabel, localDateTimeToIso } from "@/lib/timezone";
 import { SocialFeedPreview } from "@/components/social-feed-preview";
 import { CompactSelect } from "@/components/compact-select";
+import { CustomAiArtworkClient } from "@/components/custom-ai-artwork-client";
 
 const formats = [
   ["post", "Social post"],
@@ -25,7 +26,6 @@ const formats = [
   ["facebook-cover", "Facebook cover"],
   ["business-card", "Business card"],
   ["festival-greeting", "Festival greeting"],
-  ["offer-sale", "Offer / sale"],
 ] as const;
 const platforms = Object.keys(platformSpecs);
 
@@ -586,8 +586,8 @@ export function CreateClient() {
     <section className="dashboard-content create-page">
       <p className="eyebrow">YOUR STUDIO · CREATE</p>
       <h1>Create content</h1>
-      <Link className="create-ai-artwork-link" href="/dashboard/templates"><Sparkles size={16} aria-hidden="true" /> Create image artwork with AI <ChevronRight size={15} aria-hidden="true" /></Link>
       <p className="dashboard-lead">Choose one format for each draft—like a flyer, brochure or carousel. For animated character videos, use the dedicated <Link href="/dashboard/videos">Video Studio</Link>.</p>
+      <CustomAiArtworkClient />
       {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
       <form className="create-form" onSubmit={(event) => generate(event)}>
         <div className="create-idea-field">
@@ -595,7 +595,7 @@ export function CreateClient() {
             <label htmlFor="create-content-idea">Describe your content</label>
             <button type="button" className="text-button surprise-button" onClick={surpriseMe}><Sparkles size={16} aria-hidden="true" /> <span>Surprise me</span></button>
           </div>
-          <textarea id="create-content-idea" value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="Share your topic, key points, offer, or full copy. The selected template styles it; carousel content is organized into slides." rows={2} />
+          <textarea id="create-content-idea" value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="Share your topic, key points, or full copy. The selected template styles it; carousel content is organized into slides." rows={2} />
         </div>
         <fieldset className="create-fieldset">
           <legend>Choose one format</legend>

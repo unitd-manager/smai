@@ -39,7 +39,7 @@ type AutopilotRunStatus = { status: string; error: string | null; createdAt: str
 type WorkspaceAccess = { trialExpired: boolean; subscriptionStatus: string | null };
 const brandTemplateFormats = [
   "post", "carousel", "story", "poster", "brochure", "flyer", "thumbnail", "video",
-  "linkedin-banner", "pinterest-pin", "facebook-cover", "business-card", "festival-greeting", "offer-sale",
+  "linkedin-banner", "pinterest-pin", "facebook-cover", "business-card", "festival-greeting",
 ];
 
 const initialForm = {

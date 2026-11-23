@@ -56,7 +56,7 @@ export const appNavigation: AppNavGroup[] = [
   {
     label: "CREATE",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, description: "See publishing totals, upcoming work, competitor signals, and your product shortcuts." },
       { label: "Create", href: "/dashboard/create", icon: Sparkles, description: "Turn a brief into on-brand social content and creative assets." },
       {
         label: "Content Plans",
@@ -84,7 +84,7 @@ export const appNavigation: AppNavGroup[] = [
       { label: "Content", href: "/dashboard/content", icon: FileText, description: "Browse and manage generated ideas, captions and scripts." },
       { label: "Content Sets", href: "/dashboard/content-sets", icon: ListChecks, description: "Reuse saved multi-format and platform-specific content groups." },
       { label: "Autopilot", href: "/dashboard/instagram-autopilot", icon: Sparkles, description: "Generate weekly posts from your brand profile and send them for email approval." },
-      { label: "Designs", href: "/dashboard/designs", icon: Images, description: "Review and organize your finished social designs." },
+      { label: "Saved designs", href: "/dashboard/designs", icon: Images, description: "Review each visual beside its original post brief; edit the artwork text, compare styles, and restore versions." },
       {
         label: "Video Studio",
         href: "/dashboard/videos",
@@ -125,7 +125,7 @@ export const appNavigation: AppNavGroup[] = [
     label: "PUBLISH",
     items: [
       { label: "Calendar", href: "/dashboard/calendar", icon: CalendarDays, description: "See your publishing schedule in one place." },
-      { label: "Posts and Queue", href: "/dashboard/posts", icon: Send, description: "Review drafts, scheduled posts and publishing activity." },
+      { label: "Publishing", href: "/dashboard/posts", icon: Send, description: "Review drafts, approvals, scheduled posts and publishing activity." },
       { label: "Social Accounts", href: "/dashboard/social-accounts", icon: Share2, description: "Connect and manage your social channels." },
       {
         label: "Post Approvals",
@@ -154,16 +154,16 @@ export const appNavigation: AppNavGroup[] = [
         label: "Inbox",
         href: "/dashboard/inbox",
         icon: Inbox,
-        description: "Bring social conversations into a clearer daily response workflow.",
+        description: "Read and reply to Instagram Direct and Facebook Page messages in one workspace inbox.",
         pageContent: {
-          actionLabel: "Review social accounts",
-          actionHref: "/dashboard/social-accounts",
+          actionLabel: "Open Inbox",
+          actionHref: "/dashboard/inbox",
           panels: [
-            { title: "Connect a channel", description: "A connected social account is required before messages can appear here.", linkLabel: "View social accounts", linkHref: "/dashboard/social-accounts" },
-            { title: "Keep replies on-brand", description: "Use the brand profile to keep future responses consistent with your voice.", linkLabel: "Review brand profile", linkHref: "/onboarding" },
-            { title: "Track publishing separately", description: "Publishing drafts and results are available in the posts queue.", linkLabel: "Open posts and queue", linkHref: "/dashboard/posts" },
+            { title: "Read conversations", description: "Review recent Instagram Direct and Facebook Messenger threads for connected accounts." },
+            { title: "Reply from the workspace", description: "Send replies where Meta has granted messaging access and the conversation is eligible." },
+            { title: "Reconnect for messaging access", description: "Approve messaging permissions when reconnecting each Instagram account or Facebook Page.", linkLabel: "Manage social accounts", linkHref: "/dashboard/social-accounts" },
           ],
-          availabilityNote: "Social inbox integrations are not enabled for this installation, so no conversations are being imported.",
+          availabilityNote: "Inbox loads messages from Meta when opened and refreshes every two minutes while open. Meta app review and business verification may be required for customer accounts.",
         },
       },
       {
@@ -186,16 +186,16 @@ export const appNavigation: AppNavGroup[] = [
         label: "Listening",
         href: "/dashboard/listening",
         icon: Ear,
-        description: "Plan how to follow the conversations and topics that matter to your brand.",
+        description: "Monitor your connected Instagram account’s recent posts, likes, and comments.",
         pageContent: {
-          actionLabel: "Review your brand profile",
-          actionHref: "/onboarding",
+          actionLabel: "Open Instagram listening",
+          actionHref: "/dashboard/listening",
           panels: [
-            { title: "Choose meaningful topics", description: "Start with audience questions, product categories and relevant industry conversations." },
-            { title: "Use your brand context", description: "Your audience and positioning help narrow the topics worth monitoring.", linkLabel: "Open brand profile", linkHref: "/onboarding" },
-            { title: "Turn learning into content", description: "Save useful observations as a brief for a future post.", linkLabel: "Create content", linkHref: "/dashboard/create" },
+            { title: "Review recent posts", description: "See post dates, formats, captions, and available likes and comments." },
+            { title: "Read post comments", description: "Review comments on posts from the connected Instagram Professional account." },
+            { title: "Reconnect for access", description: "Approve comment access during Instagram connection to load comment threads.", linkLabel: "Manage Instagram", linkHref: "/dashboard/social-accounts/instagram" },
           ],
-          availabilityNote: "External social listening sources are not connected, so live mentions and topic results are not available.",
+          availabilityNote: "Instagram account activity refreshes every five minutes while Listening is open. Facebook monitoring and public competitor monitoring are not enabled.",
         },
       },
     ],
@@ -203,7 +203,7 @@ export const appNavigation: AppNavGroup[] = [
   {
     label: "SETTINGS",
     items: [
-      { label: "Brand Kit & Profile", href: "/onboarding", icon: Building2 },
+      { label: "Brand Kit & Profile", href: "/onboarding", icon: Building2, description: "Save your services, audience, brand voice, colors, logo, country, and publishing preferences." },
       {
         label: "Team",
         href: "/dashboard/team",
@@ -318,10 +318,19 @@ function workspaceGroup(label: string, hrefs: string[]): AppNavGroup {
 
 export const workspaceNavigation: AppNavGroup[] = [
   workspaceGroup("WORKSPACE", ["/dashboard"]),
-  workspaceGroup("CREATE", ["/dashboard/create", "/dashboard/campaigns", "/dashboard/content-plans", "/dashboard/videos", "/dashboard/templates"]),
-  workspaceGroup("LIBRARY", ["/dashboard/gallery", "/dashboard/content", "/dashboard/content-sets", "/dashboard/instagram-autopilot", "/dashboard/designs", "/dashboard/media-library", "/dashboard/import-files"]),
-  workspaceGroup("PUBLISH", ["/dashboard/calendar", "/dashboard/posts", "/dashboard/social-accounts", "/dashboard/approvals"]),
-  workspaceGroup("GROW", ["/dashboard/marketing-brain", "/dashboard/competitors", "/dashboard/inbox", "/dashboard/analytics", "/dashboard/listening"]),
+  {
+    label: "AGENCY",
+    items: [{
+      label: "Client workspaces",
+      href: "/dashboard/agency",
+      icon: Users,
+      description: "Manage separate client brands and switch into each client workspace.",
+    }],
+  },
+  workspaceGroup("CREATE", ["/dashboard/create", "/dashboard/campaigns", "/dashboard/videos"]),
+  workspaceGroup("LIBRARY", ["/dashboard/templates", "/dashboard/gallery", "/dashboard/designs", "/dashboard/content", "/dashboard/instagram-autopilot"]),
+  workspaceGroup("PUBLISH", ["/dashboard/posts", "/dashboard/calendar", "/dashboard/social-accounts"]),
+  workspaceGroup("GROW", ["/dashboard/marketing-brain", "/dashboard/competitors", "/dashboard/analytics", "/dashboard/inbox", "/dashboard/listening"]),
   workspaceGroup("SETTINGS", ["/onboarding", "/dashboard/team", "/dashboard/settings"]),
   ...appNavigation.filter((group) => group.label === "WORKSPACE ADMIN" || group.label === "ADMIN"),
 ];

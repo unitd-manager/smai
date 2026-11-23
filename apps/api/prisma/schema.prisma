@@ -33,14 +33,14 @@ enum EmailType {
 }
 
 model User {
-  id              String       @id @default(cuid())
+  id              String         @id @default(cuid())
   name            String
-  email           String       @unique
+  email           String         @unique
   passwordHash    String
   emailVerifiedAt DateTime?
   themePreference Json?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   memberships     Membership[]
   refreshTokens   RefreshToken[]
   ownedResellers  Reseller[]     @relation("ResellerOwner")
@@ -48,62 +48,66 @@ model User {
 }
 
 model Reseller {
-  id              String      @id @default(cuid())
-  ownerUserId     String?     @unique
-  name            String
-  status          String      @default("PENDING")
-  plan            String      @default("white-label-starter")
-  limits          Json?
-  createdAt       DateTime    @default(now())
-  ownerUser       User?       @relation("ResellerOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  workspaces      Workspace[]
-  contactMessages ContactMessage[]
-  demoRequests    DemoRequest[]
+  id                  String               @id @default(cuid())
+  ownerUserId         String?              @unique
+  name                String
+  status              String               @default("PENDING")
+  plan                String               @default("white-label-starter")
+  limits              Json?
+  createdAt           DateTime             @default(now())
+  ownerUser           User?                @relation("ResellerOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  workspaces          Workspace[]
+  contactMessages     ContactMessage[]
+  demoRequests        DemoRequest[]
   partnerApplications PartnerApplication[]
 
   @@index([status, createdAt])
 }
 
 model Workspace {
-  id           String       @id @default(cuid())
-  name         String
-  status       WorkspaceStatus @default(ACTIVE)
-  resellerId   String?
-  reseller     Reseller?    @relation(fields: [resellerId], references: [id], onDelete: SetNull)
-  trialStartsAt DateTime    @default(now())
-  trialEndsAt  DateTime
-  approvalEmailRecipient String? @db.VarChar(320)
-  themeDefaults Json?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  memberships  Membership[]
-  brands       Brand[]
-  subscription Subscription?
-  socialAccounts SocialAccount[]
-  mediaAssets   MediaAsset[]
-  templates     Template[]
-  designs       Design[]
-  generatedContents GeneratedContent[]
-  contentSets    ContentSet[]
-  contentPlans  ContentPlan[]
-  competitors   Competitor[]
-  competitorSnapshots CompetitorSnapshot[]
-  posts         Post[]
-  postTargets   PostTarget[]
-  publishJobs   PublishJob[]
-  videoRenderJobs VideoRenderJob[]
-  approvals     Approval[]
-  comments      Comment[]
-  analyticsSnapshots AnalyticsSnapshot[]
-  inboxItems    InboxItem[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
+  id                       String                    @id @default(cuid())
+  name                     String
+  status                   WorkspaceStatus           @default(ACTIVE)
+  resellerId               String?
+  billingWorkspaceId       String?
+  reseller                 Reseller?                 @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+  billingWorkspace         Workspace?                @relation("WorkspaceBilling", fields: [billingWorkspaceId], references: [id], onDelete: SetNull)
+  billedWorkspaces         Workspace[]               @relation("WorkspaceBilling")
+  trialStartsAt            DateTime                  @default(now())
+  trialEndsAt              DateTime
+  approvalEmailRecipient   String?                   @db.VarChar(320)
+  themeDefaults            Json?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  memberships              Membership[]
+  brands                   Brand[]
+  subscription             Subscription?
+  socialAccounts           SocialAccount[]
+  mediaAssets              MediaAsset[]
+  templates                Template[]
+  designs                  Design[]
+  generatedContents        GeneratedContent[]
+  contentSets              ContentSet[]
+  contentPlans             ContentPlan[]
+  competitors              Competitor[]
+  competitorSnapshots      CompetitorSnapshot[]
+  posts                    Post[]
+  postTargets              PostTarget[]
+  publishJobs              PublishJob[]
+  videoRenderJobs          VideoRenderJob[]
+  approvals                Approval[]
+  comments                 Comment[]
+  analyticsSnapshots       AnalyticsSnapshot[]
+  inboxItems               InboxItem[]
+  notifications            Notification[]
+  auditLogs                AuditLog[]
   marketingRecommendations MarketingRecommendation[]
-  instagramAutopilotRuns InstagramAutopilotRun[]
-  teamInvites   TeamInvite[]
-  contentVersions ContentVersion[]
+  instagramAutopilotRuns   InstagramAutopilotRun[]
+  teamInvites              TeamInvite[]
+  contentVersions          ContentVersion[]
 
   @@index([resellerId])
+  @@index([billingWorkspaceId])
 }
 
 model Membership {
@@ -120,87 +124,86 @@ model Membership {
 }
 
 model Brand {
-  id          String         @id @default(cuid())
-  workspaceId String
-  resellerId  String?
-  name        String
-  timezone    String         @default("UTC")
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  profile     CompanyProfile?
-  kit         BrandKit?
-  designs     Design[]
-  generatedContents GeneratedContent[]
-  contentSets  ContentSet[]
-  contentPlans ContentPlan[]
-  competitors Competitor[]
-  competitorSnapshots CompetitorSnapshot[]
+  id                       String                    @id @default(cuid())
+  workspaceId              String
+  resellerId               String?
+  name                     String
+  timezone                 String                    @default("UTC")
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  workspace                Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  profile                  CompanyProfile?
+  kit                      BrandKit?
+  designs                  Design[]
+  generatedContents        GeneratedContent[]
+  contentSets              ContentSet[]
+  contentPlans             ContentPlan[]
+  competitors              Competitor[]
+  competitorSnapshots      CompetitorSnapshot[]
   marketingRecommendations MarketingRecommendation[]
-  instagramAutopilotRuns InstagramAutopilotRun[]
-  posts       Post[]
-  videoRenderJobs VideoRenderJob[]
+  instagramAutopilotRuns   InstagramAutopilotRun[]
+  posts                    Post[]
+  videoRenderJobs          VideoRenderJob[]
 
   @@index([workspaceId, resellerId])
 }
 
 model CompanyProfile {
-  id              String      @id @default(cuid())
-  workspaceId     String
-  resellerId      String?
-  brandId          String      @unique
-  companyWebsite   String?
-  websiteVerified  Boolean     @default(false)
-  accountType      AccountType @default(BUSINESS)
-  emailType        EmailType   @default(WORK)
-  segment          String
-  industry         String?     @db.Text
-  description      String?     @db.Text
-  products         String?     @db.Text
-  audience         String?     @db.Text
-  offers           String?     @db.Text
-  tone             String?     @db.Text
-  brandVoiceRules Json?
-  bannedWords     Json?
-  city             String?     @db.Text
-  country          String?     @db.Text
-  languages        Json?
-  competitors      Json?
-  goals             Json?
-  preferredPlatforms Json?
-  instagramAutopilotEnabled Boolean @default(false)
+  id                          String      @id @default(cuid())
+  workspaceId                 String
+  resellerId                  String?
+  brandId                     String      @unique
+  companyWebsite              String?
+  websiteVerified             Boolean     @default(false)
+  accountType                 AccountType @default(BUSINESS)
+  emailType                   EmailType   @default(WORK)
+  segment                     String
+  industry                    String?     @db.Text
+  description                 String?     @db.Text
+  products                    String?     @db.Text
+  audience                    String?     @db.Text
+  offers                      String?     @db.Text
+  tone                        String?     @db.Text
+  brandVoiceRules             Json?
+  bannedWords                 Json?
+  city                        String?     @db.Text
+  country                     String?     @db.Text
+  languages                   Json?
+  competitors                 Json?
+  goals                       Json?
+  preferredPlatforms          Json?
+  instagramAutopilotEnabled   Boolean     @default(false)
   instagramAutopilotNextRunAt DateTime?
-  brand            Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  updatedAt        DateTime    @updatedAt
+  brand                       Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  updatedAt                   DateTime    @updatedAt
 
   @@index([workspaceId, resellerId])
 }
 
 model BrandKit {
-  id        String   @id @default(cuid())
+  id          String   @id @default(cuid())
   workspaceId String
-  resellerId String?
-  brandId   String   @unique
-  logoUrl   String?
-  colors    Json?
-  fonts     Json?
+  resellerId  String?
+  brandId     String   @unique
+  logoUrl     String?
+  colors      Json?
+  fonts       Json?
   templateIds Json?
-  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  updatedAt DateTime @updatedAt
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @updatedAt
 
   @@index([workspaceId, resellerId])
 }
 
 model Subscription {
-  id         String    @id @default(cuid())
-  workspaceId String   @unique
-  plan       String    @default("trial")
-  status     String    @default("trialing")
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  plan        String    @default("trial")
+  status      String    @default("trialing")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
-
 
 model Plan {
   id        String   @id @default(cuid())
@@ -243,65 +246,65 @@ model TeamInvite {
 }
 
 model SocialAccount {
-  id              String   @id @default(cuid())
-  workspaceId     String
-  resellerId      String?
-  brandId         String?
-  provider        String
+  id                String    @id @default(cuid())
+  workspaceId       String
+  resellerId        String?
+  brandId           String?
+  provider          String
   providerAccountId String
-  displayName     String
-  encryptedTokens String   @db.Text
-  tokenExpiresAt  DateTime?
-  status          String   @default("CONNECTED")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  displayName       String
+  encryptedTokens   String    @db.Text
+  tokenExpiresAt    DateTime?
+  status            String    @default("CONNECTED")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([workspaceId, resellerId])
 }
 
 model MediaAsset {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   workspaceId String
   resellerId  String?
   brandId     String?
   ownerId     String?
-  inGallery   Boolean  @default(false)
+  inGallery   Boolean      @default(false)
   fileName    String
   storageKey  String
   mimeType    String
   sizeBytes   BigInt
-  fileData    Bytes?   @db.LongBlob
+  fileData    Bytes?       @db.LongBlob
   metadata    Json?
-  createdAt   DateTime @default(now())
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   postTargets PostTarget[]
 
   @@index([workspaceId, resellerId, createdAt])
 }
 
 model VideoRenderJob {
-  id          String   @id @default(cuid())
-  workspaceId String
-  brandId     String?
-  contentId   String
-  status      String   @default("QUEUED")
-  progress    Int      @default(0)
-  inGallery   Boolean  @default(false)
-  inputJson   Json
-  outputKey   String?
-  error       String?  @db.Text
-  attempts    Int      @default(0)
-  lockedAt    DateTime?
-  heartbeatAt DateTime?
-  timeoutAt   DateTime?
+  id            String    @id @default(cuid())
+  workspaceId   String
+  brandId       String?
+  contentId     String
+  status        String    @default("QUEUED")
+  progress      Int       @default(0)
+  inGallery     Boolean   @default(false)
+  inputJson     Json
+  outputKey     String?
+  error         String?   @db.Text
+  attempts      Int       @default(0)
+  lockedAt      DateTime?
+  heartbeatAt   DateTime?
+  timeoutAt     DateTime?
   nextAttemptAt DateTime?
-  cancelledAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand       Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  cancelledAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand         Brand?    @relation(fields: [brandId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([workspaceId, status, createdAt])
@@ -310,20 +313,20 @@ model VideoRenderJob {
 }
 
 model InstagramAutopilotRun {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   workspaceId   String
   brandId       String
   weekStart     DateTime
-  status        String   @default("QUEUED")
-  attempts      Int      @default(0)
+  status        String    @default("QUEUED")
+  attempts      Int       @default(0)
   contentPlanId String?
   contentIds    Json?
   videoJobIds   Json?
-  error         String?  @db.Text
+  error         String?   @db.Text
   lockedAt      DateTime?
   nextAttemptAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   completedAt   DateTime?
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   brand         Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
@@ -334,36 +337,36 @@ model InstagramAutopilotRun {
 }
 
 model Template {
-  id          String   @id @default(cuid())
-  workspaceId String?
-  resellerId  String?
-  name        String
-  format      String
-  language    String   @default("en")
+  id           String     @id @default(cuid())
+  workspaceId  String?
+  resellerId   String?
+  name         String
+  format       String
+  language     String     @default("en")
   templateJson Json
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, resellerId, format])
 }
 
 model Design {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   workspaceId String
   resellerId  String?
   brandId     String
   templateId  String?
   title       String
   designJson  Json
-  previewUrl  String?  @db.Text
-  status      String   @default("DRAFT")
-  inGallery   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  previewUrl  String?          @db.Text
+  status      String           @default("DRAFT")
+  inGallery   Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand            @relation(fields: [brandId], references: [id], onDelete: Cascade)
   versions    ContentVersion[]
 
   @@index([workspaceId, resellerId, createdAt])
@@ -371,28 +374,28 @@ model Design {
 }
 
 model GeneratedContent {
-  id          String   @id @default(cuid())
-  automationKey String? @unique
-  workspaceId String
-  resellerId  String?
-  brandId     String
-  request     String?  @db.Text
-  contentJson Json
-  provider    String
-  model       String?
-  status      String   @default("COMPLETED")
-  inGallery   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  versions    ContentVersion[]
+  id            String           @id @default(cuid())
+  automationKey String?          @unique
+  workspaceId   String
+  resellerId    String?
+  brandId       String
+  request       String?          @db.Text
+  contentJson   Json
+  provider      String
+  model         String?
+  status        String           @default("COMPLETED")
+  inGallery     Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  workspace     Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand         Brand            @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  versions      ContentVersion[]
 
   @@index([workspaceId, resellerId, createdAt])
   @@index([brandId, createdAt])
 }
 
 model ContentVersion {
-  id                 String   @id @default(cuid())
+  id                 String            @id @default(cuid())
   workspaceId        String
   generatedContentId String?
   designId           String?
@@ -400,10 +403,10 @@ model ContentVersion {
   snapshot           Json
   createdById        String?
   note               String?
-  createdAt          DateTime @default(now())
-  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now())
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   generatedContent   GeneratedContent? @relation(fields: [generatedContentId], references: [id], onDelete: Cascade)
-  design             Design?  @relation(fields: [designId], references: [id], onDelete: Cascade)
+  design             Design?           @relation(fields: [designId], references: [id], onDelete: Cascade)
 
   @@unique([generatedContentId, version])
   @@unique([designId, version])
@@ -411,17 +414,17 @@ model ContentVersion {
 }
 
 model ContentSet {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   resellerId  String?
   brandId     String
   name        String
-  brief       String   @db.Text
+  brief       String    @db.Text
   platforms   Json
   contentIds  Json
-  status      String   @default("DRAFT")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String    @default("DRAFT")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
@@ -430,7 +433,7 @@ model ContentSet {
 }
 
 model ContentPlan {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   resellerId  String?
   brandId     String
@@ -438,9 +441,9 @@ model ContentPlan {
   startsAt    DateTime
   endsAt      DateTime
   planJson    Json
-  status      String   @default("DRAFT")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      String    @default("DRAFT")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
@@ -449,21 +452,21 @@ model ContentPlan {
 }
 
 model Post {
-  id          String   @id @default(cuid())
+  id          String              @id @default(cuid())
   workspaceId String
   resellerId  String?
   brandId     String
   designId    String?
   title       String?
-  caption     String   @db.Text
+  caption     String              @db.Text
   hashtags    Json?
-  status      String   @default("DRAFT")
+  status      String              @default("DRAFT")
   scheduledAt DateTime?
-  timezone    String   @default("UTC")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  timezone    String              @default("UTC")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
   targets     PostTarget[]
   publishJobs PublishJob[]
   approvals   Approval[]
@@ -475,25 +478,25 @@ model Post {
 }
 
 model PostTarget {
-  id             String   @id @default(cuid())
-  workspaceId    String
-  resellerId     String?
-  postId         String
-  platform       String
+  id              String       @id @default(cuid())
+  workspaceId     String
+  resellerId      String?
+  postId          String
+  platform        String
   socialAccountId String?
-  captionOverride String? @db.Text
-  media          Json?
-  mediaAssetId   String?
-  platformPostId String?
-  publishedUrl   String?
-  status         String   @default("PENDING")
-  publishedAt    DateTime?
-  error          String?  @db.Text
-  createdAt      DateTime @default(now())
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  post           Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  mediaAsset     MediaAsset? @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
-  publishJobs    PublishJob[]
+  captionOverride String?      @db.Text
+  media           Json?
+  mediaAssetId    String?
+  platformPostId  String?
+  publishedUrl    String?
+  status          String       @default("PENDING")
+  publishedAt     DateTime?
+  error           String?      @db.Text
+  createdAt       DateTime     @default(now())
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post            Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  mediaAsset      MediaAsset?  @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  publishJobs     PublishJob[]
 
   @@index([workspaceId, resellerId, status])
   @@index([postId, platform])
@@ -501,20 +504,20 @@ model PostTarget {
 }
 
 model PublishJob {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   workspaceId String
   resellerId  String?
   postId      String
   targetId    String?
-  status      String   @default("QUEUED")
-  attempts    Int      @default(0)
+  status      String      @default("QUEUED")
+  attempts    Int         @default(0)
   runAt       DateTime
   lockedAt    DateTime?
-  lastError   String?  @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  lastError   String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post        Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
   target      PostTarget? @relation(fields: [targetId], references: [id], onDelete: SetNull)
 
   @@index([status, runAt, lockedAt])
@@ -522,33 +525,33 @@ model PublishJob {
 }
 
 model Approval {
-  id          String   @id @default(cuid())
-  workspaceId String
-  resellerId  String?
-  postId      String
-  reviewerId  String?
-  status      String   @default("PENDING")
-  comment     String?  @db.Text
-  emailTokenHash String? @unique @db.VarChar(64)
+  id                  String    @id @default(cuid())
+  workspaceId         String
+  resellerId          String?
+  postId              String
+  reviewerId          String?
+  status              String    @default("PENDING")
+  comment             String?   @db.Text
+  emailTokenHash      String?   @unique @db.VarChar(64)
   emailTokenExpiresAt DateTime?
-  emailSentAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  emailSentAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  post                Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, resellerId, status])
   @@index([postId, status])
 }
 
 model Comment {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   resellerId  String?
   postId      String
   authorId    String?
-  body        String   @db.Text
-  createdAt   DateTime @default(now())
+  body        String    @db.Text
+  createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   post        Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
 
@@ -557,12 +560,12 @@ model Comment {
 }
 
 model AnalyticsSnapshot {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   resellerId  String?
   postId      String?
   accountId   String?
-  capturedAt  DateTime @default(now())
+  capturedAt  DateTime  @default(now())
   metrics     Json
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   post        Post?     @relation(fields: [postId], references: [id], onDelete: SetNull)
@@ -572,18 +575,18 @@ model AnalyticsSnapshot {
 }
 
 model InboxItem {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   resellerId  String?
   accountId   String?
   platform    String
   externalId  String
   itemType    String
-  content     String   @db.Text
-  status      String   @default("OPEN")
+  content     String    @db.Text
+  status      String    @default("OPEN")
   assignedTo  String?
   receivedAt  DateTime
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([platform, externalId])
@@ -591,28 +594,28 @@ model InboxItem {
 }
 
 model Notification {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   userId      String
   kind        String
   title       String
-  body        String   @db.Text
+  body        String    @db.Text
   readAt      DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, userId, readAt, createdAt])
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   workspaceId String?
   actorId     String?
   action      String
   targetType  String
   targetId    String?
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime   @default(now())
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
@@ -620,23 +623,23 @@ model AuditLog {
 }
 
 model MarketingRecommendation {
-  id              String   @id @default(cuid())
-  workspaceId     String
-  brandId         String
+  id                String    @id @default(cuid())
+  workspaceId       String
+  brandId           String
   recommendationKey String
   reasonFingerprint String
-  title           String
-  explanation     String   @db.Text
-  actionLabel     String
-  actionHref      String
-  kind            String
-  status          String   @default("ACTIVE")
-  snoozedUntil    DateTime?
-  metadata        Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand           Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  title             String
+  explanation       String    @db.Text
+  actionLabel       String
+  actionHref        String
+  kind              String
+  status            String    @default("ACTIVE")
+  snoozedUntil      DateTime?
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand             Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, brandId, recommendationKey, reasonFingerprint], map: "MarketingRecommendation_unique_reason")
   @@index([workspaceId, brandId, status, createdAt], map: "MarketingRecommendation_brand_status_idx")
@@ -644,97 +647,97 @@ model MarketingRecommendation {
 }
 
 model Competitor {
-  id            String   @id @default(cuid())
-  workspaceId   String
-  brandId       String
-  name          String
-  category      String   @default("direct")
-  industry      String?  @db.Text
-  websiteUrl    String?  @db.VarChar(2048)
-  location      String?  @db.Text
-  overview      String?  @db.Text
-  products      String?  @db.Text
-  audience      String?  @db.Text
-  uniqueValue   String?  @db.Text
-  brandVoice    String?  @db.Text
+  id             String               @id @default(cuid())
+  workspaceId    String
+  brandId        String
+  name           String
+  category       String               @default("direct")
+  industry       String?              @db.Text
+  websiteUrl     String?              @db.VarChar(2048)
+  location       String?              @db.Text
+  overview       String?              @db.Text
+  products       String?              @db.Text
+  audience       String?              @db.Text
+  uniqueValue    String?              @db.Text
+  brandVoice     String?              @db.Text
   socialProfiles Json
-  keywords      Json
-  notes         String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand         Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  snapshots     CompetitorSnapshot[]
+  keywords       Json
+  notes          String?              @db.Text
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  workspace      Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand          Brand                @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  snapshots      CompetitorSnapshot[]
 
   @@index([workspaceId, brandId, updatedAt])
 }
 
 model CompetitorSnapshot {
-  id             String   @id @default(cuid())
-  workspaceId    String
-  brandId        String
-  competitorId   String
-  observedAt     DateTime
-  sources        Json
-  observations   Json
-  analysisJson   Json?
+  id               String     @id @default(cuid())
+  workspaceId      String
+  brandId          String
+  competitorId     String
+  observedAt       DateTime
+  sources          Json
+  observations     Json
+  analysisJson     Json?
   analysisProvider String?
-  createdAt      DateTime @default(now())
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brand          Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  competitor     Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  createdAt        DateTime   @default(now())
+  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand            Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  competitor       Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, brandId, competitorId, observedAt])
 }
 
 model ContactMessage {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   resellerId String?
   name       String
   email      String
   subject    String?
-  message    String   @db.Text
-  status     String   @default("NEW")
-  createdAt  DateTime @default(now())
+  message    String    @db.Text
+  status     String    @default("NEW")
+  createdAt  DateTime  @default(now())
   reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
 
   @@index([resellerId, status, createdAt])
 }
 
 model DemoRequest {
-  id             String   @id @default(cuid())
-  resellerId     String?
-  name           String
-  email          String
-  company        String
-  teamSize       String?
-  platforms      Json?
-  preferredTime  String?
-  status         String   @default("NEW")
-  createdAt      DateTime @default(now())
-  reseller       Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
+  id            String    @id @default(cuid())
+  resellerId    String?
+  name          String
+  email         String
+  company       String
+  teamSize      String?
+  platforms     Json?
+  preferredTime String?
+  status        String    @default("NEW")
+  createdAt     DateTime  @default(now())
+  reseller      Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
 
   @@index([resellerId, status, createdAt])
 }
 
 model PartnerApplication {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   resellerId String?
   name       String
   email      String
   company    String
-  details    String?  @db.Text
-  status     String   @default("PENDING")
-  createdAt  DateTime @default(now())
+  details    String?   @db.Text
+  status     String    @default("PENDING")
+  createdAt  DateTime  @default(now())
   reseller   Reseller? @relation(fields: [resellerId], references: [id], onDelete: SetNull)
 
   @@index([resellerId, status, createdAt])
 }
 
 model NewsletterSubscriber {
-  id         String   @id @default(cuid())
-  email      String   @unique
-  source     String   @default("website")
+  id          String    @id @default(cuid())
+  email       String    @unique
+  source      String    @default("website")
   confirmedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt   DateTime  @default(now())
 }

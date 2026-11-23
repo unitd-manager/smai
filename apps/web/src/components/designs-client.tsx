@@ -288,8 +288,8 @@ export function DesignsClient() {
   return (
     <section className="dashboard-content designs-page">
       <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
-      <h1>Designs</h1>
-      <p className="dashboard-lead">Each card is a saved creative. Carousel pages stay together; a selected template saves one matched design instead of extra layout copies.</p>
+      <h1>Saved designs</h1>
+      <p className="dashboard-lead">Each visual stays linked to the brief that created it. Open a design to review its source prompt, edit the artwork text, compare styles, or restore a saved version.</p>
       <div className="design-toolbar">
         <label className="design-search">Search designs<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, brand, or platform" /></label>
         <label>Format<CompactSelect aria-label="Format filter" value={format} onChange={(event) => setFormat(event.target.value)}><option value="all">All formats</option>{formats.map((item) => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
@@ -341,7 +341,7 @@ export function DesignsClient() {
                         </section>}
                         {content?.contentJson.caption && <p className="design-post-caption">{content.contentJson.caption}</p>}
                         {content?.contentJson.hashtags && content.contentJson.hashtags.length > 0 && <p className="design-post-hashtags">{content.contentJson.hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}</p>}
-                        {!content?.contentJson.caption && content?.request && <p className="design-post-caption">{content.request}</p>}
+                        {content?.request && <div className="design-source-brief"><strong>Original creation brief</strong><p>{content.request}</p></div>}
                         {editingDesignId === selectedDesign.id ? <div className="content-editor">
                           <label>Design title<input value={editedTitle} onChange={(event) => setEditedTitle(event.target.value)} /></label>
                           <div className="content-editor-actions"><button type="button" disabled={busy} onClick={() => void saveDesignTitle(selectedDesign)}>Save version</button><button type="button" onClick={() => setEditingDesignId("")}>Cancel</button></div>
@@ -372,6 +372,14 @@ export function DesignsClient() {
                       </>}
                     />
                   : <p>No preview available for this saved design.</p>}
+              </div>
+              <div className="design-origin-summary">
+                <span>Created from</span>
+                <strong>{content?.contentJson.title || set.title}</strong>
+                {content?.request
+                  ? <p>{content.request.length > 180 ? `${content.request.slice(0, 180).trimEnd()}…` : content.request}</p>
+                  : <p>Source prompt is not available for this saved design.</p>}
+                {generatedContentId && <Link href={`/dashboard/content?edit=${encodeURIComponent(generatedContentId)}`}>View source post brief</Link>}
               </div>
             </article>;
           })}

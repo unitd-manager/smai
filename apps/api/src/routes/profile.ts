@@ -92,7 +92,16 @@ async function getInstagramAutopilotStatus(workspaceId: string, brandId?: string
     }),
     prisma.workspace.findUnique({
       where: { id: workspaceId },
-      select: { trialEndsAt: true, subscription: { select: { status: true } } },
+      select: {
+        trialEndsAt: true,
+        subscription: { select: { status: true } },
+        billingWorkspace: {
+          select: {
+            trialEndsAt: true,
+            subscription: { select: { status: true } },
+          },
+        },
+      },
     }),
   ]);
   const blockers: string[] = [];
@@ -101,9 +110,10 @@ async function getInstagramAutopilotStatus(workspaceId: string, brandId?: string
     .filter((account) => account.provider === "instagram")
     .map(() => "Instagram"))];
   if (!connectedPlatforms.length) blockers.push("Connect a supported social publishing account. Autopilot uses connected channels automatically; no platform selection is needed.");
-  const subscriptionStatus = workspace?.subscription?.status ?? null;
+  const subscriptionStatus = workspace?.billingWorkspace?.subscription?.status ?? workspace?.subscription?.status ?? null;
+  const trialEndsAt = workspace?.billingWorkspace?.trialEndsAt ?? workspace?.trialEndsAt;
   const canWrite = subscriptionStatus === "active" ||
-    (subscriptionStatus === "trialing" && Boolean(workspace && workspace.trialEndsAt > new Date()));
+    (subscriptionStatus === "trialing" && Boolean(trialEndsAt && trialEndsAt > new Date()));
   if (!canWrite) {
     blockers.push(subscriptionStatus === "trialing"
       ? "Your 14-day free trial has ended. Upgrade your plan to generate and save posts."

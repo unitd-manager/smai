@@ -5,8 +5,9 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireAuth, requireWorkspace } from "../middleware/auth.js";
 import { analyzeCompetitor } from "../services/competitor-intelligence.js";
-import { searchCompetitorWebsites } from "../services/competitor-web-search.js";
+import { CompetitorWebSearchError, searchCompetitorWebsites } from "../services/competitor-web-search.js";
 import { researchPublicWebsite } from "../services/public-website-research.js";
+import { researchCompetitorSocial } from "../services/competitor-social-research.js";
 import { env } from "../env.js";
 
 const router = Router();
@@ -89,7 +90,7 @@ const discoverSchema = z.object({
 }).strict();
 const analysisLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 5,
+  limit: 12,
   standardHeaders: "draft-8",
   legacyHeaders: false,
 });
@@ -102,8 +103,8 @@ const searchLimiter = rateLimit({
 
 router.use(requireAuth, requireWorkspace);
 
-function jsonRecord(value: Prisma.JsonValue): Prisma.JsonObject | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+function jsonRecord(value: unknown): Prisma.JsonObject | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Prisma.JsonObject : null;
 }
 
 async function selectedBrand(workspaceId: string, requestedBrandId?: string) {
@@ -141,6 +142,10 @@ router.get("/search", searchLimiter, async (req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     res.json({ provider: "Tavily Search", results });
   } catch (error) {
+    if (error instanceof CompetitorWebSearchError) {
+      res.status(502).json({ error: error.message });
+      return;
+    }
     next(error);
   }
 });
@@ -158,10 +163,19 @@ router.get("/", async (req, res, next) => {
       take: 100,
       include: { snapshots: { orderBy: { observedAt: "desc" }, take: 8 } },
     });
-    const instagramAccount = await prisma.socialAccount.findFirst({
-      where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
-      select: { id: true },
-    });
+    const [instagramAccount, facebookUserAccount, connectedFacebookPages] = await Promise.all([
+      prisma.socialAccount.findFirst({
+        where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
+        select: { id: true },
+      }),
+      prisma.socialAccount.findFirst({
+        where: { workspaceId: req.workspace!.id, provider: "facebook-user", status: "CONNECTED" },
+        select: { id: true },
+      }),
+      prisma.socialAccount.count({
+        where: { workspaceId: req.workspace!.id, provider: "facebook", status: "CONNECTED" },
+      }),
+    ]);
     res.setHeader("Cache-Control", "no-store");
     res.json({
       brand: {
@@ -182,9 +196,11 @@ router.get("/", async (req, res, next) => {
         websiteSearchAvailable: Boolean(env.TAVILY_API_KEY),
         websiteSearchProvider: env.TAVILY_API_KEY ? "Tavily Search" : null,
         instagramAccountConnected: Boolean(instagramAccount),
-        instagramCompetitorInsightsAvailable: false,
-        instagramCompetitorInsightsMessage: "The current Instagram connection supports your own account, not competitor posts or insights. Automatic competitor metrics require an Instagram Graph API Business Discovery setup, an eligible Facebook-linked professional account, and the required Meta app permissions; those are not enabled here.",
-        message: "Public homepages can be searched and scanned. Social profile links may be discovered; social posts and private metrics are not collected.",
+        instagramCompetitorInsightsAvailable: Boolean(facebookUserAccount && connectedFacebookPages),
+        instagramCompetitorInsightsMessage: "Instagram Business Discovery requires Facebook Login with instagram_basic, instagram_manage_insights, pages_read_engagement, and an eligible linked professional account. Meta app review may be required.",
+        message: `${env.TAVILY_API_KEY
+          ? "Brand Profile can automatically discover and analyze up to three relevant providers when industry, products, or business description are saved."
+          : "Configure a public web search API to enable automatic provider discovery."} Public post performance is available only where an approved API returns metrics; otherwise, record visible post links and counts as evidence.`,
       },
     });
   } catch (error) {
@@ -208,18 +224,33 @@ router.post("/discover", searchLimiter, async (req, res, next) => {
     const profile = brand.profile;
     const location = [profile?.city, profile?.country].filter(Boolean).join(", ");
     const industry = profile?.industry?.trim() || profile?.segment?.trim() || "";
-    const productContext = [profile?.products, profile?.offers, profile?.description, profile?.audience]
-      .filter(Boolean)
-      .join(" ")
-      .slice(0, 600);
-    const queryContext = [brand.name, industry, productContext, location].filter(Boolean).join(" ");
     if (!industry && !profile?.products && !profile?.description) {
       res.status(422).json({ error: "Add your industry or products to Brand Profile before automatically finding relevant competitors." });
       return;
     }
 
-    const query = `official company websites that compete with ${queryContext}; direct competitors and alternatives`;
-    const results = await searchCompetitorWebsites(query, env.TAVILY_API_KEY);
+    // Industry is the primary discovery signal; products and location narrow the match.
+    const discoverySubject = industry || profile?.products?.trim() || profile?.description?.trim() || brand.name;
+    const productTerms = [profile?.products, profile?.offers].filter(Boolean).join(" ").slice(0, 180);
+    const queries = [...new Set([
+      `official website ${discoverySubject} ${productTerms} ${location}`,
+      `${discoverySubject} companies ${location} ${productTerms}`,
+      `${discoverySubject} local businesses ${location} official website`,
+    ].map((value) => value.replace(/\s+/g, " ").trim()).filter((value) => value.length > 10))];
+    const searchOutcomes = await Promise.allSettled(queries.map((searchQuery) =>
+      searchCompetitorWebsites(searchQuery, env.TAVILY_API_KEY!)));
+    const successfulSearches = searchOutcomes.filter((outcome) => outcome.status === "fulfilled");
+    const searchWarnings = searchOutcomes.flatMap((outcome) => outcome.status === "rejected"
+      ? [outcome.reason instanceof CompetitorWebSearchError
+        ? outcome.reason.message
+        : "One competitor search could not be completed."]
+      : []);
+    if (!successfulSearches.length) {
+      const failedSearch = searchOutcomes.find((outcome) => outcome.status === "rejected");
+      if (failedSearch?.status === "rejected") throw failedSearch.reason;
+    }
+    const searchResults = successfulSearches.flatMap((outcome) => outcome.status === "fulfilled" ? outcome.value : []);
+    const results = [...new Map(searchResults.map((result) => [result.domain, result])).values()];
     const tracked = await prisma.competitor.findMany({
       where: { workspaceId: req.workspace!.id, brandId: brand.id },
       include: { snapshots: { orderBy: { observedAt: "desc" }, take: 1 } },
@@ -233,28 +264,45 @@ router.post("/discover", searchLimiter, async (req, res, next) => {
     }
 
     const newResults = results.filter((result) => !domains.has(result.domain));
-    const candidates = newResults.slice(0, input.maxCandidates);
+    const remainingSlots = Math.max(0, input.maxCandidates - tracked.length);
+    // Search results are leads, not competitor profiles. Verify the root homepage,
+    // business identity and first-party logo before adding anything to the dashboard.
+    const verifiedCandidates: Array<{ candidate: typeof newResults[number]; report: Awaited<ReturnType<typeof researchPublicWebsite>>; name: string }> = [];
+    const candidatesToCheck = newResults.slice(0, 12);
+    const websiteChecks = await Promise.allSettled(candidatesToCheck.map(async (candidate) => ({ candidate, report: await researchPublicWebsite(candidate.url) })));
+    const nonBusinessTitle = /\b(?:list of|market trends?|industry report|sector report|market map|startups? in|top \d+|best \d+|directory|business listings?|reviews? and ratings?|menu and prices?|search results?)\b/i;
+    for (const outcome of websiteChecks) {
+      if (outcome.status !== "fulfilled") continue;
+      const { candidate, report } = outcome.value;
+      const officialName = (report.title || "").replace(/\s*[|–—-]\s*(?:official (?:website|site)|home(?:page)?)\s*$/i, "").trim();
+      const identityText = `${officialName} ${report.description || ""}`;
+      if (!officialName || officialName.length < 3 || nonBusinessTitle.test(identityText) || !(report.logoUrl || report.logoText)) continue;
+      verifiedCandidates.push({ candidate, report, name: officialName.slice(0, 191) });
+      if (verifiedCandidates.length >= remainingSlots) break;
+    }
+    const candidates = verifiedCandidates;
     const discovered = [];
-    for (const candidate of candidates) {
+    for (const { candidate, report, name } of candidates) {
       const competitor = await prisma.competitor.create({
         data: {
           workspaceId: req.workspace!.id,
           brandId: brand.id,
-          name: candidate.title.slice(0, 191),
+          name,
           category: "direct",
           industry: industry || null,
           websiteUrl: candidate.url,
           location: location || null,
-          overview: "Automatically discovered from a public web search using this brand's profile context. Verify the business and details before relying on them.",
-          socialProfiles: {},
+          overview: report.description || candidate.description || `Official website for ${name}.`,
+          products: productTerms || "",
+          socialProfiles: report.socialProfiles,
           keywords: industry ? [industry] : [],
-          notes: "Automatically discovered. Public website and social links are scanned during analysis; social post metrics are not available from this search.",
+          notes: "Discovered from an industry-led public search and verified against the business homepage. The saved logo is sourced from that homepage.",
           snapshots: {
             create: {
               workspaceId: req.workspace!.id,
               brandId: brand.id,
               observedAt: new Date(),
-              sources: [{ label: "Public web search candidate", url: candidate.url }],
+              sources: [{ label: "Official business website", url: report.finalUrl }],
               observations: {
                 platformMetrics: [],
                 posts: [],
@@ -264,13 +312,14 @@ router.post("/discover", searchLimiter, async (req, res, next) => {
                 responsePatterns: [],
                 visibleCampaigns: [],
                 creativeNotes: [],
-                notes: "Candidate selected from a search based on the saved brand profile. Website scan and evidence-limited analysis run next.",
+                notes: "Business identity, website description, social links and logo were read from its public homepage.",
+                websiteResearch: { competitorWebsite: { ...report, discoveredSocialProfiles: report.socialProfiles }, warnings: [] },
               },
             },
           },
         },
       });
-      discovered.push({ id: competitor.id, name: competitor.name, websiteUrl: competitor.websiteUrl });
+      discovered.push({ id: competitor.id, name: competitor.name, websiteUrl: competitor.websiteUrl, logoUrl: report.logoUrl, logoText: report.logoText });
       domains.add(candidate.domain);
     }
     const needsAnalysis = tracked
@@ -279,18 +328,25 @@ router.post("/discover", searchLimiter, async (req, res, next) => {
     const analysisQueue = [...discovered, ...needsAnalysis].slice(0, input.maxCandidates);
 
     res.status(201).json({
-      query,
+      queries,
       discovered,
       analysisQueue,
       skippedAlreadyTracked: results.length - newResults.length,
       omittedByLimit: newResults.length - candidates.length,
+      searchWarnings,
       message: discovered.length
-        ? "Competitor candidates were found from Brand Profile context. Public websites and available social links are being analyzed."
+        ? `${discovered.length} individual business profile${discovered.length === 1 ? "" : "s"} verified from your industry search. Each includes its own homepage logo and available social links.`
         : needsAnalysis.length
           ? "No new competitor websites were found; saved competitors without an analysis are queued."
-          : "No new competitor websites were found, and the saved research set is already analyzed. Broaden the Brand Profile or add competitors manually.",
+          : tracked.length >= input.maxCandidates
+            ? `The target of ${input.maxCandidates} tracked competitors has already been reached.`
+            : "No new individual business homepages with a verifiable logo were found. Add a more specific industry or location in Brand Profile, or add a competitor website manually.",
     });
   } catch (error) {
+    if (error instanceof CompetitorWebSearchError) {
+      res.status(502).json({ error: error.message });
+      return;
+    }
     next(error);
   }
 });
@@ -412,6 +468,42 @@ router.post("/:id/snapshots", async (req, res, next) => {
   }
 });
 
+router.post("/:id/research-website", analysisLimiter, async (req, res, next) => {
+  try {
+    const id = z.string().trim().min(1).parse(req.params.id);
+    const competitor = await prisma.competitor.findFirst({
+      where: { id, workspaceId: req.workspace!.id, ...(req.header("x-brand-id") ? { brandId: req.header("x-brand-id")! } : {}) },
+      include: { snapshots: { orderBy: { observedAt: "desc" }, take: 1 } },
+    });
+    if (!competitor) { res.status(404).json({ error: "Competitor not found in this workspace." }); return; }
+    if (!competitor.websiteUrl) { res.status(422).json({ error: "Add the competitor's public website before scanning for its logo." }); return; }
+    const report = await researchPublicWebsite(competitor.websiteUrl);
+    const snapshot = competitor.snapshots[0] ?? await prisma.competitorSnapshot.create({
+      data: {
+        workspaceId: req.workspace!.id,
+        brandId: competitor.brandId,
+        competitorId: competitor.id,
+        observedAt: new Date(),
+        sources: [{ label: "Competitor homepage", url: report.finalUrl }],
+        observations: { platformMetrics: [], posts: [], websiteFindings: [], seoFindings: [], audienceThemes: [], responsePatterns: [], visibleCampaigns: [], creativeNotes: [], notes: "" },
+      },
+    });
+    const prior = jsonRecord(snapshot.observations) ?? {};
+    const priorResearch = jsonRecord(prior.websiteResearch) ?? {};
+    const observations = {
+      ...prior,
+      websiteResearch: {
+        ...priorResearch,
+        competitorWebsite: { ...report, discoveredSocialProfiles: report.socialProfiles },
+        warnings: Array.isArray(priorResearch.warnings) ? priorResearch.warnings : [],
+      },
+    } as Prisma.InputJsonObject;
+    await prisma.competitorSnapshot.update({ where: { id: snapshot.id }, data: { observations } });
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ logoUrl: report.logoUrl, logoText: report.logoText, snapshotId: snapshot.id });
+  } catch (error) { next(error); }
+});
+
 router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
   try {
     const id = z.string().trim().min(1).parse(req.params.id);
@@ -490,6 +582,39 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
         Boolean(url) && !(typeof existingSocialProfiles[platform] === "string" && existingSocialProfiles[platform])))
       : {};
     const mergedSocialProfiles = { ...existingSocialProfiles, ...discoveredSocialProfiles };
+    const instagramProfileUrl = typeof mergedSocialProfiles.Instagram === "string" ? mergedSocialProfiles.Instagram : "";
+    let facebookUserAccount: { id: string; encryptedTokens: string; tokenExpiresAt: Date | null } | null = null;
+    let facebookPages: Array<{ providerAccountId: string; encryptedTokens: string }> = [];
+    if (instagramProfileUrl) {
+      [facebookUserAccount, facebookPages] = await Promise.all([
+        prisma.socialAccount.findFirst({
+          where: { workspaceId: req.workspace!.id, provider: "facebook-user", status: "CONNECTED" },
+          select: { id: true, encryptedTokens: true, tokenExpiresAt: true },
+        }),
+        prisma.socialAccount.findMany({
+          where: { workspaceId: req.workspace!.id, provider: "facebook", status: "CONNECTED" },
+          select: { providerAccountId: true, encryptedTokens: true },
+        }),
+      ]);
+    }
+    const socialResearch = await researchCompetitorSocial({
+      socialProfiles: mergedSocialProfiles,
+      facebookUserAccount,
+      facebookPages,
+    });
+    websiteWarnings.push(...socialResearch.warnings);
+    const newPostUrls = new Set(socialResearch.posts.map((post) => post.url));
+    const savedPosts = boundedList("posts").filter((post) => {
+      const record = jsonRecord(post);
+      return !record || typeof record.url !== "string" || !newPostUrls.has(record.url);
+    });
+    const mergedPosts = [...socialResearch.posts, ...savedPosts].slice(0, 50);
+    const updatedPlatforms = new Set(socialResearch.platformMetrics.map((metric) => metric.platform));
+    const savedMetrics = boundedList("platformMetrics").filter((metric) => {
+      const record = jsonRecord(metric);
+      return !record || typeof record.platform !== "string" || !updatedPlatforms.has(record.platform);
+    });
+    const mergedMetrics = [...socialResearch.platformMetrics, ...savedMetrics].slice(0, 12);
     const existingSources = Array.isArray(snapshot.sources)
       ? snapshot.sources.map(jsonRecord).filter((source): source is Prisma.JsonObject => source !== null)
       : [];
@@ -497,9 +622,13 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
       label: `${site.label} (automatically scanned)`,
       url: site.finalUrl,
     }));
+    const socialSources = socialResearch.sources.map((source) => ({
+      label: source.label,
+      url: source.url,
+    }));
     const updatedSources = [
       ...existingSources,
-      ...websiteSources.filter((source) => !existingSources.some((existing) => existing.url === source.url)),
+      ...[...websiteSources, ...socialSources].filter((source) => !existingSources.some((existing) => existing.url === source.url)),
     ].slice(0, 30);
     const websiteResearch = {
       brandWebsite,
@@ -510,6 +639,8 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
       ...storedObservations,
       websiteResearch,
       websiteFindings: [...scannedFindings, ...boundedList("websiteFindings")].slice(0, 30),
+      platformMetrics: mergedMetrics,
+      posts: mergedPosts,
     };
     if (Object.keys(discoveredSocialProfiles).length) {
       await prisma.competitor.update({
@@ -524,11 +655,9 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
         observations: updatedObservations as Prisma.InputJsonValue,
       },
     });
-    const platformMetrics = boundedList("platformMetrics");
-    const posts = boundedList("posts");
     const observations = {
-      platformMetrics,
-      posts: posts.slice(0, 20),
+      platformMetrics: mergedMetrics,
+      posts: mergedPosts.slice(0, 45),
       websiteFindings: [...scannedFindings, ...boundedList("websiteFindings")].slice(0, 15),
       seoFindings: boundedList("seoFindings"),
       audienceThemes: boundedList("audienceThemes"),
@@ -548,6 +677,8 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
           url: competitorWebsite.finalUrl,
           title: competitorWebsite.title,
           description: competitorWebsite.description,
+          logoUrl: competitorWebsite.logoUrl,
+          logoText: competitorWebsite.logoText,
           excerpt: competitorWebsite.excerpt,
           discoveredSocialProfiles: competitorWebsite.socialProfiles,
         } : null,
@@ -603,6 +734,8 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
         scannedWebsiteCount: websiteReports.length,
         discoveredSocialProfiles: Object.keys(competitorWebsite?.socialProfiles ?? {}).length,
         addedSocialProfiles: Object.keys(discoveredSocialProfiles).length,
+        collectedSocialPosts: socialResearch.posts.length,
+        socialWarnings: socialResearch.warnings,
         warnings: websiteWarnings,
       },
     });

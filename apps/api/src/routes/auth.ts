@@ -303,9 +303,20 @@ router.post("/signup", async (req, res, next) => {
       const createdUser = await tx.user.create({
         data: { name: input.name, email: input.email, passwordHash },
       });
+      const reseller = input.accountType === "agency"
+        ? await tx.reseller.create({
+            data: {
+              ownerUserId: createdUser.id,
+              name: input.companyName,
+              status: "ACTIVE",
+              plan: "agency",
+            },
+          })
+        : null;
       const workspace = await tx.workspace.create({
         data: {
           name: input.companyName,
+          resellerId: reseller?.id,
           trialStartsAt: now,
           trialEndsAt,
           approvalEmailRecipient: input.email,

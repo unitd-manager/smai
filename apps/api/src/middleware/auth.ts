@@ -45,9 +45,16 @@ export async function requireWorkspace(req: Request, res: Response, next: NextFu
         select: {
           id: true,
           resellerId: true,
+          billingWorkspaceId: true,
           status: true,
           trialEndsAt: true,
-          subscription: { select: { status: true } },
+          subscription: { select: { status: true, plan: true } },
+          billingWorkspace: {
+            select: {
+              trialEndsAt: true,
+              subscription: { select: { status: true, plan: true } },
+            },
+          },
         },
       },
     },
@@ -59,9 +66,16 @@ export async function requireWorkspace(req: Request, res: Response, next: NextFu
   }
 
   req.workspace = {
-    ...membership.workspace,
+    id: membership.workspace.id,
+    resellerId: membership.workspace.resellerId,
+    billingWorkspaceId: membership.workspace.billingWorkspaceId,
+    status: membership.workspace.status,
     role: membership.role,
-    subscriptionStatus: membership.workspace.subscription?.status ?? null,
+    trialEndsAt: membership.workspace.billingWorkspace?.trialEndsAt ?? membership.workspace.trialEndsAt,
+    subscriptionStatus: membership.workspace.billingWorkspace?.subscription?.status ??
+      membership.workspace.subscription?.status ?? null,
+    subscriptionPlan: membership.workspace.billingWorkspace?.subscription?.plan ??
+      membership.workspace.subscription?.plan ?? null,
   };
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method) && membership.role === "VIEWER") {
     res.status(403).json({ error: "Viewer access is read-only. Ask a workspace administrator for editing access." });

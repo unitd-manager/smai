@@ -30,6 +30,13 @@ const envSchema = z.object({
     (value) => (value === "" ? undefined : value),
     z.string().url().optional(),
   ),
+  FACEBOOK_APP_ID: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
+  FACEBOOK_APP_SECRET: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
+  FACEBOOK_REDIRECT_URI: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url().optional(),
+  ),
+  FACEBOOK_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
   SOCIAL_TOKEN_ENCRYPTION_KEY: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().regex(/^[0-9a-f]{64}$/i).optional(),
@@ -39,6 +46,8 @@ const envSchema = z.object({
   FFPROBE_PATH: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   PRODUCT_NAME: z.string().min(1).default(brand.productName),
   TAVILY_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
+  YOUTUBE_DATA_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
+  X_API_BEARER_TOKEN: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
   GOOGLE_AI_STUDIO_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   GOOGLE_AI_STUDIO_MODEL: z.string().min(1).default("gemini-3.5-flash-lite"),
   OPENAI_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),

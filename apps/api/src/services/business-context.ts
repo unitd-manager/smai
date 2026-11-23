@@ -136,7 +136,7 @@ export async function getBusinessContext(workspaceId: string, brandId: string, b
       lastReviewed: industryKnowledge.lastReviewed,
       guidance: [
         ...industryKnowledge.guidance,
-        "Use only business facts and offers supplied in the brand profile or current brief.",
+        "Do not recommend promotions, discounts, prices, or incentives. Mention one only when the user explicitly asks for it in the current brief; never invent its terms.",
         "Use prior posts and designs as style and repetition context, not as verified performance evidence.",
         "Prefer clear, audience-relevant ideas with a practical call to action.",
         "Treat analytics as unavailable unless real numeric metrics are present.",

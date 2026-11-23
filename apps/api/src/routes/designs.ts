@@ -82,12 +82,9 @@ router.post(
         res.status(404).json({ error: "Choose a brand profile before creating artwork." });
         return;
       }
-      const [subscription, usage] = await Promise.all([
-        prisma.subscription.findUnique({ where: { workspaceId: req.workspace!.id }, select: { plan: true } }),
-        prisma.generatedContent.count({ where: { workspaceId: req.workspace!.id, provider: { not: "duplicate" }, createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } }),
-      ]);
+      const usage = await prisma.generatedContent.count({ where: { workspaceId: req.workspace!.id, provider: { not: "duplicate" }, createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } });
       const limit = getAiGenerationLimit(
-        subscription?.plan,
+        req.workspace!.subscriptionPlan,
         req.workspace!.subscriptionStatus,
         req.workspace!.trialEndsAt,
       );

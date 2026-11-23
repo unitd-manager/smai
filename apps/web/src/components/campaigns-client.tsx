@@ -22,7 +22,7 @@ const campaignObjectives = [
   "Re-engagement",
   "Upselling & Cross-selling",
   "Referral Generation",
-  "Seasonal/Promotional Campaign",
+  "Seasonal and Local Moments",
 ] as const;
 const campaignFormats = [
   "post",
@@ -38,7 +38,6 @@ const campaignFormats = [
   "facebook-cover",
   "business-card",
   "festival-greeting",
-  "offer-sale",
 ] as const;
 type CampaignFormat = (typeof campaignFormats)[number];
 const formatLabels: Record<CampaignFormat, string> = {
@@ -55,7 +54,6 @@ const formatLabels: Record<CampaignFormat, string> = {
   "facebook-cover": "Facebook cover",
   "business-card": "Business card",
   "festival-greeting": "Festival greeting",
-  "offer-sale": "Offer / sale",
 };
 
 type CampaignConcept = {
@@ -184,13 +182,45 @@ const defaultKpi: Record<string, string> = {
   "Re-engagement": "Reactivated customers",
   "Upselling & Cross-selling": "Upsell conversions",
   "Referral Generation": "Qualified referrals",
-  "Seasonal/Promotional Campaign": "Conversions",
+  "Seasonal and Local Moments": "Reach",
 };
 
 function localDateOffset(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+type CampaignMoment = { title: string; date: Date; angle: string; outcome: string };
+
+function upcomingCampaignMoments(country: string, industry: string): CampaignMoment[] {
+  const now = new Date();
+  const year = now.getFullYear();
+  const india = /india/i.test(country);
+  const dates = [
+    { month: 0, day: 1, title: "New Year", angle: "Share a fresh start tied to real services", outcome: "Brand recall and saves" },
+    { month: 1, day: 14, title: "Valentine’s Day", angle: "Show a thoughtful way customers can enjoy or share your service", outcome: "Shares and discovery" },
+    { month: 2, day: 8, title: "International Women’s Day", angle: "Recognize people and stories connected to your community", outcome: "Meaningful engagement" },
+    { month: 5, day: 5, title: "World Environment Day", angle: "Explain a verified sustainability practice, if your business has one", outcome: "Trust and saves" },
+    { month: 5, day: 21, title: "International Yoga Day", angle: "Create a calm, useful moment that fits your audience", outcome: "Reach and engagement" },
+    { month: 8, day: 27, title: "World Tourism Day", angle: "Show how your local experience fits into a day out", outcome: "Local discovery" },
+    { month: 9, day: 16, title: "World Food Day", angle: "Tell the story behind an ingredient, dish, or food tradition", outcome: "Saves and profile visits" },
+    { month: 11, day: 25, title: "Christmas", angle: "Share a warm seasonal brand story without inventing a promotion", outcome: "Brand recall and shares" },
+  ];
+  if (india) dates.push(
+    { month: 0, day: 26, title: "India · Republic Day", angle: "Celebrate local culture through a verified team or menu story", outcome: "Community engagement" },
+    { month: 7, day: 15, title: "India · Independence Day", angle: "Connect a local tradition or regional ingredient to your brand", outcome: "Reach and shares" },
+    { month: 9, day: 2, title: "India · Gandhi Jayanti", angle: "Share a thoughtful message grounded in actual business practices", outcome: "Brand trust" },
+    { month: 10, day: 14, title: "India · Children’s Day", angle: "Show a family-friendly experience only if it reflects your service", outcome: "Saves and local discovery" },
+  );
+  const moments = dates.flatMap((item) => [year, year + 1].map((eventYear) => ({ ...item, date: new Date(eventYear, item.month, item.day, 12) })))
+    .filter((item) => item.date.getTime() > now.getTime() && item.date.getTime() < now.getTime() + 121 * 86_400_000)
+    .map(({ month: _month, day: _day, ...item }) => item);
+  const season = india
+    ? now.getMonth() >= 2 && now.getMonth() <= 5 ? "Summer" : now.getMonth() >= 5 && now.getMonth() <= 8 ? "Monsoon" : "Winter"
+    : now.getMonth() >= 2 && now.getMonth() <= 4 ? "Spring" : now.getMonth() >= 5 && now.getMonth() <= 7 ? "Summer" : now.getMonth() >= 8 && now.getMonth() <= 10 ? "Autumn" : "Winter";
+  moments.push({ title: `${season} · ${industry || "brand"} stories`, date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 12), angle: `Create useful ${season.toLowerCase()} content around real services, ingredients, and customer needs`, outcome: "Sustained seasonal relevance" });
+  return moments.sort((a, b) => a.date.getTime() - b.date.getTime()).slice(0, 4);
 }
 
 function createDateRange(startDate: string, durationDays: number) {
@@ -249,6 +279,7 @@ export function CampaignsClient() {
   const [geminiConfigured, setGeminiConfigured] = useState(false);
   const [configurationLoaded, setConfigurationLoaded] = useState(false);
   const [configurationError, setConfigurationError] = useState("");
+  const [brandMarket, setBrandMarket] = useState({ country: "", industry: "" });
 
   useEffect(() => {
     apiRequest<{ configured: boolean }>("/api/content/configuration")
@@ -261,6 +292,17 @@ export function CampaignsClient() {
         setConfigurationError(requestError instanceof Error ? requestError.message : "Could not check AI provider configuration.");
       })
       .finally(() => setConfigurationLoaded(true));
+    apiRequest<{ brand: { profile?: { country?: string; industry?: string } | null } }>("/api/brand-profile")
+      .then(({ brand }) => {
+        const market = { country: brand.profile?.country ?? "", industry: brand.profile?.industry ?? "" };
+        setBrandMarket(market);
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has("goal")) {
+          const nextMoment = upcomingCampaignMoments(market.country, market.industry)[0];
+          if (nextMoment) applyCampaignMoment(nextMoment);
+        }
+      })
+      .catch(() => setBrandMarket({ country: "", industry: "" }));
     apiRequest<{ campaigns: PersistedCampaign[] }>("/api/campaigns")
       .then(({ campaigns }) => {
         setCampaignHistory(campaigns);
@@ -285,6 +327,17 @@ export function CampaignsClient() {
 
   function toggle<T extends string>(value: T, values: T[], setValues: (next: T[]) => void) {
     setValues(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  }
+
+  function applyCampaignMoment(moment: CampaignMoment) {
+    setName(`${moment.title} · ${brandMarket.industry || "Brand"}`);
+    setObjective("Brand Awareness");
+    setPrimaryKpi("Reach");
+    setPrimaryTarget("Compare with the previous 14-day period");
+    setGoal(`${moment.angle}. Intended outcome: ${moment.outcome}. Use verified business details only. Do not invent offers, discounts, prices, or claims.`);
+    const daysUntilMoment = Math.ceil((moment.date.getTime() - Date.now()) / 86_400_000);
+    setStartDate(localDateOffset(Math.max(1, daysUntilMoment - 7)));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function refreshHistory() {
@@ -434,7 +487,7 @@ export function CampaignsClient() {
           `Day ${sequence.day} of ${durationDays}; campaign phase: ${sequence.phase}; funnel stage: ${sequence.funnelStage}.`,
           `Content pillar: ${sequence.pillar}. Topic: ${sequence.topic}.`,
           `Use this opening angle: ${sequence.hook}. CTA: ${sequence.callToAction}.`,
-          `Use the confirmed campaign offer only when confirmed by the brand: ${strategy.positioning.offer.recommendation}.`,
+          "Do not invent or suggest discounts, offers, prices, scarcity, guarantees, or unverified claims. Focus on the supplied brand experience and services.",
           "Make this asset distinct from the other campaign days, specific to the audience, and factually limited to the supplied brand brief. Do not invent testimonials, statistics, discounts, scarcity, guarantees, or product claims.",
         ].join("\n");
         const dailyResponse = await apiRequest<CampaignResponse>("/api/content/generate", {
@@ -575,6 +628,10 @@ export function CampaignsClient() {
       <div className="campaign-capability-note" role="note">
         Strategy and copy are AI recommendations based on your brief and saved brand profile. External market/trend research is not connected. Instagram is the only live social publisher in this project; other selected channels are content drafts, not live publishing. Metrics are shown only when actual campaign-attributed data is available.
       </div>
+      <section className="campaign-moments" aria-label="Upcoming campaign ideas">
+        <div className="campaign-moments-heading"><div><p className="eyebrow">BRAND CALENDAR</p><h2>Campaign ideas coming up</h2><p>Ideas use your saved industry and country. Outcomes are goals, not guaranteed results.</p></div><span>{brandMarket.country || "Global dates"}</span></div>
+        <div className="campaign-moments-grid">{upcomingCampaignMoments(brandMarket.country, brandMarket.industry).map((moment) => <article className="campaign-moment-card" key={`${moment.title}-${moment.date.toISOString()}`}><time dateTime={moment.date.toISOString()}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(moment.date)}</time><h3>{moment.title}</h3><p>{moment.angle}</p><small>Goal: {moment.outcome}</small><button type="button" className="button button-outline" onClick={() => applyCampaignMoment(moment)}>Use this idea</button></article>)}</div>
+      </section>
       {publisherCapabilities && <div className="campaign-capability-note" role="status">
         {selectedPlatforms.includes("Instagram")
           ? publisherCapabilities.instagramConnected
@@ -703,11 +760,9 @@ export function CampaignsClient() {
               <label>Unique value proposition<textarea rows={3} value={strategy.positioning.valueProposition} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, valueProposition: event.target.value } })} /></label>
               <label>Campaign theme<input value={strategy.positioning.theme} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, theme: event.target.value } })} /></label>
               <label>Visual direction<textarea rows={3} value={strategy.positioning.visualDirection} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, visualDirection: event.target.value } })} /></label>
-              <label>Offer recommendation<textarea rows={3} value={strategy.positioning.offer.recommendation} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, offer: { ...strategy.positioning.offer, recommendation: event.target.value } } })} /></label>
               <label>Primary CTA<input value={strategy.positioning.primaryCta} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, primaryCta: event.target.value } })} /></label>
               <label>Secondary CTA<input value={strategy.positioning.secondaryCta} onChange={(event) => setStrategy({ ...strategy, positioning: { ...strategy.positioning, secondaryCta: event.target.value } })} /></label>
             </div>
-            <p className="campaign-caution-note">{strategy.positioning.offer.safeguard} {strategy.positioning.offer.confirmationRequired ? "Confirm any offer terms before publishing." : ""}</p>
             <div className="campaign-hook-list"><strong>Suggested hooks</strong>{strategy.positioning.hooks.map((hook) => <p key={hook}>{hook}</p>)}</div>
             <div className="campaign-pillars">{strategy.positioning.contentPillars.map((pillar) => <article key={pillar.name}><strong>{pillar.name}</strong><p>{pillar.purpose}</p></article>)}</div>
             <button className="button button-outline" type="button" onClick={() => void saveStrategy()} disabled={savingStrategy || creating}>{savingStrategy ? "Saving strategy…" : "Save strategy edits"}</button>

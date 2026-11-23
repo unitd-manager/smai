@@ -1,22 +1,18 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import sharp from "sharp";
 import { env } from "../env.js";
 import { prisma } from "../db.js";
+import { decryptSocialToken, encryptSocialToken, getSocialTokenEncryptionKey } from "./social-token-crypto.js";
+
+export { encryptSocialToken as encryptInstagramToken } from "./social-token-crypto.js";
 
 type InstagramTokenResponse = { access_token: string; expires_in?: number };
 type InstagramAccountCredentials = { accessToken: string; expiresAt: Date | null };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function getEncryptionKey() {
-  if (!env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
-    throw new Error("Social token encryption is not configured.");
-  }
-  return Buffer.from(env.SOCIAL_TOKEN_ENCRYPTION_KEY, "hex");
 }
 
 function getInstagramConfig() {
@@ -42,7 +38,7 @@ export function makeInstagramAuthorizationUrl(state: string) {
   url.searchParams.set("client_id", config.appId);
   url.searchParams.set("redirect_uri", config.redirectUri);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "instagram_business_basic,instagram_business_content_publish");
+  url.searchParams.set("scope", "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_comments,instagram_business_manage_insights,instagram_business_manage_messages");
   url.searchParams.set("state", state);
   return url.toString();
 }
@@ -129,30 +125,9 @@ export async function exchangeInstagramCode(code: string) {
   return {
     providerAccountId: accountData.user_id,
     displayName: `@${accountData.username}`,
-    encryptedTokens: encryptInstagramToken(longLived.access_token),
+    encryptedTokens: encryptSocialToken(longLived.access_token),
     tokenExpiresAt: new Date(Date.now() + tokenExpirySeconds(longLived) * 1000),
   };
-}
-
-export function encryptInstagramToken(token: string) {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
-  const ciphertext = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `v1.${iv.toString("base64url")}.${tag.toString("base64url")}.${ciphertext.toString("base64url")}`;
-}
-
-function decryptInstagramToken(encrypted: string) {
-  const [version, iv, tag, ciphertext] = encrypted.split(".");
-  if (version !== "v1" || !iv || !tag || !ciphertext) {
-    throw new Error("The stored Instagram token has an unsupported format. Reconnect the account.");
-  }
-  const decipher = createDecipheriv("aes-256-gcm", getEncryptionKey(), Buffer.from(iv, "base64url"));
-  decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(ciphertext, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
 }
 
 export async function getInstagramAccessToken(account: {
@@ -160,7 +135,7 @@ export async function getInstagramAccessToken(account: {
   encryptedTokens: string;
   tokenExpiresAt: Date | null;
 }): Promise<InstagramAccountCredentials> {
-  let accessToken = decryptInstagramToken(account.encryptedTokens);
+  let accessToken = decryptSocialToken(account.encryptedTokens);
   let expiresAt = account.tokenExpiresAt;
   if (expiresAt && expiresAt.getTime() <= Date.now()) {
     throw new Error("The Instagram access token has expired. Reconnect the Instagram account.");
@@ -176,10 +151,108 @@ export async function getInstagramAccessToken(account: {
     expiresAt = new Date(Date.now() + tokenExpirySeconds(refreshed) * 1000);
     await prisma.socialAccount.update({
       where: { id: account.id },
-      data: { encryptedTokens: encryptInstagramToken(accessToken), tokenExpiresAt: expiresAt },
+      data: { encryptedTokens: encryptSocialToken(accessToken), tokenExpiresAt: expiresAt },
     });
   }
   return { accessToken, expiresAt };
+}
+
+type InstagramJson = Record<string, unknown>;
+
+function asInstagramRecord(value: unknown): InstagramJson | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as InstagramJson
+    : null;
+}
+
+async function instagramGet(path: string, accessToken: string, fields?: string, params: Record<string, string> = {}) {
+  const url = new URL(`https://graph.instagram.com/${env.INSTAGRAM_GRAPH_API_VERSION}/${path}`);
+  if (fields) url.searchParams.set("fields", fields);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  url.searchParams.set("access_token", accessToken);
+  return responseJson(await fetch(url, { signal: AbortSignal.timeout(20_000) }));
+}
+
+export async function getInstagramListeningData(account: {
+  id: string;
+  providerAccountId: string;
+  encryptedTokens: string;
+  tokenExpiresAt: Date | null;
+}) {
+  const { accessToken } = await getInstagramAccessToken(account);
+  const mediaResponse = await instagramGet(
+    `${encodeURIComponent(account.providerAccountId)}/media`,
+    accessToken,
+    "id,caption,media_type,permalink,timestamp,like_count,comments_count",
+  );
+  const data = asInstagramRecord(mediaResponse);
+  if (!data || !Array.isArray(data.data)) throw new Error("Instagram returned an invalid media list.");
+
+  const media = data.data.flatMap((item) => {
+    const record = asInstagramRecord(item);
+    if (!record || typeof record.id !== "string") return [];
+    return [{
+      id: record.id,
+      caption: typeof record.caption === "string" ? record.caption : "",
+      mediaType: typeof record.media_type === "string" ? record.media_type : "POST",
+      permalink: typeof record.permalink === "string" ? record.permalink : null,
+      timestamp: typeof record.timestamp === "string" ? record.timestamp : null,
+      likes: typeof record.like_count === "number" ? record.like_count : null,
+      commentsCount: typeof record.comments_count === "number" ? record.comments_count : null,
+    }];
+  }).slice(0, 30);
+
+  const posts = await Promise.all(media.map(async (post) => {
+    let insights: Record<string, number | null> = {};
+    try {
+      const insightsResponse = await instagramGet(
+        `${encodeURIComponent(post.id)}/insights`,
+        accessToken,
+        undefined,
+        { metric: "views,reach,saved,shares,total_interactions" },
+      );
+      const insightData = asInstagramRecord(insightsResponse);
+      if (Array.isArray(insightData?.data)) {
+        for (const item of insightData.data) {
+          const record = asInstagramRecord(item);
+          const value = Array.isArray(record?.values) ? asInstagramRecord(record.values[0])?.value : record?.total_value;
+          insights[String(record?.name)] = typeof value === "number" ? value : null;
+        }
+      }
+    } catch {
+      // Insights can be unavailable for a particular format or until Meta grants the permission.
+    }
+    try {
+      const response = await instagramGet(
+        `${encodeURIComponent(post.id)}/comments`,
+        accessToken,
+        "id,text,timestamp,username,like_count",
+      );
+      const commentsData = asInstagramRecord(response);
+      const comments = Array.isArray(commentsData?.data)
+        ? commentsData.data.flatMap((comment) => {
+            const record = asInstagramRecord(comment);
+            if (!record || typeof record.id !== "string") return [];
+            return [{
+              id: record.id,
+              text: typeof record.text === "string" ? record.text : "",
+              timestamp: typeof record.timestamp === "string" ? record.timestamp : null,
+              username: typeof record.username === "string" ? record.username : null,
+              likes: typeof record.like_count === "number" ? record.like_count : null,
+            }];
+          })
+        : [];
+      return { ...post, insights, comments, commentsAvailable: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Instagram comments are unavailable.";
+      const permissionMissing = /permission|authorized|access|scope/i.test(message);
+      return { ...post, insights, comments: [], commentsAvailable: false, commentError: permissionMissing
+        ? "Reconnect Instagram and approve comment access to view comments."
+        : "Instagram could not load comments for this post." };
+    }
+  }));
+
+  return { posts, fetchedAt: new Date().toISOString() };
 }
 
 export async function listInstagramMediaIds(account: {
@@ -223,8 +296,7 @@ export async function listInstagramMediaIds(account: {
 }
 
 function signMediaRequest(targetId: string, mediaIndex: number, expires: string, mediaType: "image" | "video") {
-  const key = getEncryptionKey();
-  return createHmac("sha256", key).update(`${targetId}.${mediaIndex}.${expires}.${mediaType}`).digest("base64url");
+  return createHmac("sha256", getSocialTokenEncryptionKey()).update(`${targetId}.${mediaIndex}.${expires}.${mediaType}`).digest("base64url");
 }
 
 export function isInstagramMediaHostingConfigured() {

@@ -1,10 +1,10 @@
 const formatGroups = [
-  { format: "post", category: "Social posts", names: ["Product launch", "Customer proof", "Expert tip", "Founder note", "New feature", "Quick promotion"] },
-  { format: "story", category: "Stories", names: ["Daily offer", "Behind the scenes", "Ask your audience", "One-minute tip", "Customer moment", "This or that"] },
+  { format: "post", category: "Social posts", names: ["Product introduction", "Customer proof", "Expert tip", "Founder note", "New feature", "Quick guide"] },
+  { format: "story", category: "Stories", names: ["Chef favorite", "Behind the scenes", "Ask your audience", "One-minute tip", "Customer moment", "This or that"] },
   { format: "carousel", category: "Carousels", names: ["How-to guide", "Before and after", "Service breakdown", "Common questions", "Step-by-step", "Myth versus fact"] },
   { format: "poster", category: "Posters", names: ["Event announcement", "Campaign statement", "Community spotlight", "New collection", "Brand manifesto", "Seasonal feature"] },
   { format: "brochure", category: "Brochures", names: ["Company overview", "Service menu", "Product guide", "Capabilities", "Client welcome", "Impact report"] },
-  { format: "flyer", category: "Flyers", names: ["Local event", "New customer offer", "Workshop invitation", "Open house", "Grand opening", "Special announcement"] },
+  { format: "flyer", category: "Flyers", names: ["Local event", "Seasonal menu introduction", "Workshop invitation", "Open house", "Grand opening", "Special announcement"] },
   { format: "thumbnail", category: "Video thumbnails", names: ["Tutorial cover", "Product reveal", "Customer question", "Quick walkthrough", "Expert insight", "Behind the build"] },
   { format: "video", category: "Video covers", names: ["Product demonstration", "Founder introduction", "How it works", "Customer story", "Feature spotlight", "A day in the workflow"] },
   { format: "linkedin-banner", category: "LinkedIn banners", names: ["Company expertise", "Hiring announcement", "Founder perspective", "Industry insight", "Team milestone", "Service overview"] },
@@ -12,7 +12,6 @@ const formatGroups = [
   { format: "facebook-cover", category: "Facebook covers", names: ["Brand introduction", "Community invitation", "Seasonal campaign", "New location", "Customer appreciation", "Product collection"] },
   { format: "business-card", category: "Business cards", names: ["Professional profile", "Studio identity", "Contact essentials", "Modern minimal", "Creative studio", "Service specialist"] },
   { format: "festival-greeting", category: "Indian festival greetings", names: ["Festive wishes", "Community celebration", "Seasonal message", "Gather together", "Light and joy", "A note of gratitude"] },
-  { format: "offer-sale", category: "Offers and sales", names: ["Limited-time offer", "Bundle promotion", "New customer benefit", "Member appreciation", "Seasonal savings", "Launch special"] },
 ] as const;
 
 const layouts = ["editorial", "split", "bold", "collage", "framed", "magazine", "type-led", "triptych", "spotlight", "grid", "sparkle", "radiant"] as const;

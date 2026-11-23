@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseCompetitorAnalysis, type CompetitorAnalysis } from "../src/services/competitor-intelligence.js";
 import { normalizeCompetitorWebsiteResults, searchCompetitorWebsites } from "../src/services/competitor-web-search.js";
+import { publicProfileUsername, youtubeChannelReference } from "../src/services/competitor-social-research.js";
 import { extractPublicWebsite, isPublicAddress, researchPublicWebsite } from "../src/services/public-website-research.js";
 
 const validAnalysis: CompetitorAnalysis = {
@@ -133,4 +134,50 @@ test("in-dashboard search calls Tavily without requesting answer or page content
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("in-dashboard search reports actionable Tavily credential and quota errors", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(null, { status: 401 });
+    await assert.rejects(
+      searchCompetitorWebsites("marketing software", "test-api-key"),
+      /Tavily rejected the API key/,
+    );
+
+    globalThis.fetch = async () => new Response(null, { status: 429 });
+    await assert.rejects(
+      searchCompetitorWebsites("marketing software", "test-api-key"),
+      /rate limit or usage quota/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("in-dashboard search reports Tavily connection timeouts", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw Object.assign(new Error("Request timed out"), { name: "TimeoutError" });
+  };
+  try {
+    await assert.rejects(
+      searchCompetitorWebsites("marketing software", "test-api-key"),
+      /Tavily Search timed out/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("competitor social research accepts only recognized public profile links", () => {
+  assert.equal(publicProfileUsername("https://www.instagram.com/example.brand/", "Instagram"), "example.brand");
+  assert.equal(publicProfileUsername("https://instagram.com/p/ABC123/", "Instagram"), null);
+  assert.equal(publicProfileUsername("http://x.com/example", "X"), null);
+  assert.equal(publicProfileUsername("https://x.com/example/status/123", "X"), "example");
+  assert.deepEqual(youtubeChannelReference("https://www.youtube.com/@example"), { handle: "example" });
+  assert.deepEqual(youtubeChannelReference("https://youtube.com/channel/UC1234567890123456789012"), {
+    channelId: "UC1234567890123456789012",
+  });
+  assert.equal(youtubeChannelReference("https://youtu.be/example"), null);
 });

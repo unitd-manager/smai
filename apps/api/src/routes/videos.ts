@@ -231,8 +231,7 @@ router.post("/magic-hour/generate", requireWritableWorkspace, async (req, res, n
         }
       }
     }
-    const [subscription, usage, accountResults] = await Promise.all([
-      prisma.subscription.findUnique({ where: { workspaceId: req.workspace!.id }, select: { plan: true } }),
+    const [usage, accountResults] = await Promise.all([
       prisma.generatedContent.count({ where: { workspaceId: req.workspace!.id, provider: { not: "duplicate" }, createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } }),
       Promise.allSettled(magicHourAccounts().map(async ({ slot }) => ({ slot, account: await getMagicHourAccount(slot) }))),
     ]);
@@ -240,7 +239,7 @@ router.post("/magic-hour/generate", requireWritableWorkspace, async (req, res, n
     if (!availableAccounts.length) throw accountResults[0]?.status === "rejected" ? accountResults[0].reason : new Error("Magic Hour account status is unavailable.");
     const selectedAccount = availableAccounts.find(({ account }) => typeof account.credits !== "number" || account.credits > 0) ?? availableAccounts[0]!;
     const account = selectedAccount.account;
-    const limit = getAiGenerationLimit(subscription?.plan, req.workspace!.subscriptionStatus, req.workspace!.trialEndsAt);
+    const limit = getAiGenerationLimit(req.workspace!.subscriptionPlan, req.workspace!.subscriptionStatus, req.workspace!.trialEndsAt);
     if (limit !== null && usage >= limit) {
       res.status(403).json({ error: `This workspace has reached its ${limit} monthly generation limit.`, code: "GENERATION_LIMIT_REACHED" });
       return;
@@ -468,8 +467,7 @@ router.post("/idea-to-mp4/plan", requireWritableWorkspace, async (req, res, next
       }
     }
 
-    const [subscription, usage, account] = await Promise.all([
-      prisma.subscription.findUnique({ where: { workspaceId: req.workspace!.id }, select: { plan: true } }),
+    const [usage, account] = await Promise.all([
       prisma.generatedContent.count({
         where: { workspaceId: req.workspace!.id, provider: { not: "duplicate" }, createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } },
       }),
@@ -480,7 +478,7 @@ router.post("/idea-to-mp4/plan", requireWritableWorkspace, async (req, res, next
       }),
     ]);
     const limit = getAiGenerationLimit(
-      subscription?.plan,
+      req.workspace!.subscriptionPlan,
       req.workspace!.subscriptionStatus,
       req.workspace!.trialEndsAt,
     );

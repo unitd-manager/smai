@@ -9,9 +9,12 @@ declare global {
       workspace?: {
         id: string;
         resellerId: string | null;
+        billingWorkspaceId: string | null;
+        status: "ACTIVE" | "SUSPENDED";
         role: MembershipRole;
         trialEndsAt: Date;
         subscriptionStatus: string | null;
+        subscriptionPlan: string | null;
       };
     }
   }

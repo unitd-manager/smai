@@ -16,7 +16,7 @@ export default function SignupPage() {
       <section className="auth-panel">
         <p className="eyebrow">YOUR CONTENT, THOUGHTFULLY MADE</p>
         <h1>Tell us about your business.<br /><em>We&apos;ll take it from here.</em></h1>
-        <p className="auth-intro">Create your workspace and start with 14 days of full access. No card required.</p>
+        <p className="auth-intro">Choose an individual business workspace or an agency account for managing separate client brands. Start with 14 days of access.</p>
         <AuthForm mode="signup" />
       </section>
     </main>

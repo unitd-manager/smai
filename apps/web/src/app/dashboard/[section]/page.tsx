@@ -30,6 +30,8 @@ export function generateStaticParams() {
         "/dashboard/system-status",
         "/dashboard/marketing-brain",
         "/dashboard/competitors",
+        "/dashboard/listening",
+        "/dashboard/inbox",
       ].includes(item.href),
     )
     .map((item) => ({ section: item.href.slice("/dashboard/".length) }));

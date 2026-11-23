@@ -6,14 +6,13 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
-  Camera,
+  FileVideo2,
   Clock3,
   FileText,
-  Plus,
-  Send,
+  FolderOpen,
+  Image,
+  Search,
   Sparkles,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
@@ -43,22 +42,10 @@ type Post = {
   }>;
 };
 
-type BrainPreview = {
-  recommendations: Array<{ id: string; title: string; explanation: string; actionLabel: string; actionHref: string }>;
-  contextSummary: { analyticsAvailable: boolean };
-};
-
 type SocialAccount = { id: string; displayName: string | null; status: string };
-
-type DashboardApproval = {
-  id: string;
-  createdAt: string;
-  post: {
-    title: string | null;
-    brand: { name: string };
-    targets: Array<{ id: string; platform: string }>;
-  };
-};
+type DashboardCompetitor = { id: string; name: string; websiteUrl: string | null; snapshots: Array<{ observations: { posts: Array<{ url: string; topic: string; format: string; metrics: { views?: number; likes?: number; comments?: number } }> } }> };
+type CompetitorPreview = { competitors: DashboardCompetitor[] };
+type AutopilotPreview = { brand: { instagramAutopilotEnabled: boolean; instagramAutopilotNextRunAt: string | null }; latestRun: { status: string; error: string | null } | null; blockers: string[] };
 
 type DashboardActivity = {
   draftCount: number;
@@ -135,19 +122,24 @@ function DashboardPerformanceChart({ values }: { values: number[] }) {
   );
 }
 
-const shortcuts = [
-  { label: "Plan your content", href: "/dashboard/content-plans", icon: CalendarDays },
-  { label: "Review drafts", href: "/dashboard/content", icon: FileText },
-  { label: "Connect accounts", href: "/dashboard/social-accounts", icon: Camera },
-  { label: "Manage campaigns", href: "/dashboard/campaigns", icon: Send },
+const studioFeatures = [
+  { label: "Create a post", detail: "Write and design on-brand content", href: "/dashboard/create", icon: Sparkles },
+  { label: "Build a campaign", detail: "Plan around a goal or season", href: "/dashboard/campaigns", icon: CalendarDays },
+  { label: "Create a video", detail: "Make product and brand videos", href: "/dashboard/videos", icon: FileVideo2 },
+  { label: "Browse templates", detail: "Choose an editable layout", href: "/dashboard/templates", icon: Image },
+  { label: "Open your gallery", detail: "Find saved brand assets", href: "/dashboard/gallery", icon: FolderOpen },
+  { label: "Edit a saved design", detail: "Adjust artwork text and export", href: "/dashboard/designs", icon: Image },
+  { label: "View calendar", detail: "Review the publishing schedule", href: "/dashboard/calendar", icon: CalendarDays },
+  { label: "Marketing Brain", detail: "Turn brand and activity signals into next-step ideas", href: "/dashboard/marketing-brain", icon: Sparkles },
+  { label: "Manage publishing", detail: "Review drafts, approvals, and scheduled posts", href: "/dashboard/posts", icon: FileText },
+  { label: "Connect social channels", detail: "Manage the accounts used for publishing", href: "/dashboard/social-accounts", icon: FolderOpen },
 ];
 
 export function DashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [brain, setBrain] = useState<BrainPreview | null>(null);
   const [activity, setActivity] = useState<DashboardActivity | null>(null);
-  const [approvals, setApprovals] = useState<DashboardApproval[] | null>(null);
-  const [approvalError, setApprovalError] = useState("");
+  const [competitors, setCompetitors] = useState<DashboardCompetitor[]>([]);
+  const [autopilot, setAutopilot] = useState<AutopilotPreview | null>(null);
   const [error, setError] = useState("");
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -159,15 +151,12 @@ export function DashboardClient() {
         if (active) setError(requestError instanceof Error ? requestError.message : "Could not load your workspace.");
       });
 
-    apiRequest<BrainPreview>("/api/marketing-brain")
-      .then((response) => { if (active) setBrain(response); })
-      .catch(() => { if (active) setBrain(null); });
-
-    apiRequest<{ approvals: DashboardApproval[] }>("/api/posts/approvals?status=pending&brandId=all")
-      .then((response) => { if (active) setApprovals(response.approvals); })
-      .catch((requestError: unknown) => {
-        if (active) setApprovalError(requestError instanceof Error ? requestError.message : "Could not load approval requests.");
-      });
+    apiRequest<CompetitorPreview>("/api/competitors")
+      .then((response) => { if (active) setCompetitors(response.competitors); })
+      .catch(() => { if (active) setCompetitors([]); });
+    apiRequest<AutopilotPreview>("/api/brand-profile/instagram-autopilot/status")
+      .then((response) => { if (active) setAutopilot(response); })
+      .catch(() => { if (active) setAutopilot(null); });
 
     Promise.all([
       apiRequest<{ posts: Post[] }>("/api/posts?brandId=all&limit=100"),
@@ -229,7 +218,6 @@ export function DashboardClient() {
   }, [weekOffset]);
 
   const dateRange = `${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(weekDays[0]!)} – ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(weekDays[6]!)}`;
-  const recommendation = brain?.recommendations[0];
   const scheduledCount = activity?.scheduledCount ?? 0;
   const publishedCount = activity?.publishedCount ?? 0;
   const draftCount = activity?.draftCount ?? 0;
@@ -240,12 +228,12 @@ export function DashboardClient() {
       <header className="dashboard-welcome">
         <div className="dashboard-welcome-copy">
           <p className="eyebrow">YOUR MARKETING STUDIO</p>
-          <h1>Good morning, Team <span aria-hidden="true">👋</span></h1>
+          <h1>{data?.brand?.name ?? data?.workspace.name ?? "Your workspace"}</h1>
           <p>Your AI-powered workspace for planning, creating, and scheduling on-brand content.</p>
         </div>
         <div className="dashboard-welcome-actions">
           <Link className="button button-outline" href="/dashboard/calendar"><CalendarDays size={16} aria-hidden="true" /> View calendar</Link>
-          <Link className="button button-gold" href="/dashboard/templates"><Sparkles size={16} aria-hidden="true" /> Create with AI</Link>
+          <Link className="button button-gold" href="/dashboard/create"><Sparkles size={16} aria-hidden="true" /> Create content</Link>
         </div>
       </header>
 
@@ -277,133 +265,42 @@ export function DashboardClient() {
         </article>
       </section>
 
-      <div className="dashboard-main-grid">
-        <section className="dashboard-panel dashboard-calendar-panel" aria-label="Content calendar">
-          <div className="dashboard-panel-heading">
-            <div><h2>Content calendar</h2><p>Your scheduled posts for the week</p></div>
-            <div className="dashboard-week-controls">
-              <button type="button" aria-label="Previous week" onClick={() => setWeekOffset((offset) => offset - 1)}><ChevronLeft size={16} /></button>
-              <span>{dateRange}</span>
-              <button type="button" aria-label="Next week" onClick={() => setWeekOffset((offset) => offset + 1)}><ChevronRight size={16} /></button>
-            </div>
-          </div>
-          <div className="dashboard-week-grid">
-            {weekDays.map((date) => {
-              const dayPosts = activity?.upcomingPosts.filter((post) =>
-                post.scheduledAt && sameDay(new Date(post.scheduledAt), date),
-              ) ?? [];
-              return (
-                <article className={`dashboard-day-column${sameDay(date, new Date()) ? " is-today" : ""}`} key={date.toISOString()}>
-                  <div className="dashboard-day-heading">
-                    <span>{new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date)}</span>
-                    <strong>{date.getDate()}</strong>
-                  </div>
-                  <div className="dashboard-day-posts">
-                    {dayPosts.map((post) => (
-                      <Link className="dashboard-post-chip" href="/dashboard/posts" key={post.id} title={post.title}>
-                        <span className="dashboard-post-chip-top"><span>{post.targets[0]?.platform ?? "Post"}</span><Clock3 size={11} aria-hidden="true" /></span>
-                        <strong>{post.title}</strong>
-                        <small>{postTime(post)}</small>
-                      </Link>
-                    ))}
-                    {dayPosts.length === 0 && <p className="dashboard-no-posts">{sameDay(date, new Date()) ? "Your day is open" : "No posts"}</p>}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+      <section className="dashboard-product-grid" aria-label="Product features">
+        <div className="dashboard-product-heading"><div><p className="eyebrow">YOUR WORKSPACE</p><h2>What would you like to work on?</h2></div></div>
+        <div className="dashboard-feature-grid">
+          {studioFeatures.map((feature) => <Link className="dashboard-feature-card" href={feature.href} key={feature.href}>
+            <span className="dashboard-feature-icon"><feature.icon size={19} aria-hidden="true" /></span>
+            <span><strong>{feature.label}</strong><small>{feature.detail}</small></span><ArrowRight size={16} aria-hidden="true" />
+          </Link>)}
+        </div>
+      </section>
+
+      <div className="dashboard-insight-grid">
+        <section className="dashboard-insight-card" aria-label="Competitor snapshot">
+          <header><div><p className="eyebrow">MARKET SNAPSHOT</p><h2>Competitor intelligence</h2></div><Link href="/dashboard/competitors" aria-label="Open competitor intelligence"><ArrowRight size={17} /></Link></header>
+          {competitors.length ? competitors.filter((competitor) => competitor.websiteUrl).slice(0, 3).map((competitor) => {
+            const posts = competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts);
+            const strongest = [...posts].sort((a, b) => ((b.metrics.views ?? 0) + (b.metrics.likes ?? 0) + (b.metrics.comments ?? 0)) - ((a.metrics.views ?? 0) + (a.metrics.likes ?? 0) + (a.metrics.comments ?? 0)))[0];
+            return <div className="dashboard-competitor-row" key={competitor.id}><strong>{competitor.name}</strong><span>{strongest ? `${strongest.format || "Post"}${strongest.topic ? ` · ${strongest.topic}` : ""} · ${strongest.metrics.views !== undefined ? `${strongest.metrics.views.toLocaleString()} views` : strongest.metrics.likes !== undefined ? `${strongest.metrics.likes.toLocaleString()} likes` : "metrics saved"}` : "No post performance recorded yet"}</span></div>;
+          }) : <p className="dashboard-insight-empty">Add verified competitor profiles to see their standout content here.</p>}
+          <Link className="dashboard-insight-link" href="/dashboard/competitors">View competitor findings <ArrowRight size={14} /></Link>
         </section>
-
-        <aside className="dashboard-side-stack">
-          <section className="dashboard-panel dashboard-ai-card" aria-label="AI recommendation">
-            <div className="dashboard-ai-heading"><span className="dashboard-ai-icon"><Sparkles size={17} aria-hidden="true" /></span><h2>AI marketing assistant</h2></div>
-            {recommendation ? <>
-              <strong className="dashboard-ai-title">{recommendation.title}</strong>
-              <p>{recommendation.explanation}</p>
-              <Link className="dashboard-ai-link" href={recommendation.actionHref}>{recommendation.actionLabel}<ArrowRight size={13} aria-hidden="true" /></Link>
-            </> : <>
-              <strong className="dashboard-ai-title">Build your strategy from your brand</strong>
-              <p>{brain?.contextSummary.analyticsAvailable
-                ? "There are no new recommendations right now. Check back as your content performance changes."
-                : "Complete your brand profile to get recommendations tailored to your business."}</p>
-              <Link className="dashboard-ai-link" href={brain?.contextSummary.analyticsAvailable ? "/dashboard/marketing-brain" : "/onboarding"}>
-                {brain?.contextSummary.analyticsAvailable ? "Explore marketing brain" : "Complete your profile"}<ArrowRight size={13} aria-hidden="true" />
-              </Link>
-            </>}
-          </section>
-
-          <section className="dashboard-panel dashboard-approvals-card" aria-label="Approval queue">
-            <div className="dashboard-panel-heading">
-              <div><h2>Approval queue</h2><p>{approvals ? `${approvals.length} waiting for review` : "Pending review"}</p></div>
-            </div>
-            {approvalError ? (
-              <p className="dashboard-panel-empty" role="status">{approvalError}</p>
-            ) : approvals === null ? (
-              <p className="dashboard-panel-empty" role="status">Loading approval requests…</p>
-            ) : approvals.length ? (
-              <div className="dashboard-approval-list">
-                {approvals.slice(0, 3).map((approval) => (
-                  <Link className="dashboard-approval-item" href="/dashboard/approvals" key={approval.id}>
-                    <span className="dashboard-approval-icon"><FileText size={15} aria-hidden="true" /></span>
-                    <span className="dashboard-approval-copy">
-                      <strong>{approval.post.title ?? "Untitled post"}</strong>
-                      <small>{approval.post.brand.name}{approval.post.targets.length ? ` · ${approval.post.targets.map((target) => target.platform).join(", ")}` : ""}</small>
-                    </span>
-                    <ArrowRight size={13} aria-hidden="true" />
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="dashboard-panel-empty">No posts are waiting for approval.</p>
-            )}
-          </section>
-
-          <section className="dashboard-panel" aria-label="Instagram connection">
-            <div className="dashboard-panel-heading"><div><h2>Social accounts</h2><p>Publishing connections</p></div><Link href="/dashboard/social-accounts">Manage <ArrowRight size={13} aria-hidden="true" /></Link></div>
-            <div className="dashboard-account-row">
-              <span className="dashboard-account-provider"><PlatformIcon platform="Instagram" />Instagram</span>
-              {activity?.accounts.some((account) => account.status === "CONNECTED")
-                ? <span className="dashboard-account-state"><CheckCircle2 size={13} />Connected</span>
-                : <Link className="dashboard-account-state is-disconnected" href="/dashboard/social-accounts">Connect <ArrowRight size={12} /></Link>}
-            </div>
-            {activity?.accounts.filter((account) => account.status === "CONNECTED").map((account) => (
-              <p className="dashboard-account-name" key={account.id}>{account.displayName ?? "Instagram account"}</p>
-            ))}
-          </section>
-        </aside>
+        <section className="dashboard-insight-card" aria-label="Weekly Autopilot">
+          <header><div><p className="eyebrow">WEEKLY CONTENT</p><h2>Autopilot</h2></div><Sparkles size={18} aria-hidden="true" /></header>
+          <strong className="dashboard-autopilot-state">{autopilot?.brand.instagramAutopilotEnabled ? "Weekly generation is on" : "Weekly generation is off"}</strong>
+          <p>{autopilot?.brand.instagramAutopilotEnabled
+            ? autopilot.brand.instagramAutopilotNextRunAt ? `Next batch · ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(autopilot.brand.instagramAutopilotNextRunAt))}. Sent for your review.` : "The next brand-specific batch will be sent for your review."
+            : autopilot?.blockers?.length ? autopilot.blockers[0] : "Turn on weekly generation in Publishing settings."}</p>
+          <Link className="dashboard-insight-link" href={autopilot?.brand.instagramAutopilotEnabled ? "/dashboard/instagram-autopilot" : "/dashboard/settings/publishing"}>{autopilot?.brand.instagramAutopilotEnabled ? "View Autopilot" : "Set up Autopilot"} <ArrowRight size={14} /></Link>
+        </section>
       </div>
 
       <section className="dashboard-panel dashboard-analytics-panel" aria-label="Publishing analytics">
-        <div className="dashboard-panel-heading">
-          <div><h2>Publishing analytics</h2><p>Confirmed live posts this week</p></div>
-          <Link href="/dashboard/analytics">View analytics <ArrowRight size={13} aria-hidden="true" /></Link>
-        </div>
-        {activity
-          ? <>
-              <div className="dashboard-performance-summary"><strong>{activity.dailyPublished.reduce((sum, count) => sum + count, 0)}</strong><span>live posts confirmed this week</span></div>
-              <DashboardPerformanceChart values={activity.dailyPublished} />
-              {!activity.dailyPublished.some((count) => count > 0) && <p className="dashboard-chart-empty">The chart will update after a connected platform confirms a published post.</p>}
-            </>
-          : <p className="dashboard-panel-empty" role="status">Loading live publishing analytics…</p>}
+        <div className="dashboard-panel-heading"><div><h2>Publishing activity</h2><p>Confirmed live posts this week</p></div><Link href="/dashboard/analytics">Open analytics <ArrowRight size={13} aria-hidden="true" /></Link></div>
+        {activity ? <><div className="dashboard-performance-summary"><strong>{activity.dailyPublished.reduce((sum, count) => sum + count, 0)}</strong><span>live posts confirmed this week</span></div><DashboardPerformanceChart values={activity.dailyPublished} />{!activity.dailyPublished.some((count) => count > 0) && <p className="dashboard-chart-empty">Activity will appear after a connected platform confirms published posts.</p>}</> : <p className="dashboard-panel-empty" role="status">Loading publishing activity…</p>}
       </section>
 
-      <div className="dashboard-bottom-grid">
-        <section className="dashboard-panel">
-          <div className="dashboard-panel-heading"><div><h2>Your content pipeline</h2><p>Track the work from draft to publication</p></div></div>
-          <div className="dashboard-pipeline">
-            <div className="dashboard-pipeline-step"><span className="dashboard-pipeline-icon"><Sparkles size={16} /></span><span><strong>Drafts</strong><small>{activity ? draftCount : "—"} to review</small></span></div>
-            <div className="dashboard-pipeline-step"><span className="dashboard-pipeline-icon"><Clock3 size={16} /></span><span><strong>Scheduled</strong><small>{activity ? scheduledCount : "—"} in queue</small></span></div>
-            <div className="dashboard-pipeline-step"><span className="dashboard-pipeline-icon"><CheckCircle2 size={16} /></span><span><strong>Published</strong><small>{activity ? publishedCount : "—"} completed</small></span></div>
-          </div>
-        </section>
-        <section className="dashboard-panel">
-          <div className="dashboard-panel-heading"><div><h2>Quick access</h2><p>Pick up where you left off</p></div></div>
-          <div className="dashboard-shortcuts">
-            {shortcuts.map((shortcut) => <Link className="dashboard-shortcut" href={shortcut.href} key={shortcut.href}><shortcut.icon size={16} aria-hidden="true" />{shortcut.label}<Plus size={13} aria-hidden="true" /></Link>)}
-          </div>
-        </section>
-      </div>
-
+      {activity?.upcomingPosts.length ? <section className="dashboard-upcoming-strip"><header><h2>Coming up</h2><Link href="/dashboard/calendar">Open calendar <ArrowRight size={13} /></Link></header>{activity.upcomingPosts.slice(0, 3).map((post) => <Link href="/dashboard/posts" key={post.id}><span>{post.title}</span><small>{post.scheduledAt ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: post.timezone || undefined }).format(new Date(post.scheduledAt)) : "Draft"}</small></Link>)}</section> : null}
       {data && data.trialDaysRemaining > 0 && data.subscriptionStatus === "trialing" && (
         <p className="dashboard-trial-note">Your trial has {data.trialDaysRemaining} {data.trialDaysRemaining === 1 ? "day" : "days"} left. <Link href="/pricing">Explore plans <ArrowRight size={12} /></Link></p>
       )}

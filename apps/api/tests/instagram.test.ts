@@ -7,8 +7,76 @@ process.env.INSTAGRAM_APP_SECRET = "test-instagram-secret";
 process.env.INSTAGRAM_REDIRECT_URI = "https://api.example.test/api/social-accounts/instagram/callback";
 process.env.PUBLIC_API_URL = "https://api.example.test";
 process.env.SOCIAL_TOKEN_ENCRYPTION_KEY = "a".repeat(64);
+process.env.FACEBOOK_APP_ID = "test-facebook-app";
+process.env.FACEBOOK_APP_SECRET = "test-facebook-secret";
+process.env.FACEBOOK_REDIRECT_URI = "https://api.example.test/api/social-accounts/facebook/callback";
 
 const instagram = await import("../src/services/instagram.js");
+const facebook = await import("../src/services/facebook.js");
+const { decryptSocialToken } = await import("../src/services/social-token-crypto.js");
+
+test("Facebook OAuth URL requests Page-list and Instagram Business Discovery permissions", () => {
+  const authorizationUrl = new URL(facebook.makeFacebookAuthorizationUrl("oauth-state"));
+  assert.equal(authorizationUrl.origin, "https://www.facebook.com");
+  assert.equal(authorizationUrl.pathname, "/v26.0/dialog/oauth");
+  assert.equal(authorizationUrl.searchParams.get("client_id"), "test-facebook-app");
+  assert.equal(authorizationUrl.searchParams.get("redirect_uri"), process.env.FACEBOOK_REDIRECT_URI);
+  assert.equal(authorizationUrl.searchParams.get("response_type"), "code");
+  assert.equal(
+    authorizationUrl.searchParams.get("scope"),
+    "pages_show_list,instagram_basic,instagram_manage_insights,pages_read_engagement",
+  );
+  assert.equal(authorizationUrl.searchParams.get("state"), "oauth-state");
+});
+
+test("Facebook code exchange encrypts every Page token and follows safe Page cursors", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: URL; authorization?: string }> = [];
+  const responses = [
+    { access_token: "short-lived-user-token" },
+    { access_token: "long-lived-user-token", expires_in: 5_184_000 },
+    { id: "facebook-user-1", name: "Test Facebook User" },
+    {
+      data: [{ id: "page-1", name: "First Page", access_token: "first-page-token" }],
+      paging: {
+        next: "https://graph.facebook.com/v26.0/me/accounts?after=cursor&access_token=long-lived-user-token",
+      },
+    },
+    { data: [{ id: "page-2", name: "Second Page", access_token: "second-page-token" }] },
+  ];
+  globalThis.fetch = async (input, init) => {
+    requests.push({
+      url: new URL(input instanceof Request ? input.url : input.toString()),
+      authorization: new Headers(init?.headers).get("Authorization") ?? undefined,
+    });
+    const body = responses.shift();
+    assert.ok(body);
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  try {
+    const connection = await facebook.exchangeFacebookCode("authorization-code");
+    assert.equal(connection.pages.length, 2);
+    assert.deepEqual(connection.pages.map((page) => page.id), ["page-1", "page-2"]);
+    assert.equal(decryptSocialToken(connection.pages[0]!.encryptedTokens), "first-page-token");
+    assert.equal(decryptSocialToken(connection.pages[1]!.encryptedTokens), "second-page-token");
+    assert.equal(decryptSocialToken(connection.user.encryptedTokens), "long-lived-user-token");
+    assert.equal(connection.user.id, "facebook-user-1");
+    assert.ok(connection.user.tokenExpiresAt instanceof Date);
+    assert.equal(requests.length, 5);
+    assert.equal(requests[0]!.url.pathname, "/v26.0/oauth/access_token");
+    assert.equal(requests[1]!.url.searchParams.get("grant_type"), "fb_exchange_token");
+    assert.equal(requests[2]!.url.pathname, "/v26.0/me");
+    assert.equal(requests[2]!.url.searchParams.get("fields"), "id,name");
+    assert.equal(requests[3]!.url.searchParams.get("fields"), "id,name,access_token");
+    assert.equal(requests[2]!.authorization, "Bearer long-lived-user-token");
+    assert.equal(requests[4]!.url.searchParams.get("after"), "cursor");
+    assert.equal(requests[4]!.url.searchParams.has("access_token"), false);
+    assert.equal(requests[3]!.authorization, "Bearer long-lived-user-token");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("Instagram OAuth URL requests only publishing permissions and carries signed server state", () => {
   const authorizationUrl = new URL(instagram.makeInstagramAuthorizationUrl("oauth-state"));

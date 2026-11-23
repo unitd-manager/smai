@@ -114,6 +114,16 @@ Requirements: Node.js 20 or newer, npm, and MySQL 8 or a compatible XAMPP MariaD
 
    Add Instagram Login to the Meta app and request `instagram_business_basic` and `instagram_business_content_publish`. Use an Instagram Professional (Business or Creator) account and grant your Meta app user/tester access while the app is in Development mode. Use Meta's App Review and Advanced Access for accounts outside the app's roles. Never commit or share the app secret or encryption key.
 
+5. To connect Facebook Pages, configure the same Meta app with Facebook Login and register this exact callback URL:
+
+   ```text
+   https://YOUR_API_HOST/api/social-accounts/facebook/callback
+   ```
+
+   Set `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, and `FACEBOOK_REDIRECT_URI` in `apps\api\.env`; use the Facebook callback above for `FACEBOOK_REDIRECT_URI`. Keep the same `SOCIAL_TOKEN_ENCRYPTION_KEY` used by Instagram, and use `FACEBOOK_GRAPH_API_VERSION` only when intentionally selecting a different supported Graph API version. The connection requests `pages_show_list`, `instagram_basic`, `instagram_manage_insights`, and `pages_read_engagement`, and stores user and Page access tokens encrypted. Instagram competitor Business Discovery requires an eligible linked professional account and Meta app approval/permissions; reconnect Facebook after configuring them.
+
+   **Competitor analytics setup:** Competitor Intelligence automatically searches for up to six competitors when the page is opened and an industry, product, or business description is saved in Brand Profile. Configure `TAVILY_API_KEY` for discovery, `YOUTUBE_DATA_API_KEY` for public YouTube channel/video statistics, and `X_API_BEARER_TOKEN` for public X posts. Instagram competitor posts use Facebook Login Business Discovery as described above. Facebook, LinkedIn, TikTok, and Pinterest profile links are saved, but this app does not have approved competitor-data API connectors for them. API coverage and visible counts vary by account and platform.
+
    For local API development, `PUBLIC_API_URL` must be an active public HTTPS tunnel that forwards to the local API. Temporary tunnel URLs expire; update this setting and restart the API whenever the tunnel URL changes. Instagram cannot fetch media from `localhost`.
 
 5. Apply the schema, generate Prisma Client, and seed the administrator and starter templates. For a database that already contains applied migrations, do not reset it to resolve migration history or checksum errors; inspect the schema first and apply only reviewed additive migrations. The two current marketing migrations add a Content Sets table and optional profile voice-rule fields.
@@ -163,6 +173,12 @@ Requirements: Node.js 20 or newer, npm, and MySQL 8 or a compatible XAMPP MariaD
 | API | `FFMPEG_PATH` / `FFPROBE_PATH` | Optional full executable paths when FFmpeg is not on `PATH` |
 | API | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` | Instagram Login credentials from the Meta Business app |
 | API | `INSTAGRAM_REDIRECT_URI` | Exact callback URL registered in Meta |
+| API | `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` | Facebook Login credentials from the Meta app |
+| API | `FACEBOOK_REDIRECT_URI` | Exact Facebook callback URL registered in Meta |
+| API | `FACEBOOK_GRAPH_API_VERSION` | Facebook Graph API version (default `v26.0`) |
+| API | `TAVILY_API_KEY` | Search provider key for automatic competitor website discovery |
+| API | `YOUTUBE_DATA_API_KEY` | YouTube Data API key for public channel/video statistics |
+| API | `X_API_BEARER_TOKEN` | X API bearer token for recent public account posts and metrics |
 | API | `SOCIAL_TOKEN_ENCRYPTION_KEY` | 32-byte hex key used to encrypt connected social tokens at rest |
 | API | `INSTAGRAM_GRAPH_API_VERSION` | Instagram Graph API version (default `v26.0`) |
 | API | `PRODUCT_NAME` | API log and seeded-admin product label |
@@ -193,6 +209,8 @@ The public pricing page does not invent subscription rates: it explains that rat
 Expired app sessions attempt one shared refresh request before protected API calls are retried; if the session cannot be refreshed, the user is returned to sign-in. Appearance preferences are stored per user, with an optional owner-managed workspace default. Midnight blue and violet is the default dark palette; users can select other palettes or customize colors. The dashboard uses shared semantic theme tokens, inline tool search, and supports light, dark, or system color mode.
 
 ## Implemented screens and runtime behavior
+
+- **Agency and individual accounts:** Individual signup creates one independent workspace. Agency signup creates an agency workspace and reseller record; agency owners can create separate client workspaces and switch between them. Client workspaces isolate brands, content, social accounts, media, and team memberships. Each client workspace inherits the agency workspace subscription status and plan instead of creating another billing subscription. Agency owners can invite client members to a selected client workspace through the existing Team flow.
 
 ## Reliability and diagnostics (Batch 0 in progress)
 

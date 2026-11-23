@@ -22,7 +22,7 @@ const formatOptions = [
   { id: "facebook-cover", label: "Facebook cover", channel: "Draft" },
 ] as const;
 type FormatId = typeof formatOptions[number]["id"];
-const initialCounts: Record<FormatId, number> = { post: 5, carousel: 2, brochure: 2, "video-product-demo": 1, "video-avatar": 1, "linkedin-banner": 1, "facebook-cover": 1 };
+const initialCounts: Record<FormatId, number> = { post: 4, carousel: 3, brochure: 0, "video-product-demo": 0, "video-avatar": 0, "linkedin-banner": 0, "facebook-cover": 0 };
 
 const activeStatuses = new Set(["QUEUED", "GENERATING", "WAITING_FOR_RENDER"]);
 
@@ -104,7 +104,7 @@ export function InstagramAutopilotClient() {
           <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
           <h1>Autopilot</h1>
           <p className="dashboard-lead">
-            Generate a weekly batch from your saved brand profile, email it for approval, and queue approved posts in your brand time zone. Autopilot selects connected channels automatically; Instagram is currently the only live publishing integration.
+            Every week, Autopilot creates fresh posts and carousels using this brand&apos;s profile, services, audience, voice, and goals. It emails the drafts for your review; it never publishes without your approval.
           </p>
         </div>
         <span className="instagram-autopilot-approval-badge">Approval-first scheduling</span>
@@ -115,9 +115,9 @@ export function InstagramAutopilotClient() {
 
       <article className="instagram-autopilot-card">
         <div>
-          <p className="eyebrow">ONE-TIME TEST RUN</p>
-          <h2>{status?.brand.name ?? "Your brand"} · Build a scheduled batch</h2>
-          <p>Autopilot creates a profile focused mix, then emails every item for your review. Approved Instagram posts are queued automatically. Nothing publishes before approval.</p>
+          <p className="eyebrow">WEEKLY AUTOMATION</p>
+          <h2>{status?.brand.name ?? "Your brand"} · Brand-specific content</h2>
+          <p>When weekly Autopilot is enabled in Brand Profile, it generates a new seven-day batch automatically and emails it to the workspace owner. Drafts stay in review until you approve them.</p>
           {status && <small>Connected channel{status.brand.connectedPlatforms.length === 1 ? "" : "s"}: {status.brand.connectedPlatforms.join(", ") || "none"} · Brand time zone: {status.brand.timezone}</small>}
         </div>
         <button

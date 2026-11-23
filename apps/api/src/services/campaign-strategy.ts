@@ -198,7 +198,7 @@ Rules:
 - Apply the supplied active Marketing Brain insights where relevant; do not turn recommendations into proven performance claims.
 - Apply supplied competitor insights only as evidence-limited strategic hypotheses. Do not copy competitor wording, creative assets, claims, or branding; generate differentiated original work.
 - If no analyzed competitor evidence is supplied, do not invent competitive strengths, weaknesses, or activity.
-- Offers are recommendations only. Set confirmationRequired=true for unverified discounts, scarcity, guarantees, and incentives. Never create artificial urgency or claim an unconfirmed offer exists.
+- Do not recommend or invent discounts, offers, prices, scarcity, guarantees, or incentives. Set the offer recommendation to "No offer recommended; focus on the supplied products, services, and experience." Keep confirmationRequired=true and use a non-promotional safeguard.
 - Paid media is optional advice only. Do not imply campaigns can be launched through ad integrations. Use relative budget guidance, not a currency forecast.
 - Generate 3 to 5 non-repetitive hooks and 3 to 6 content pillars. Use the brand's tone and avoid banned words.
 - Timeline day ranges must fit 1..${request.durationDays}, cover the campaign without gaps, and be in chronological order. Content sequence phase names should correspond to timeline phases.

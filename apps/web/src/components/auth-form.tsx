@@ -116,22 +116,23 @@ export function AuthForm({ mode }: AuthFormProps) {
       </div>
       {isSignup && (
         <>
-          <label>
-            What will you use {brand.productName} for?
+      <label>
+        Account type
             <CompactSelect
-              aria-label={`What will you use ${brand.productName} for?`}
+          aria-label="Account type"
               value={accountType}
               onChange={(event) => {
                 setAccountType(event.target.value as AccountType);
                 setNoWebsite(false);
               }}
             >
-              <option value="business">Business</option>
-              <option value="agency">Agency</option>
+          <option value="business">Individual business</option>
+          <option value="agency">Agency managing client brands</option>
               <option value="creator">Creator or influencer</option>
               <option value="personal">Personal use</option>
             </CompactSelect>
           </label>
+      {accountType === "agency" && <p className="auth-account-type-note">Create one agency sign-in, then set up a separate workspace for each client. Your clients’ brands, content and connected social accounts stay isolated.</p>}
           {accountType !== "personal" && (
             <>
               <label>

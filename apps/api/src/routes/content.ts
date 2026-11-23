@@ -232,17 +232,11 @@ router.post("/generate", requireWritableWorkspace, async (req, res, next) => {
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const [subscription, usage] = await Promise.all([
-      prisma.subscription.findUnique({
-        where: { workspaceId: req.workspace!.id },
-        select: { plan: true },
-      }),
-      prisma.generatedContent.count({
+    const usage = await prisma.generatedContent.count({
         where: { workspaceId: req.workspace!.id, provider: { not: "duplicate" }, createdAt: { gte: monthStart } },
-      }),
-    ]);
+      });
     const generationLimit = getAiGenerationLimit(
-      subscription?.plan,
+      req.workspace!.subscriptionPlan,
       req.workspace!.subscriptionStatus,
       req.workspace!.trialEndsAt,
       now,
@@ -727,14 +721,11 @@ router.post("/:id/regenerate-platform", requireWritableWorkspace, async (req, re
     }
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const [subscription, usage] = await Promise.all([
-      prisma.subscription.findUnique({ where: { workspaceId: req.workspace!.id }, select: { plan: true } }),
-      prisma.generatedContent.count({
+    const usage = await prisma.generatedContent.count({
         where: { workspaceId: req.workspace!.id, provider: { not: "duplicate" }, createdAt: { gte: monthStart } },
-      }),
-    ]);
+      });
     const generationLimit = getAiGenerationLimit(
-      subscription?.plan,
+      req.workspace!.subscriptionPlan,
       req.workspace!.subscriptionStatus,
       req.workspace!.trialEndsAt,
       now,

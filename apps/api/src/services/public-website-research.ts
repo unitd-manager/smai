@@ -12,6 +12,8 @@ export type PublicWebsiteResearch = {
   finalUrl: string;
   title: string | null;
   description: string | null;
+  logoUrl: string | null;
+  logoText: string | null;
   excerpt: string;
   socialProfiles: Partial<Record<"Instagram" | "Facebook" | "LinkedIn" | "TikTok" | "YouTube" | "X" | "Pinterest", string>>;
   collectedAt: string;
@@ -133,11 +135,61 @@ export function extractPublicWebsite(html: string, url: string): Omit<PublicWebs
     .find((tag) => /(?:name|property)\s*=\s*["'](?:description|og:description)["']/i.test(tag));
   const title = normalizeText(titleTag) || null;
   const description = metaDescription ? normalizeText(attribute(metaDescription, "content")) || null : null;
+  const baseUrl = new URL(url);
+  const safeLogoUrl = (value: string) => {
+    try {
+      const logo = new URL(decodeHtml(value.trim()), baseUrl);
+      if (logo.protocol !== "https:" || logo.username || logo.password || logo.pathname === "/") return null;
+      return logo.toString();
+    } catch { return null; }
+  };
+  const metaTags = [...withoutHidden.matchAll(/<meta\b[^>]*>/gi)].map(([tag]) => tag);
+  const logoMeta = metaTags.find((tag) => /(?:property|itemprop|name)\s*=\s*["'](?:og:logo|logo|brand-logo)["']/i.test(tag));
+  const linkTags = [...withoutHidden.matchAll(/<link\b[^>]*>/gi)].map(([tag]) => tag);
+  const logoLink = linkTags.find((tag) => /\brel\s*=\s*["'][^"']*\b(?:logo|apple-touch-icon)\b/i.test(tag));
+  const iconLink = linkTags.find((tag) => /\brel\s*=\s*["'][^"']*\bicon\b/i.test(tag));
+  const images = [...withoutHidden.matchAll(/<img\b[^>]*>/gi)].map(([tag]) => tag);
+  const imageSource = (tag: string) => attribute(tag, "src") || attribute(tag, "data-src") || attribute(tag, "data-lazy-src") || attribute(tag, "data-original") || attribute(tag, "srcset").split(/[\s,]/)[0] || "";
+  const logoImage = images.find((tag) => /(?:alt|class|id|src|data-src|data-lazy-src)\s*=\s*["'][^"']*logo[^"']*["']/i.test(tag))
+    || (withoutHidden.match(/<header\b[^>]*>([\s\S]*?)<\/header\s*>/i)?.[1] ?? "").match(/<img\b[^>]*>/i)?.[0]
+    || "";
+  const logoMarkMatch = withoutHidden.match(/<(?:span|div|b|strong)\b[^>]*class\s*=\s*["'][^"']*\bmark\b[^"']*["'][^>]*>([\s\S]*?)<\/(?:span|div|b|strong)\s*>/i);
+  const logoText = logoMarkMatch ? normalizeText(logoMarkMatch[1] ?? "").slice(0, 12) || null : null;
+  const structuredLogo = [...withoutHidden.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script\s*>/gi)]
+    .flatMap(([, raw]) => {
+      try {
+        const parsed: unknown = JSON.parse(raw ?? "");
+        const pending: unknown[] = Array.isArray(parsed) ? [...parsed] : [parsed];
+        const found: string[] = [];
+        while (pending.length) {
+          const item = pending.pop();
+          if (!item || typeof item !== "object") continue;
+          if (Array.isArray(item)) { pending.push(...item); continue; }
+          const record = item as Record<string, unknown>;
+          const logo = record.logo;
+          if (typeof logo === "string") found.push(logo);
+          else if (logo && typeof logo === "object") {
+            const logoUrl = (logo as Record<string, unknown>).url;
+            if (typeof logoUrl === "string") found.push(logoUrl);
+          }
+          pending.push(...Object.values(record).filter((value) => value && typeof value === "object"));
+        }
+        return found;
+      } catch { return []; }
+    })[0];
+  const logoUrl = safeLogoUrl(logoMeta ? attribute(logoMeta, "content") : "")
+    ?? safeLogoUrl(structuredLogo ?? "")
+    ?? safeLogoUrl(logoLink ? attribute(logoLink, "href") : "")
+    ?? safeLogoUrl(logoImage ? imageSource(logoImage) : "")
+    ?? safeLogoUrl(attribute(metaTags.find((tag) => /(?:property|name)\s*=\s*["'](?:og:image|twitter:image)["']/i.test(tag)) ?? "", "content"))
+    ?? safeLogoUrl(iconLink ? attribute(iconLink, "href") : "");
   const body = withoutHidden.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i)?.[1] ?? withoutHidden;
   return {
     url,
     title,
     description,
+    logoUrl,
+    logoText,
     excerpt: normalizeText(body),
     socialProfiles: extractSocialProfiles(withoutHidden),
   };
@@ -167,8 +219,9 @@ function resolvePublicAddress(hostname: string): Promise<{ address: string; fami
   });
 }
 
-function requestHtml(url: URL, address: { address: string; family: 4 | 6 }): Promise<{ html: string; redirect?: string }> {
+function requestHtml(url: URL, address: { address: string; family: 4 | 6 }): Promise<{ html: string; redirect?: string; truncated?: true }> {
   return new Promise((resolve, reject) => {
+    let settled = false;
     const pinnedLookup: LookupFunction = (_hostname, options, callback) => {
       if (typeof options === "object" && options !== null && "all" in options && options.all) {
         callback(null, [{ address: address.address, family: address.family }]);
@@ -205,20 +258,38 @@ function requestHtml(url: URL, address: { address: string; family: 4 | 6 }): Pro
       }
       const chunks: Buffer[] = [];
       let totalBytes = 0;
+      const finish = (truncated = false) => {
+        if (settled) return;
+        settled = true;
+        const html = Buffer.concat(chunks).toString("utf8");
+        resolve({ html, ...(truncated ? { truncated: true } : {}) });
+      };
       response.on("data", (chunk: Buffer | string) => {
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        totalBytes += buffer.length;
-        if (totalBytes > maximumHtmlBytes) {
-          request.destroy(new Error("Website page exceeded the 512 KB research limit."));
+        const remaining = maximumHtmlBytes - totalBytes;
+        if (buffer.length > remaining) {
+          if (remaining > 0) chunks.push(buffer.subarray(0, remaining));
+          totalBytes = maximumHtmlBytes;
+          finish(true);
+          response.destroy();
           return;
         }
+        totalBytes += buffer.length;
         chunks.push(buffer);
       });
-      response.on("end", () => resolve({ html: Buffer.concat(chunks).toString("utf8") }));
-      response.on("error", reject);
+      response.on("end", () => finish());
+      response.on("error", (error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      });
     });
     request.setTimeout(requestTimeoutMs, () => request.destroy(new Error("Website request timed out.")));
-    request.on("error", reject);
+    request.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
     request.end();
   });
 }
@@ -245,8 +316,10 @@ export async function researchPublicWebsite(value: string): Promise<PublicWebsit
       url = validateWebsiteUrl(new URL(response.redirect, url).toString());
       continue;
     }
+    const extracted = extractPublicWebsite(response.html, requestedUrl);
     return {
-      ...extractPublicWebsite(response.html, requestedUrl),
+      ...extracted,
+      excerpt: response.truncated ? `[Homepage scan capped at 512 KB.] ${extracted.excerpt}`.slice(0, maximumExcerptLength) : extracted.excerpt,
       finalUrl: url.toString(),
       collectedAt: new Date().toISOString(),
     };

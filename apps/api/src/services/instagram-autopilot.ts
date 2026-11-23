@@ -11,7 +11,9 @@ type AutopilotFormat = typeof autopilotFormatOptions[number];
 export type AutopilotSettings = { days: number; counts: Record<AutopilotFormat, number>; campaignGoal: string };
 export const defaultInstagramAutopilotSettings: AutopilotSettings = {
   days: 7,
-  counts: { post: 5, carousel: 2, brochure: 2, "video-product-demo": 1, "video-avatar": 1, "linkedin-banner": 1, "facebook-cover": 1 },
+  // The unattended weekly run should work without external video services or assets.
+  // It creates native Instagram image posts and carousels from the saved brand profile.
+  counts: { post: 4, carousel: 3, brochure: 0, "video-product-demo": 0, "video-avatar": 0, "linkedin-banner": 0, "facebook-cover": 0 },
   campaignGoal: "",
 };
 const retryIntervalMs = 15 * 60 * 1000;
@@ -418,16 +420,34 @@ async function queueDueProfiles(now: Date) {
       brandId: true,
       workspaceId: true,
       instagramAutopilotNextRunAt: true,
+      industry: true,
+      products: true,
+      audience: true,
+      tone: true,
+      goals: true,
+      brand: { select: { name: true, kit: { select: { colors: true, fonts: true } } } },
     },
   });
   for (const profile of profiles) {
+    const hasColors = Array.isArray(profile.brand.kit?.colors) && profile.brand.kit.colors.some((color) => typeof color === "string" && /^#[\da-f]{6}$/i.test(color));
+    const hasFonts = Array.isArray(profile.brand.kit?.fonts) && profile.brand.kit.fonts.some((font) => typeof font === "string" && font.trim());
+    const goals = strings(profile.goals);
+    const [account, workspace, owner] = await Promise.all([
+      prisma.socialAccount.findFirst({ where: { workspaceId: profile.workspaceId, brandId: profile.brandId, provider: "instagram", status: "CONNECTED" }, select: { id: true } }),
+      prisma.workspace.findUnique({ where: { id: profile.workspaceId }, select: { trialEndsAt: true, subscription: { select: { status: true } }, billingWorkspace: { select: { trialEndsAt: true, subscription: { select: { status: true } } } } } }),
+      prisma.membership.findFirst({ where: { workspaceId: profile.workspaceId, role: "OWNER" }, select: { id: true } }),
+    ]);
+    const subscriptionStatus = workspace?.billingWorkspace?.subscription?.status ?? workspace?.subscription?.status;
+    const trialEndsAt = workspace?.billingWorkspace?.trialEndsAt ?? workspace?.trialEndsAt;
+    const canWrite = subscriptionStatus === "active" || (subscriptionStatus === "trialing" && Boolean(trialEndsAt && trialEndsAt > now));
+    // Wait until all required inputs and delivery channels are ready. Keeping the due date
+    // unchanged lets the worker pick this brand up as soon as setup is complete.
+    if (!profile.brand.name.trim() || !profile.industry?.trim() || !profile.products?.trim() || !profile.audience?.trim() ||
+      !profile.tone?.trim() || !goals.length || !hasColors || !hasFonts || !account || !owner || !canWrite ||
+      !approvalEmailConfigured || !isInstagramMediaHostingConfigured() ||
+      (!env.GOOGLE_AI_STUDIO_API_KEY && !env.GROQ_API_KEY && !env.OPENAI_API_KEY)) continue;
     const weekStart = profile.instagramAutopilotNextRunAt ?? now;
-    const previousRun = await prisma.instagramAutopilotRun.findFirst({
-      where: { workspaceId: profile.workspaceId, brandId: profile.brandId },
-      orderBy: { createdAt: "desc" },
-      select: { contentIds: true },
-    });
-    const settings = previousRun ? readSettings(previousRun.contentIds) : defaultInstagramAutopilotSettings;
+    const settings = defaultInstagramAutopilotSettings;
     const run = await prisma.instagramAutopilotRun.upsert({
       where: { brandId_weekStart: { brandId: profile.brandId, weekStart } },
       create: {

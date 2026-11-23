@@ -26,6 +26,9 @@ import { themeSettingsRouter } from "./routes/theme-settings.js";
 import { notificationsRouter } from "./routes/notifications.js";
 import { notificationSettingsRouter } from "./routes/notification-settings.js";
 import { approvalEmailRouter } from "./routes/approval-email.js";
+import { agencyRouter } from "./routes/agency.js";
+import { listeningRouter } from "./routes/listening.js";
+import { inboxRouter } from "./routes/inbox.js";
 import { requireAuth, requireWorkspace } from "./middleware/auth.js";
 import { prisma } from "./db.js";
 import { Prisma } from "@prisma/client";
@@ -69,6 +72,8 @@ app.use("/api/templates", templatesRouter);
 app.use("/api/designs", designsRouter);
 app.use("/api/posts", postsRouter);
 app.use("/api/social-accounts", socialAccountsRouter);
+app.use("/api/listening", listeningRouter);
+app.use("/api/inbox", inboxRouter);
 app.use("/api/videos", videosRouter);
 app.use("/api/media", mediaRouter);
 app.use("/api/gallery", galleryRouter);
@@ -83,6 +88,7 @@ app.use("/api/theme-settings", themeSettingsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/notification-settings", notificationSettingsRouter);
 app.use("/api/approval-email", approvalEmailRouter);
+app.use("/api/agency", agencyRouter);
 
 app.get("/api/workspaces", requireAuth, async (req, res, next) => {
   try {
@@ -101,8 +107,19 @@ app.get("/api/workspaces", requireAuth, async (req, res, next) => {
               id: true,
               name: true,
               trialEndsAt: true,
-              subscription: { select: { status: true } },
-              brands: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } },
+              billingWorkspaceId: true,
+              subscription: { select: { status: true, plan: true } },
+              billingWorkspace: {
+                select: {
+                  trialEndsAt: true,
+                  subscription: { select: { status: true, plan: true } },
+                },
+              },
+              reseller: { select: { ownerUserId: true } },
+              brands: {
+                select: { id: true, name: true, profile: { select: { accountType: true } } },
+                orderBy: { createdAt: "asc" },
+              },
             },
           },
         },
@@ -110,14 +127,24 @@ app.get("/api/workspaces", requireAuth, async (req, res, next) => {
     ]);
     res.json({
       workspaces: memberships.map(({ role, workspace }) => {
-        const { subscription, ...workspaceData } = workspace;
+        const subscription = workspace.billingWorkspace?.subscription ?? workspace.subscription;
+        const trialEndsAt = workspace.billingWorkspace?.trialEndsAt ?? workspace.trialEndsAt;
+        const reseller = workspace.reseller;
+        const brands = workspace.brands;
         return {
-          ...workspaceData,
+          id: workspace.id,
+          name: workspace.name,
+          billingWorkspaceId: workspace.billingWorkspaceId,
+          trialEndsAt,
+          brands: brands.map(({ id, name }) => ({ id, name })),
           role,
           subscriptionStatus: subscription?.status ?? null,
+          subscriptionPlan: subscription?.plan ?? null,
+          agencyOwner: reseller?.ownerUserId === req.auth!.userId ||
+            brands.some((brand) => brand.profile?.accountType === "AGENCY"),
           trialDaysRemaining:
             subscription?.status === "trialing"
-              ? Math.max(0, Math.ceil((workspace.trialEndsAt.getTime() - Date.now()) / 86400000))
+              ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86400000))
               : 0,
         };
       }),

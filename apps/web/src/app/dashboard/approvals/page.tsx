@@ -1,7 +1,5 @@
-import { ApprovalsClient } from "@/components/approvals-client";
-import { Logo } from "@/components/logo";
-import { WorkspaceShell } from "@/components/workspace-shell";
+import { redirect } from "next/navigation";
 
 export default function ApprovalsPage() {
-  return <WorkspaceShell logo={<Logo markOnly />}><ApprovalsClient /></WorkspaceShell>;
+  redirect("/dashboard/posts?view=approvals");
 }

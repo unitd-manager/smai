@@ -49,6 +49,7 @@ type Workspace = {
   trialEndsAt: string;
   trialDaysRemaining: number;
   subscriptionStatus: string | null;
+  agencyOwner: boolean;
   brands: Array<{ id: string; name: string }>;
 };
 
@@ -378,9 +379,10 @@ export function WorkspaceShell({
   const visibleNavigation = useMemo(
     () => workspaceNavigation.filter((group) =>
       (group.label !== "ADMIN" || isSuperAdmin) &&
-      (group.label !== "WORKSPACE ADMIN" || activeWorkspace?.role === "OWNER" || activeWorkspace?.role === "ADMIN"),
+      (group.label !== "WORKSPACE ADMIN" || activeWorkspace?.role === "OWNER" || activeWorkspace?.role === "ADMIN") &&
+      (group.label !== "AGENCY" || activeWorkspace?.agencyOwner),
     ),
-    [activeWorkspace?.role, isSuperAdmin],
+    [activeWorkspace?.agencyOwner, activeWorkspace?.role, isSuperAdmin],
   );
   const matchingTools = useMemo(() => {
     const query = toolSearch.trim().toLocaleLowerCase();
@@ -435,6 +437,21 @@ export function WorkspaceShell({
     }
   }
 
+  function switchWorkspace(workspaceId: string) {
+    const workspace = workspaces.find((item) => item.id === workspaceId);
+    if (!workspace || workspace.id === activeWorkspaceId) return;
+    window.localStorage.setItem("united-technologies.workspaceId", workspace.id);
+    const savedBrand = window.localStorage.getItem("united-technologies.brandId");
+    const brandId = workspace.brands.some((item) => item.id === savedBrand) ? savedBrand : workspace.brands[0]?.id;
+    if (brandId) window.localStorage.setItem("united-technologies.brandId", brandId);
+    else window.localStorage.removeItem("united-technologies.brandId");
+    verifiedProfileWorkspaceId.current = "";
+    setActiveWorkspaceId(workspace.id);
+    setError("");
+    setMobileOpen(false);
+    router.replace("/dashboard");
+  }
+
   return (
     <div className={`app-shell${sidebarResizing ? " sidebar-resizing" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`} style={{ "--sidebar-width": `${sidebarCollapsed ? 58 : sidebarWidth}px` } as CSSProperties}>
       {mobileOpen && <button type="button" className="mobile-sidebar-backdrop" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
@@ -474,7 +491,7 @@ export function WorkspaceShell({
                 {group.items.map((item) => {
                   const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
                   return (
-                    <Link key={item.href} className={`nav-item${active ? " active" : ""}`} href={item.href} aria-label={item.label} aria-current={active ? "page" : undefined}
+                    <Link key={item.href} className={`nav-item${active ? " active" : ""}`} href={item.href} aria-label={item.description ? `${item.label}: ${item.description}` : item.label} title={item.description} aria-current={active ? "page" : undefined}
                       onMouseEnter={(event) => showSidebarTooltip(item.label, event.currentTarget)}
                       onMouseLeave={() => setSidebarTooltip(null)}
                       onFocus={(event) => showSidebarTooltip(item.label, event.currentTarget)}
@@ -569,6 +586,13 @@ export function WorkspaceShell({
             <span className="topbar-page-title">{activePage?.label ?? "Workspace"}</span>
           </div>
           <div className="topbar-actions">
+            {activeWorkspace?.agencyOwner && pathname !== "/dashboard/agency" && <Link className="agency-return-link" href="/dashboard/agency">All client workspaces</Link>}
+            {workspaces.length > 1 && <label className="workspace-switcher">
+              <span className="sr-only">Switch workspace</span>
+              <select aria-label="Switch workspace" value={activeWorkspaceId} onChange={(event) => switchWorkspace(event.target.value)}>
+                {workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+              </select>
+            </label>}
             <div className="topbar-popover-wrap">
               <button type="button" className="icon-button notification-button" title="Publishing and workspace notifications" aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ""}`} aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((open) => !open)}>
                 <Bell size={19} strokeWidth={2} aria-hidden="true" />

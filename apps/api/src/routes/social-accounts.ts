@@ -6,6 +6,7 @@ import { z } from "zod";
 import { env } from "../env.js";
 import { prisma } from "../db.js";
 import { requireAuth, requireCompleteBrandProfile, requireWritableWorkspace, requireWorkspace } from "../middleware/auth.js";
+import { exchangeFacebookCode, isFacebookConfigured, makeFacebookAuthorizationUrl } from "../services/facebook.js";
 import {
   exchangeInstagramCode,
   convertInstagramSvgToJpeg,
@@ -22,9 +23,9 @@ import { fromObjectStorageKey, getStoredObject } from "../services/object-storag
 const router = Router();
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-function socialAccountsPage(status: "connected" | "cancelled" | "failed") {
+function socialAccountsPage(platform: "instagram" | "facebook", status: "connected" | "cancelled" | "failed") {
   const url = new URL("/dashboard/social-accounts", env.WEB_ORIGIN);
-  url.searchParams.set("instagram", status);
+  url.searchParams.set(platform, status);
   return url.toString();
 }
 
@@ -161,13 +162,13 @@ router.get("/instagram-media/:targetId", async (req, res, next) => {
 router.get("/instagram/callback", async (req, res) => {
   const error = req.query.error;
   if (typeof error === "string" && error) {
-    res.redirect(socialAccountsPage("cancelled"));
+    res.redirect(socialAccountsPage("instagram", "cancelled"));
     return;
   }
   const code = req.query.code;
   const state = req.query.state;
   if (typeof code !== "string" || typeof state !== "string") {
-    res.redirect(socialAccountsPage("failed"));
+    res.redirect(socialAccountsPage("instagram", "failed"));
     return;
   }
 
@@ -175,7 +176,7 @@ router.get("/instagram/callback", async (req, res) => {
     const payload = jwt.verify(state, env.JWT_ACCESS_SECRET, { issuer: "united-technologies-instagram" }) as JwtPayload;
     const workspaceId = payload.workspaceId;
     if (typeof payload.sub !== "string" || typeof workspaceId !== "string" || payload.purpose !== "instagram-connect") {
-      res.redirect(socialAccountsPage("failed"));
+      res.redirect(socialAccountsPage("instagram", "failed"));
       return;
     }
     const membership = await prisma.membership.findFirst({
@@ -187,7 +188,7 @@ router.get("/instagram/callback", async (req, res) => {
       select: { workspace: { select: { id: true, resellerId: true } } },
     });
     if (!membership) {
-      res.redirect(socialAccountsPage("failed"));
+      res.redirect(socialAccountsPage("instagram", "failed"));
       return;
     }
     const account = await exchangeInstagramCode(code);
@@ -197,7 +198,7 @@ router.get("/instagram/callback", async (req, res) => {
     });
     if (existing && existing.workspaceId !== membership.workspace.id) {
       console.error("Instagram account is already connected to a different workspace.");
-      res.redirect(socialAccountsPage("failed"));
+      res.redirect(socialAccountsPage("instagram", "failed"));
       return;
     }
     await prisma.socialAccount.upsert({
@@ -216,10 +217,107 @@ router.get("/instagram/callback", async (req, res) => {
         status: "CONNECTED",
       },
     });
-    res.redirect(socialAccountsPage("connected"));
+    res.redirect(socialAccountsPage("instagram", "connected"));
   } catch (callbackError) {
     console.error("Instagram account connection failed.", callbackError);
-    res.redirect(socialAccountsPage("failed"));
+    res.redirect(socialAccountsPage("instagram", "failed"));
+  }
+});
+
+router.get("/facebook/callback", async (req, res) => {
+  const error = req.query.error;
+  if (typeof error === "string" && error) {
+    res.redirect(socialAccountsPage("facebook", "cancelled"));
+    return;
+  }
+  const code = req.query.code;
+  const state = req.query.state;
+  if (typeof code !== "string" || typeof state !== "string") {
+    res.redirect(socialAccountsPage("facebook", "failed"));
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(state, env.JWT_ACCESS_SECRET, { issuer: "united-technologies-facebook" }) as JwtPayload;
+    const workspaceId = payload.workspaceId;
+    if (typeof payload.sub !== "string" || typeof workspaceId !== "string" || payload.purpose !== "facebook-connect") {
+      res.redirect(socialAccountsPage("facebook", "failed"));
+      return;
+    }
+    const membership = await prisma.membership.findFirst({
+      where: {
+        userId: payload.sub,
+        workspaceId,
+        workspace: { status: "ACTIVE" },
+      },
+      select: { workspace: { select: { id: true, resellerId: true } } },
+    });
+    if (!membership) {
+      res.redirect(socialAccountsPage("facebook", "failed"));
+      return;
+    }
+
+    const connection = await exchangeFacebookCode(code);
+    const pages = connection.pages;
+    const existing = await prisma.socialAccount.findMany({
+      where: {
+        provider: "facebook",
+        providerAccountId: { in: pages.map((page) => page.id) },
+      },
+      select: { providerAccountId: true, workspaceId: true },
+    });
+    if (existing.some((account) => account.workspaceId !== membership.workspace.id)) {
+      console.error("A Facebook Page is already connected to a different workspace.");
+      res.redirect(socialAccountsPage("facebook", "failed"));
+      return;
+    }
+
+    await prisma.$transaction([
+      ...pages.map((page) => prisma.socialAccount.upsert({
+        where: { provider_providerAccountId: { provider: "facebook", providerAccountId: page.id } },
+        create: {
+          provider: "facebook",
+          providerAccountId: page.id,
+          displayName: page.name,
+          encryptedTokens: page.encryptedTokens,
+          workspaceId: membership.workspace.id,
+          resellerId: membership.workspace.resellerId,
+        },
+        update: {
+          displayName: page.name,
+          encryptedTokens: page.encryptedTokens,
+          tokenExpiresAt: null,
+          status: "CONNECTED",
+        },
+      })),
+      prisma.socialAccount.upsert({
+        where: {
+          provider_providerAccountId: {
+            provider: "facebook-user",
+            providerAccountId: membership.workspace.id,
+          },
+        },
+        create: {
+          provider: "facebook-user",
+          providerAccountId: membership.workspace.id,
+          displayName: `Meta API access · ${connection.user.name}`,
+          encryptedTokens: connection.user.encryptedTokens,
+          tokenExpiresAt: connection.user.tokenExpiresAt,
+          workspaceId: membership.workspace.id,
+          resellerId: membership.workspace.resellerId,
+        },
+        update: {
+          displayName: `Meta API access · ${connection.user.name}`,
+          encryptedTokens: connection.user.encryptedTokens,
+          tokenExpiresAt: connection.user.tokenExpiresAt,
+          status: "CONNECTED",
+        },
+      }),
+    ]);
+    res.redirect(socialAccountsPage("facebook", "connected"));
+  } catch (callbackError) {
+    console.error("Facebook Page connection failed.", callbackError instanceof Error ? callbackError.message : "Unknown error.");
+    res.redirect(socialAccountsPage("facebook", "failed"));
   }
 });
 
@@ -228,7 +326,7 @@ router.use(requireAuth, requireWorkspace, requireCompleteBrandProfile);
 router.get("/", async (req, res, next) => {
   try {
     const accounts = await prisma.socialAccount.findMany({
-      where: { workspaceId: req.workspace!.id, provider: "instagram" },
+      where: { workspaceId: req.workspace!.id, provider: { in: ["instagram", "facebook"] } },
       orderBy: { createdAt: "asc" },
       select: { id: true, provider: true, displayName: true, status: true, tokenExpiresAt: true },
     });
@@ -243,6 +341,7 @@ router.get("/", async (req, res, next) => {
     res.json({
       accounts,
       instagramConfigured: isInstagramConfigured(),
+      facebookConfigured: isFacebookConfigured(),
       mediaPublishingConfigured,
       mediaPublishingMessage,
     });
@@ -268,20 +367,50 @@ router.post("/instagram/connect", requireWritableWorkspace, async (req, res, nex
   }
 });
 
+router.post("/facebook/connect", requireWritableWorkspace, async (req, res, next) => {
+  try {
+    if (!isFacebookConfigured()) {
+      res.status(503).json({ error: "Facebook App ID, App Secret, callback URL, and social token encryption key are not configured." });
+      return;
+    }
+    const state = jwt.sign(
+      { workspaceId: req.workspace!.id, purpose: "facebook-connect" },
+      env.JWT_ACCESS_SECRET,
+      { subject: req.auth!.userId, issuer: "united-technologies-facebook", expiresIn: "10m" },
+    );
+    res.json({ authorizationUrl: makeFacebookAuthorizationUrl(state) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete("/:id", requireWritableWorkspace, async (req, res, next) => {
   try {
     const accountId = z.string().parse(req.params.id);
     const account = await prisma.socialAccount.findFirst({
-      where: { id: accountId, workspaceId: req.workspace!.id, provider: "instagram" },
-      select: { id: true },
+      where: { id: accountId, workspaceId: req.workspace!.id, provider: { in: ["instagram", "facebook"] } },
+      select: { id: true, provider: true },
     });
     if (!account) {
-      res.status(404).json({ error: "Connected Instagram account not found." });
+      res.status(404).json({ error: "Connected social account not found." });
       return;
     }
-    await prisma.socialAccount.update({
-      where: { id: account.id },
-      data: { status: "DISCONNECTED", encryptedTokens: "", tokenExpiresAt: null },
+    await prisma.$transaction(async (tx) => {
+      await tx.socialAccount.update({
+        where: { id: account.id },
+        data: { status: "DISCONNECTED", encryptedTokens: "", tokenExpiresAt: null },
+      });
+      if (account.provider === "facebook") {
+        const remainingPages = await tx.socialAccount.count({
+          where: { workspaceId: req.workspace!.id, provider: "facebook", status: "CONNECTED" },
+        });
+        if (remainingPages === 0) {
+          await tx.socialAccount.updateMany({
+            where: { workspaceId: req.workspace!.id, provider: "facebook-user" },
+            data: { status: "DISCONNECTED", encryptedTokens: "", tokenExpiresAt: null },
+          });
+        }
+      }
     });
     res.json({ disconnected: true });
   } catch (error) {

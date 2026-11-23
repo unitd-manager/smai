@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, BarChart3, Brain, Building2, Compass, FileText, Lightbulb, Radio, Search, TrendingUp, UsersRound } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Activity, ArrowRight, BarChart3, Brain, Building2, CheckCircle2, Circle, Compass, FileText, Lightbulb, Plus, RefreshCw, Search, UsersRound } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { apiRequest } from "@/lib/api";
 
 type CompetitorCategory = "direct" | "indirect" | "emerging" | "industry-leader";
@@ -51,6 +51,8 @@ type WebsiteResearchReport = {
   finalUrl: string;
   title: string | null;
   description: string | null;
+  logoUrl?: string | null;
+  logoText?: string | null;
   excerpt: string;
   socialProfiles: Partial<Record<SocialPlatform, string>>;
   collectedAt: string;
@@ -147,23 +149,47 @@ const numberFields: Array<{ key: keyof CapturedMetrics; label: string }> = [
 const profileMetricFields = numberFields.filter(({ key }) => key === "followers" || key === "following" || key === "totalPosts");
 const postMetricFields = numberFields.filter(({ key }) => key !== "followers" && key !== "following" && key !== "totalPosts");
 
+/* Chart palette: used only for graphs and analytics accents; buttons and page theme stay on the app theme. */
+const CHART = {
+  cyan: "#22d3ee",
+  violet: "#a78bfa",
+  amber: "#fbbf24",
+  pink: "#f472b6",
+  green: "#34d399",
+  blue: "#60a5fa",
+  orange: "#fb923c",
+  track: "rgba(148,163,184,0.18)",
+};
+const categoryMeta: Record<CompetitorCategory, { label: string; color: string }> = {
+  direct: { label: "Similar service", color: CHART.cyan },
+  indirect: { label: "Related service", color: CHART.violet },
+  emerging: { label: "New provider", color: CHART.amber },
+  "industry-leader": { label: "Established provider", color: CHART.pink },
+};
+
 function metricNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString() : "Not captured";
 }
 
-function profileCompleteness(competitor: CompetitorProfile) {
-  const signals = [
-    competitor.industry,
-    competitor.websiteUrl,
-    competitor.location,
-    competitor.overview,
-    competitor.products,
-    competitor.audience,
-    competitor.uniqueValue,
-    competitor.brandVoice,
-    Object.values(competitor.socialProfiles).some(Boolean) ? "social profile" : "",
+function postInteractions(post: ObservedPost) {
+  const values = [post.metrics.likes, post.metrics.comments, post.metrics.shares];
+  return values.some((value) => typeof value === "number" && Number.isFinite(value))
+    ? values.reduce<number>((total, value) => total + (typeof value === "number" && Number.isFinite(value) ? value : 0), 0)
+    : null;
+}
+
+function profileChecklist(competitor: CompetitorProfile): Array<{ label: string; done: boolean }> {
+  return [
+    { label: "Industry", done: Boolean(competitor.industry) },
+    { label: "Website", done: Boolean(competitor.websiteUrl) },
+    { label: "Location", done: Boolean(competitor.location) },
+    { label: "Overview", done: Boolean(competitor.overview) },
+    { label: "Products", done: Boolean(competitor.products) },
+    { label: "Audience", done: Boolean(competitor.audience) },
+    { label: "Unique value", done: Boolean(competitor.uniqueValue) },
+    { label: "Brand voice", done: Boolean(competitor.brandVoice) },
+    { label: "Social links", done: Object.values(competitor.socialProfiles).some(Boolean) },
   ];
-  return Math.round(signals.filter(Boolean).length / signals.length * 100);
 }
 
 function captureMetrics(values: Record<string, string>, fields: Array<{ key: keyof CapturedMetrics }>): CapturedMetrics {
@@ -176,18 +202,31 @@ function captureMetrics(values: Record<string, string>, fields: Array<{ key: key
 }
 
 function exportReport(competitor: CompetitorProfile) {
-  const blob = new Blob([JSON.stringify({
-    reportType: "competitor-intelligence",
-    exportedAt: new Date().toISOString(),
-    competitor,
-    evidencePolicy: "Metrics and observations are user-recorded public data; AI analysis is interpretation, not independently verified research.",
-  }, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${competitor.name.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-|-$/g, "") || "competitor"}-report.json`;
-  link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const safe = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+  const latest = competitor.snapshots[0] ?? null;
+  const topPosts = [...(latest?.observations.posts ?? [])].sort((left, right) => {
+    const leftInteractions = postInteractions(left);
+    const rightInteractions = postInteractions(right);
+    if (leftInteractions !== null && rightInteractions !== null) return rightInteractions - leftInteractions;
+    if (left.metrics.views !== undefined && right.metrics.views !== undefined) return right.metrics.views - left.metrics.views;
+    return Number(rightInteractions !== null || right.metrics.views !== undefined) - Number(leftInteractions !== null || left.metrics.views !== undefined);
+  }).slice(0, 3);
+  const summary = latest?.analysisJson?.summary.slice(0, 700) ?? "No content analysis has been saved for this profile yet.";
+  const tactics = latest?.analysisJson?.content.patterns.slice(0, 3) ?? [];
+  const capturedViews = topPosts.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
+  const capturedInteractions = topPosts.reduce((total, post) => total + (postInteractions(post) ?? 0), 0);
+  const headlineStats = `<div class="stats"><div><span>Posts reviewed</span><strong>${topPosts.length}</strong></div><div><span>Recorded views</span><strong>${capturedViews ? capturedViews.toLocaleString() : "—"}</strong></div><div><span>Recorded interactions</span><strong>${capturedInteractions ? capturedInteractions.toLocaleString() : "—"}</strong></div></div>`;
+  const postCards = topPosts.length ? topPosts.map((post, index) => {
+    const interactions = postInteractions(post);
+    return `<article class="post"><div class="rank">0${index + 1}</div><div class="post-body"><h3>${safe(post.topic || post.format || "Public social post")}</h3><p>${safe(post.platform)} · ${safe(post.format)}</p><div class="metrics"><span><b>${post.metrics.views?.toLocaleString() ?? "—"}</b> views</span><span><b>${post.metrics.likes?.toLocaleString() ?? "—"}</b> likes</span><span><b>${post.metrics.comments?.toLocaleString() ?? "—"}</b> comments</span><span><b>${post.metrics.shares?.toLocaleString() ?? "—"}</b> shares</span></div><a href="${safe(post.url)}">View original post ↗</a><small>${interactions === null && post.metrics.views === undefined ? "No public performance counts recorded" : "Recorded public metrics; counts do not establish why a post performed."}</small></div></article>`;
+  }).join("") : `<p class="empty">No public posts with saved evidence yet. Add post links and visible metrics in the Evidence tab.</p>`;
+  const reportContent = `${headlineStats}<section class="summary"><div class="eyebrow">The takeaway</div><h2>What stands out</h2><p>${safe(summary)}</p></section><section><div class="section-heading"><div class="eyebrow">Public post evidence</div><h2>Posts to study</h2></div><p class="muted">Up to three posts from the latest saved observation, ranked by available recorded performance counts.</p><div class="posts">${postCards}</div></section>${tactics.length ? `<section><div class="section-heading"><div class="eyebrow">Creative cues</div><h2>Patterns worth exploring</h2></div><ul>${tactics.map((item) => `<li>${safe(item)}</li>`).join("")}</ul><p class="muted">Observed patterns are clues, not proof of what caused engagement.</p></section>` : ""}${latest?.analysisJson?.positioning.differentiation ? `<section class="takeaway"><div class="eyebrow">Your next move</div><h2>Make the idea your own</h2><p>${safe(latest.analysisJson.positioning.differentiation.slice(0, 600))}</p></section>` : ""}`;
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) { window.alert("Allow pop-ups to export this report as a PDF."); return; }
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html><html><head><title>${safe(competitor.name)} · Competitor report</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:A4;margin:15mm}*{box-sizing:border-box}body{margin:0;color:#14243a;background:#eef2f8;font:14px/1.65 Inter,"Segoe UI",Arial,sans-serif}.page{max-width:900px;margin:24px auto;padding:42px;background:#fff;border-radius:20px;box-shadow:0 16px 50px #182b451c}header{position:relative;overflow:hidden;padding:34px 38px;border-radius:16px;background:linear-gradient(125deg,#101e36,#283f66 65%,#5146d8);color:white}header:after{position:absolute;right:-44px;top:-95px;width:240px;height:240px;border:1px solid #ffffff30;border-radius:50%;box-shadow:0 0 0 28px #ffffff09,0 0 0 58px #ffffff08;content:""}header .eyebrow{color:#c7c5ff}header h1{position:relative;z-index:1;max-width:650px;margin:10px 0 8px;font-size:34px;line-height:1.13;letter-spacing:-.035em}header p{position:relative;z-index:1;margin:0;color:#d9e2f1}.eyebrow{color:#6558d9;font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}h2{margin:6px 0 10px;font-size:21px;letter-spacing:-.02em}h3{margin:0 0 7px;font-size:14px}p,li{color:#4b5c70}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}.stats>div{padding:16px 18px;border:1px solid #e2e8f0;border-radius:12px;background:#f8f9fd}.stats span,.stats strong{display:block}.stats span{color:#64748b;font-size:11px}.stats strong{margin-top:5px;color:#172a45;font-size:24px;letter-spacing:-.03em}.section-heading{margin-bottom:8px}.section-heading h2{margin-top:4px}section{margin-top:26px}.summary,.takeaway{padding:21px 23px;border:1px solid #e2e8f0;border-radius:14px;background:linear-gradient(135deg,#f7f8ff,#fff)}.summary{border-left:4px solid #6558d9}.summary p,.takeaway p{margin-bottom:0}.muted,.empty{color:#64748b;font-size:12px}.posts{display:grid;gap:11px}.post{display:grid;grid-template-columns:40px minmax(0,1fr);gap:13px;padding:17px;border:1px solid #e2e8f0;border-radius:13px;background:#fff;box-shadow:0 3px 12px #13243a08;break-inside:avoid}.rank{display:grid;width:36px;height:36px;place-items:center;border-radius:11px;background:#eeeefe;color:#5548c9;font-size:13px;font-weight:800}.post-body{min-width:0}.post p{margin:4px 0 10px;font-size:12px}.metrics{display:flex;flex-wrap:wrap;gap:7px;margin:11px 0}.metrics span{padding:7px 10px;border:1px solid #e7ebf2;border-radius:8px;background:#f7f8fb;color:#64748b;font-size:10px}.metrics b{color:#1e2d42;font-size:12px}.post a{color:#5146d8;font-size:12px;font-weight:700;overflow-wrap:anywhere}.post small{display:block;margin-top:8px;color:#728096;font-size:10px}.takeaway{border-left:4px solid #6558d9;background:#f7f6ff}ul{padding-left:20px}li{margin:7px 0}.notice{margin-top:28px;padding-top:12px;border-top:1px solid #e2e8f0;color:#728096;font-size:10px}.actions{position:sticky;top:0;display:flex;justify-content:flex-end;padding:12px;background:#eef2f8}.actions button{border:0;border-radius:9px;padding:11px 16px;background:#5146d8;color:white;font-weight:700;cursor:pointer;box-shadow:0 5px 14px #5146d833}@media(max-width:640px){.page{margin:10px;padding:16px}header{padding:25px 22px}.stats{grid-template-columns:1fr}header h1{font-size:28px}}@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{background:white}.page{max-width:none;margin:0;padding:0;box-shadow:none;border-radius:0}header{break-inside:avoid}.actions{display:none}a{color:inherit}}</style></head><body><div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div><main class="page"><header><div class="eyebrow">Competitor content report · Generated ${new Date().toLocaleDateString()}</div><h1>${safe(competitor.name)}</h1><p>${safe([competitor.industry, competitor.location].filter(Boolean).join(" · ") || "Public profile research")}</p></header>${reportContent}<div class="notice">Public metrics are recorded evidence. Content analysis is an interpretation, not independently verified research.</div></main></body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
 }
 
 function actionBrief(idea: CompetitorAnalysis["contentIdeas"][number]) {
@@ -206,9 +245,37 @@ function InsightList({ title, items, empty = "No sourced observations recorded y
     : <p>{empty}</p>}</section>;
 }
 
+/* ---------- Lightweight chart helpers ---------- */
+
+function shortLabel(text: string, max = 34) {
+  const clean = text.replace(/^https?:\/\//, "");
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+function HorizontalBars({ rows, emptyText }: { rows: Array<{ label: string; value: number; color: string; display?: string }>; emptyText: string }) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  if (!rows.length) return <p style={{ margin: 0, opacity: 0.7 }}>{emptyText}</p>;
+  return (
+    <div style={{ display: "grid", gap: 14, minWidth: 0, width: "100%" }}>
+      {rows.map((row) => (
+        <div key={row.label} style={{ display: "grid", gap: 6, minWidth: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 12, fontSize: 13 }}>
+            <span title={row.label} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortLabel(row.label)}</span>
+            <strong style={{ color: row.color }}>{row.display ?? row.value.toLocaleString()}</strong>
+          </div>
+          <div style={{ height: 10, borderRadius: 999, background: CHART.track, overflow: "hidden" }}>
+            <div style={{ width: `${row.value ? Math.max(4, row.value / max * 100) : 0}%`, height: "100%", borderRadius: 999, background: `linear-gradient(90deg, ${row.color}, ${row.color}aa)`, boxShadow: `0 0 12px ${row.color}55` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CompetitorIntelligenceClient() {
   const profileFormRef = useRef<HTMLFormElement>(null);
   const automaticDiscoveryStarted = useRef(false);
+  const logoScansStarted = useRef(new Set<string>());
   const [data, setData] = useState<CompetitorResponse | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [form, setForm] = useState<ProfileForm>(emptyProfile);
@@ -221,8 +288,9 @@ export function CompetitorIntelligenceClient() {
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [retryDiscovery, setRetryDiscovery] = useState(false);
   const [notice, setNotice] = useState("");
-  const [tab, setTab] = useState<"overview" | "evidence" | "analysis" | "compare">("overview");
+  const [tab, setTab] = useState<"overview" | "evidence" | "analysis" | "compare" | "posts">("analysis");
   const [sourceLabel, setSourceLabel] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [observedPlatform, setObservedPlatform] = useState<SocialPlatform>("Instagram");
@@ -254,10 +322,16 @@ export function CompetitorIntelligenceClient() {
       const response = await apiRequest<CompetitorResponse>("/api/competitors");
       setData(response);
       setError("");
-      setSelectedId((current) => keepSelected && response.competitors.some((item) => item.id === current)
+      setRetryDiscovery(false);
+      const topThree = response.competitors.map((competitor) => {
+        const posts = competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts);
+        return { id: competitor.id, interactions: posts.reduce((total, post) => total + (postInteractions(post) ?? 0), 0), views: posts.reduce((total, post) => total + (post.metrics.views ?? 0), 0) };
+      }).sort((left, right) => right.interactions - left.interactions || right.views - left.views).slice(0, 3);
+      setSelectedId((current) => keepSelected && topThree.some((item) => item.id === current)
         ? current
-        : response.competitors[0]?.id ?? "");
+        : topThree[0]?.id ?? "");
     } catch (requestError) {
+      setRetryDiscovery(false);
       setError(requestError instanceof Error ? requestError.message : "Could not load competitor intelligence.");
     } finally {
       setLoading(false);
@@ -270,6 +344,22 @@ export function CompetitorIntelligenceClient() {
   }, [load]);
 
   useEffect(() => {
+    if (loading || !data) return;
+    const needingLogo = data.competitors.filter((competitor) => {
+      const report = competitor.snapshots[0]?.observations.websiteResearch?.competitorWebsite;
+      let hasImage = false;
+      try { hasImage = Boolean(report?.logoUrl && new URL(report.logoUrl).pathname !== "/"); } catch { hasImage = false; }
+      return Boolean(competitor.websiteUrl && !hasImage && !report?.logoText && !logoScansStarted.current.has(competitor.id));
+    });
+    if (!needingLogo.length) return;
+    for (const competitor of needingLogo) logoScansStarted.current.add(competitor.id);
+    void Promise.allSettled(needingLogo.map((competitor) => apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}/research-website`, { method: "POST", body: JSON.stringify({}) })))
+      .then((results) => {
+        if (results.some((result) => result.status === "fulfilled")) void load();
+      });
+  }, [data, load, loading]);
+
+  useEffect(() => {
     if (!showProfileForm) return;
     const formElement = profileFormRef.current;
     if (!formElement) return;
@@ -280,7 +370,50 @@ export function CompetitorIntelligenceClient() {
   const selected = data?.competitors.find((competitor) => competitor.id === selectedId) ?? null;
   const latest = selected?.snapshots[0] ?? null;
   const analysis = latest?.analysisJson ?? null;
-  const observedPosts = latest?.observations.posts ?? [];
+  const observedPosts = selected ? [...new Map(selected.snapshots.flatMap((snapshot) => snapshot.observations.posts).map((post) => [post.url, post])).values()] : [];
+  const excludedCompetitorHosts = new Set(["wanderlog.com", "magicpin.in", "tracxn.com", "rocketreach.co", "tripadvisor.com", "zomato.com", "swiggy.com", "justdial.com", "yelp.com", "google.com", "facebook.com", "instagram.com", "linkedin.com", "tiktok.com", "x.com", "twitter.com"]);
+  const competitorIsBusiness = (competitor: CompetitorProfile) => {
+    let host = "";
+    try { host = new URL(competitor.websiteUrl || "").hostname.toLowerCase().replace(/^www\./, ""); } catch { return false; }
+    const titleLooksLikeListing = /\b(?:list of|market trends?|industry report|startups? in|top \d+|directory|business listings?|reviews? and ratings?)\b/i.test(competitor.name);
+    return !titleLooksLikeListing && ![...excludedCompetitorHosts].some((excluded) => host === excluded || host.endsWith(`.${excluded}`));
+  };
+  const rankedCompetitors = [...(data?.competitors ?? [])].filter(competitorIsBusiness).map((competitor) => {
+    const posts = [...new Map(competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts).map((post) => [post.url, post])).values()];
+    const interactions = posts.reduce((total, post) => total + (postInteractions(post) ?? 0), 0);
+    const measuredPosts = posts.filter((post) => postInteractions(post) !== null).length;
+    const views = posts.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
+    return { competitor, posts, interactions, measuredPosts, views };
+  }).sort((left, right) => right.interactions - left.interactions || right.views - left.views || right.measuredPosts - left.measuredPosts || left.competitor.name.localeCompare(right.competitor.name)).slice(0, 3);
+  const allCompetitorPosts = rankedCompetitors.flatMap(({ competitor }) => {
+    const uniquePosts = new Map<string, { competitor: CompetitorProfile; snapshot: CompetitorSnapshot; post: ObservedPost; interactions: number | null }>();
+    for (const snapshot of competitor.snapshots) for (const post of snapshot.observations.posts) {
+      if (!uniquePosts.has(post.url)) uniquePosts.set(post.url, { competitor, snapshot, post, interactions: postInteractions(post) });
+    }
+    return [...uniquePosts.values()];
+  });
+  const topViewedPosts = [...allCompetitorPosts].filter(({ post }) => typeof post.metrics.views === "number")
+    .sort((left, right) => (right.post.metrics.views ?? 0) - (left.post.metrics.views ?? 0)).slice(0, 3);
+  const topInteractedPosts = [...allCompetitorPosts].filter(({ interactions }) => interactions !== null)
+    .sort((left, right) => (right.interactions ?? 0) - (left.interactions ?? 0)).slice(0, 3);
+  const tacticGroups = new Map<string, { interactions: number; count: number }>();
+  for (const { post, interactions } of allCompetitorPosts) {
+    const format = post.format.trim() || "Unspecified format";
+    const current = tacticGroups.get(format) ?? { interactions: 0, count: 0 };
+    current.interactions += interactions ?? 0;
+    current.count += 1;
+    tacticGroups.set(format, current);
+  }
+  const topTactics = [...tacticGroups].map(([format, values]) => ({ format, ...values }))
+    .sort((left, right) => right.interactions - left.interactions || right.count - left.count).slice(0, 5);
+  const postsWithInteractions = observedPosts
+    .map((post) => ({ post, interactions: postInteractions(post) }))
+    .filter((entry): entry is { post: ObservedPost; interactions: number } => entry.interactions !== null)
+    .sort((left, right) => right.interactions - left.interactions);
+  const topInteractionPost = postsWithInteractions[0] ?? null;
+  const topViewedPost = observedPosts
+    .filter((post): post is ObservedPost & { metrics: CapturedMetrics & { views: number } } => typeof post.metrics.views === "number" && Number.isFinite(post.metrics.views))
+    .sort((left, right) => right.metrics.views - left.metrics.views)[0] ?? null;
   const displayedPosts = [...observedPosts
     .filter((post) => postPlatformFilter === "all" || post.platform === postPlatformFilter)
     .filter((post) => postFormatFilter === "all" || post.format.toLowerCase() === postFormatFilter)
@@ -288,18 +421,32 @@ export function CompetitorIntelligenceClient() {
     .filter((post) => !postDateFilter || Boolean(post.publishedAt && post.publishedAt.slice(0, 10) >= postDateFilter))]
     .sort((left, right) => {
       if (postSort === "date") return (right.publishedAt ?? "").localeCompare(left.publishedAt ?? "");
-      const engagement = (post: ObservedPost) => (post.metrics.likes ?? 0) + (post.metrics.comments ?? 0) + (post.metrics.shares ?? 0);
-      return engagement(right) - engagement(left);
+      return (postInteractions(right) ?? -1) - (postInteractions(left) ?? -1);
     });
-  const activity = (data?.competitors ?? []).flatMap((competitor) => competitor.snapshots.map((snapshot) => ({
-    id: snapshot.id,
-    competitor: competitor.name,
-    competitorId: competitor.id,
-    observedAt: snapshot.observedAt,
-    sourceCount: snapshot.sources.length,
-    postCount: snapshot.observations.posts.length,
-    analyzed: Boolean(snapshot.analysisJson),
-  }))).sort((left, right) => right.observedAt.localeCompare(left.observedAt)).slice(0, 12);
+  const selectedRank = rankedCompetitors.findIndex((item) => item.competitor.id === selected?.id) + 1;
+
+  const comparisonRows = rankedCompetitors.map(({ competitor }) => {
+    const snapshot = competitor.snapshots[0];
+    const platformMetrics = snapshot?.observations.platformMetrics.filter((item) => comparisonPlatform === "all" || item.platform === comparisonPlatform) ?? [];
+    const posts = snapshot?.observations.posts.filter((post) => comparisonPlatform === "all" || post.platform === comparisonPlatform) ?? [];
+    const sum = (key: "likes" | "comments") => posts.reduce((total, post) => total + (post.metrics[key] ?? 0), 0);
+    const followerTotal = platformMetrics.reduce((total, item) => total + (item.metrics.followers ?? 0), 0);
+    const hasFollowers = platformMetrics.some((item) => item.metrics.followers !== undefined);
+    const byPlatform = (key: "followers" | "following" | "totalPosts") => platformMetrics
+      .filter((item) => item.metrics[key] !== undefined)
+      .map((item) => `${item.platform}: ${metricNumber(item.metrics[key])}`).join(" · ") || "Not captured";
+    return { competitor, snapshot, platformMetrics, posts, sum, byPlatform, followerTotal, hasFollowers };
+  });
+  const followerBars = comparisonRows.filter((row) => row.hasFollowers).map((row, index) => ({
+    label: row.competitor.name,
+    value: row.followerTotal,
+    color: [CHART.cyan, CHART.violet, CHART.amber, CHART.pink, CHART.green, CHART.blue][index % 6]!,
+  }));
+  const engagementBars = comparisonRows.filter((row) => row.posts.length).map((row, index) => ({
+    label: row.competitor.name,
+    value: row.posts.reduce((total, post) => total + (postInteractions(post) ?? 0), 0),
+    color: [CHART.green, CHART.pink, CHART.amber, CHART.violet, CHART.cyan, CHART.blue][index % 6]!,
+  }));
 
   function editProfile(competitor: CompetitorProfile) {
     setSelectedId(competitor.id);
@@ -352,6 +499,7 @@ export function CompetitorIntelligenceClient() {
     event.preventDefault();
     setBusy("profile");
     setError("");
+    setRetryDiscovery(false);
     setNotice("");
     const socialProfiles = Object.fromEntries(Object.entries(form.socialProfiles).filter(([, value]) => value.trim()));
     const payload = {
@@ -392,7 +540,7 @@ export function CompetitorIntelligenceClient() {
         <div className="created-results-heading"><div><p className="card-kicker">{selectedId ? "EDIT PROFILE" : "COMPETITOR DISCOVERY"}</p><h2>{selectedId ? "Update competitor profile" : "Add a competitor"}</h2><p>Enter known business and profile details. These fields are context, not independently verified facts.</p></div><button className="button button-outline" type="button" onClick={() => setShowProfileForm(false)}>Close</button></div>
         <div className="competitor-form-grid">
           <label>Business name<input required minLength={2} maxLength={191} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label>Relationship<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as CompetitorCategory })}><option value="direct">Direct competitor</option><option value="indirect">Indirect competitor</option><option value="emerging">Emerging competitor</option><option value="industry-leader">Industry leader</option></select></label>
+          <label>Service relationship<select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as CompetitorCategory })}><option value="direct">Offers a similar service</option><option value="indirect">Offers a related service</option><option value="emerging">New provider</option><option value="industry-leader">Established provider</option></select></label>
           <label>Industry or category<input value={form.industry} maxLength={500} onChange={(event) => setForm({ ...form, industry: event.target.value })} /></label>
           <label>Website URL<input type="url" value={form.websiteUrl} maxLength={2048} placeholder="https://" onChange={(event) => setForm({ ...form, websiteUrl: event.target.value })} /></label>
           <label>Location or target market<input value={form.location} maxLength={500} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
@@ -414,6 +562,7 @@ export function CompetitorIntelligenceClient() {
     if (!window.confirm(`Remove ${competitor.name} and its saved observations from this workspace?`)) return;
     setBusy("remove");
     setError("");
+    setRetryDiscovery(false);
     setNotice("");
     try {
       await apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}`, { method: "DELETE" });
@@ -428,11 +577,12 @@ export function CompetitorIntelligenceClient() {
     }
   }
 
-  async function recordSnapshot(event: FormEvent<HTMLFormElement>) {
+  async function recordSnapshot(event: FormEvent<HTMLFormElement>, target = selected) {
     event.preventDefault();
-    if (!selected) return;
+    if (!target) return;
     setBusy("snapshot");
     setError("");
+    setRetryDiscovery(false);
     setNotice("");
     const profileMetrics = captureMetrics(metricValues, postUrl.trim() ? profileMetricFields : numberFields);
     const postMetrics = captureMetrics(metricValues, postMetricFields);
@@ -451,7 +601,7 @@ export function CompetitorIntelligenceClient() {
       metrics: postMetrics,
     }] : [];
     try {
-      await apiRequest<{ snapshot: CompetitorSnapshot }>(`/api/competitors/${encodeURIComponent(selected.id)}/snapshots`, {
+      await apiRequest<{ snapshot: CompetitorSnapshot }>(`/api/competitors/${encodeURIComponent(target.id)}/snapshots`, {
         method: "POST",
         body: JSON.stringify({
           observedAt: new Date(`${observationDate}T12:00:00`).toISOString(),
@@ -470,6 +620,7 @@ export function CompetitorIntelligenceClient() {
         }),
       });
       await load();
+      setSelectedId(target.id);
       setTab("evidence");
       setNotice("Dated public observations saved with their source. Metrics remain attributed to your recorded source, not a connected competitor API.");
       setMetricValues({});
@@ -481,29 +632,57 @@ export function CompetitorIntelligenceClient() {
     }
   }
 
-  async function analyzeLatest() {
-    if (!selected) return;
+  async function analyzeLatest(target = selected) {
+    if (!target) return;
     setBusy("analysis");
     setError("");
+    setRetryDiscovery(false);
     setNotice("");
     try {
       const response = await apiRequest<{
-        research: { scannedWebsiteCount: number; discoveredSocialProfiles: number; addedSocialProfiles: number; warnings: string[] };
-      }>(`/api/competitors/${encodeURIComponent(selected.id)}/analyze`, {
+        research: { scannedWebsiteCount: number; discoveredSocialProfiles: number; addedSocialProfiles: number; collectedSocialPosts: number; warnings: string[] };
+      }>(`/api/competitors/${encodeURIComponent(target.id)}/analyze`, {
         method: "POST",
-        body: JSON.stringify(latest ? { snapshotId: latest.id } : {}),
+        body: JSON.stringify(target.snapshots[0] ? { snapshotId: target.snapshots[0].id } : {}),
       });
       await load();
+      setSelectedId(target.id);
       setTab("analysis");
       const scanned = response.research.scannedWebsiteCount;
       const accounts = response.research.discoveredSocialProfiles;
       const addedAccounts = response.research.addedSocialProfiles;
-      const result = `Analysis saved. Scanned ${scanned} public website${scanned === 1 ? "" : "s"}; found ${accounts} social link${accounts === 1 ? "" : "s"}${addedAccounts ? ` and added ${addedAccounts} to the profile` : ""}.`;
+      const collectedPosts = response.research.collectedSocialPosts;
+      const result = `Analysis updated. Reviewed ${scanned} website${scanned === 1 ? "" : "s"}, found ${accounts} social link${accounts === 1 ? "" : "s"}${addedAccounts ? ` and saved ${addedAccounts} to this profile` : ""}, and collected ${collectedPosts} public post${collectedPosts === 1 ? "" : "s"} where connected APIs allow it.`;
       setNotice(response.research.warnings.length
         ? `${result} ${response.research.warnings.join(" ")}`
         : result);
     } catch (requestError) {
+      // Website and social observations are persisted before AI generation.
+      // Reload them even when the analysis provider fails so refreshed logos
+      // and social links still appear on the card.
+      await load(false).catch(() => undefined);
+      setSelectedId(target.id);
       setError(requestError instanceof Error ? requestError.message : "Could not analyze the saved observations.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function refreshWebsiteFindings(target: CompetitorProfile) {
+    setBusy("website");
+    setError("");
+    setNotice("");
+    try {
+      const result = await apiRequest<{ logoUrl: string | null; logoText: string | null }>(`/api/competitors/${encodeURIComponent(target.id)}/research-website`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      await load();
+      setNotice(result.logoUrl || result.logoText
+        ? `Website scan saved the ${result.logoUrl ? "logo image" : "brand mark"} for ${target.name}.`
+        : `The homepage scan completed, but ${target.name} does not expose a recognizable logo image or brand mark in its public markup.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not scan the competitor website.");
     } finally {
       setBusy("");
     }
@@ -512,31 +691,37 @@ export function CompetitorIntelligenceClient() {
   const discoverAndAnalyze = useCallback(async () => {
     setBusy("discovery");
     setError("");
+    setRetryDiscovery(false);
     setNotice("");
     try {
       const response = await apiRequest<{
         discovered: Array<{ id: string; name: string; websiteUrl: string | null }>;
         analysisQueue: Array<{ id: string; name: string }>;
         message: string;
+        searchWarnings: string[];
       }>("/api/competitors/discover", {
         method: "POST",
         body: JSON.stringify({ maxCandidates: 3 }),
       });
       if (!response.analysisQueue.length) {
         await load();
-        setNotice(response.message);
-        return;
+        setNotice([response.message, ...response.searchWarnings].join(" "));
+        return true;
       }
 
       const analyzed: string[] = [];
       const failures: string[] = [];
+      const researchWarnings = new Set<string>();
+      let collectedSocialPosts = 0;
       for (const competitor of response.analysisQueue) {
         try {
-          await apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}/analyze`, {
+          const result = await apiRequest<{ research?: { collectedSocialPosts?: number; warnings?: string[] } }>(`/api/competitors/${encodeURIComponent(competitor.id)}/analyze`, {
             method: "POST",
             body: JSON.stringify({}),
           });
           analyzed.push(competitor.name);
+          collectedSocialPosts += result.research?.collectedSocialPosts ?? 0;
+          result.research?.warnings?.forEach((warning) => researchWarnings.add(warning));
         } catch (requestError) {
           failures.push(`${competitor.name}: ${requestError instanceof Error ? requestError.message : "Analysis failed."}`);
         }
@@ -545,10 +730,18 @@ export function CompetitorIntelligenceClient() {
       await load(false);
       setSelectedId(response.analysisQueue[0]!.id);
       setTab("analysis");
-      setNotice(`${response.discovered.length} new competitor${response.discovered.length === 1 ? "" : "s"} discovered; ${analyzed.length} profile${analyzed.length === 1 ? "" : "s"} analyzed from public website evidence.${response.discovered.length ? " Review each candidate for relevance." : ""}`);
-      if (failures.length) setError(`Some analyses could not finish: ${failures.join(" ")}`);
+      const researchSummary = researchWarnings.size ? ` ${[...researchWarnings].slice(0, 3).join(" ")}` : "";
+      const searchSummary = response.searchWarnings.length ? ` ${response.searchWarnings.join(" ")}` : "";
+      setNotice(`Found ${response.discovered.length} new profile${response.discovered.length === 1 ? "" : "s"}; analyzed ${analyzed.length} and collected ${collectedSocialPosts} public post${collectedSocialPosts === 1 ? "" : "s"} where connected APIs allow it.${researchSummary}${searchSummary}`);
+      if (failures.length) {
+        setRetryDiscovery(true);
+        setError(`Some analyses could not finish: ${failures.join(" ")}`);
+      }
+      return failures.length === 0;
     } catch (requestError) {
+      setRetryDiscovery(true);
       setError(requestError instanceof Error ? requestError.message : "Automatic competitor discovery failed.");
+      return false;
     } finally {
       setBusy("");
     }
@@ -557,20 +750,36 @@ export function CompetitorIntelligenceClient() {
   useEffect(() => {
     if (loading || !data || !data.dataCollection.websiteSearchAvailable || automaticDiscoveryStarted.current) return;
     const hasBrandContext = Boolean(data.brand.industry || data.brand.products || data.brand.description);
-    const hasWorkToDo = data.competitors.length === 0 || data.competitors.some((competitor) => !competitor.snapshots[0]?.analysisJson);
-    if (!hasBrandContext || !hasWorkToDo) return;
+    if (!hasBrandContext) return;
 
     const storageKey = `competitor-auto-discovery:${data.brand.id}`;
+    const profileSignature = JSON.stringify([
+      data.brand.industry,
+      data.brand.location,
+      data.brand.products,
+      data.brand.audience,
+      data.brand.description,
+      data.brand.website,
+    ]);
     try {
-      if (window.localStorage.getItem(storageKey)) return;
-      window.localStorage.setItem(storageKey, "started");
+      if (window.localStorage.getItem(storageKey) === profileSignature) return;
+      window.localStorage.setItem(storageKey, profileSignature);
     } catch {
-      window.setTimeout(() => setError("Automatic discovery could not start because this browser could not save its one-time run marker. Use Auto-discover & analyze to run it manually."), 0);
+      window.setTimeout(() => setError("Automatic discovery could not start because this browser could not save its run marker. Use Auto-discover & analyze to retry."), 0);
       return;
     }
 
     automaticDiscoveryStarted.current = true;
-    window.setTimeout(() => void discoverAndAnalyze(), 0);
+    window.setTimeout(() => {
+      void discoverAndAnalyze().then((success) => {
+        if (success) return;
+        try {
+          if (window.localStorage.getItem(storageKey) === profileSignature) window.localStorage.removeItem(storageKey);
+        } catch {
+          setError("Automatic discovery failed, and this browser could not reset its retry marker. Use Auto-discover & analyze to retry.");
+        }
+      });
+    }, 0);
   }, [data, discoverAndAnalyze, loading]);
 
   const searchQueries = data ? [
@@ -592,177 +801,1437 @@ export function CompetitorIntelligenceClient() {
     })) ?? []),
   ] : [];
 
+  const accentFor = (index: number) => [CHART.cyan, CHART.violet, CHART.amber, CHART.pink, CHART.green, CHART.blue, CHART.orange][index % 7]!;
+  const tabs = [
+    { key: "overview", label: "Profile", Icon: UsersRound, color: CHART.cyan, count: 0 },
+    { key: "posts", label: "Top posts", Icon: Activity, color: CHART.green, count: 0 },
+    { key: "analysis", label: "Why it works", Icon: Brain, color: CHART.amber, count: 0 },
+    { key: "compare", label: "Brand fit", Icon: BarChart3, color: CHART.pink, count: 0 },
+    { key: "evidence", label: "Sources & metrics", Icon: FileText, color: CHART.violet, count: 0 },
+  ] as const;
+  const activeTab = tabs.find((item) => item.key === tab) ?? tabs[0];
+
   return (
-    <section className="dashboard-content competitor-page">
-      <div className="competitor-hero">
-        <div className="competitor-hero-copy">
-          <p className="eyebrow competitor-eyebrow"><Activity size={14} aria-hidden="true" /> GROW YOUR BUSINESS · COMPETITIVE RESEARCH</p>
-          <h1>Competitor intelligence</h1>
-          <p>Turn sourced public observations into a practical, differentiated marketing plan. Nothing is scraped or estimated.</p>
+    <section className="dashboard-content competitor-page ci-page">
+      <style>{`
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page { display: flex; flex-direction: column; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page > * { margin: 0 !important; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head h1 { margin: 0 !important; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--navy-600); cursor: help; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi { position: relative; display: flex; align-items: center; gap: 14px; overflow: hidden; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 14px; padding: 16px 18px 16px 22px; background: var(--studio-panel-raised, var(--ivory-50)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi::before { position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--c); content: ""; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi-icon { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi strong { display: block; font-size: 28px; line-height: 1.05; color: var(--foreground); white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi strong.is-text { font-size: 18px; padding: 5px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi small { display: block; margin-top: 3px; color: var(--navy-600); font-size: 12px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card { min-width: 0; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 14px; padding: 18px; background: var(--studio-panel-raised, var(--ivory-50)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 14px; font-weight: 700; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card h2 svg { color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head h2 { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row { display: flex; align-items: center; gap: 18px; min-width: 0; flex-wrap: wrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split { display: grid; grid-template-columns: 330px minmax(0, 1fr); align-items: start; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-list { display: grid; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-height: 0 !important; border: 1px solid var(--studio-line, var(--ivory-300)); border-left: 4px solid var(--c); border-radius: 12px !important; padding: 10px 12px !important; background: var(--studio-panel, var(--ivory-50)); color: var(--foreground); text-align: left; cursor: pointer; transition: border-color .15s, background .15s; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp:hover { background: color-mix(in srgb, var(--c) 8%, var(--studio-panel, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp.is-selected { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, var(--studio-panel, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp small { display: block; margin-top: 3px; font-size: 11px; color: var(--navy-600); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-queries { display: grid; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query { display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; align-items: center; gap: 10px; width: 100%; min-height: 0 !important; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 10px !important; padding: 9px 10px !important; background: var(--studio-panel, var(--ivory-50)); color: var(--foreground); text-align: left; cursor: pointer; font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query:hover:not(:disabled) { border-color: var(--c); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query span.t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-note { margin: 10px 0 0; color: var(--navy-600); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-results { display: grid; gap: 8px; margin-top: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 10px; padding: 9px 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-result strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-result span { color: var(--navy-600); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-result-actions { display: flex; align-items: center; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-result-actions a, html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-result-actions button { border: 0; background: transparent; padding: 2px !important; min-height: 0 !important; color: var(--accent-500); font-size: 12px; font-weight: 700; cursor: pointer; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity { display: grid; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity button { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 0 !important; border: 0; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 0 !important; padding: 10px 0 !important; background: transparent; color: var(--foreground); text-align: left; cursor: pointer; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity button:last-child { border-bottom: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dot { width: 10px; height: 10px; border-radius: 50%; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity small { color: var(--navy-600); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity time { color: var(--navy-600); font-size: 11px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title { min-width: 0; flex: 1 1 260px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title h2 { margin: 0 !important; font-size: 20px !important; line-height: 1.3; overflow-wrap: anywhere; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title p { margin: 4px 0 0; color: var(--navy-600); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-badge { display: inline-block; margin-bottom: 6px; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; text-transform: capitalize; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tabs { display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); padding-bottom: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; border: 1px solid transparent; border-radius: 999px; padding: 8px 14px; background: transparent; color: var(--navy-600); font-size: 13px; font-weight: 650; cursor: pointer; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab:hover { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab.is-active { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab em { font-style: normal; border-radius: 999px; padding: 1px 7px; background: color-mix(in srgb, var(--c) 25%, transparent); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-sub { border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 12px; padding: 16px; background: var(--studio-panel, var(--ivory-50)); min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-sub h3 { margin: 0 0 12px; font-size: 14px; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px 14px; margin: 0; font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dt { color: var(--navy-600); font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-stack { display: flex; flex-direction: column; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-stack .button { width: 100%; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-links a { color: var(--accent-500); font-size: 12px; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-toolbar label { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-toolbar select { min-width: 170px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters label { display: grid; gap: 6px; min-width: 0; font-size: 12px; font-weight: 650; color: var(--navy-600); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-empty { display: grid; justify-items: center; gap: 12px; padding: 40px 20px; text-align: center; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-empty h2 { margin: 0; font-size: 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-brand { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-brand strong { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-brand span, html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-brand a { color: var(--navy-600); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-brand a { color: var(--accent-500); font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-profile-form { margin: 0 !important; }
+@media (max-width: 1150px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts, html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-grid2 { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dd { margin-bottom: 8px; }
+}
+/* ================================================================
+   COMPETITOR INTELLIGENCE — COMPLETE PAGE UI PASS
+   Scoped to .ci-page. Preserves the app theme, fonts and button system.
+   All existing JSX, state, handlers, API calls and data remain intact.
+================================================================ */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page {
+  gap: 22px !important;
+  width: 100%;
+  min-width: 0;
+  max-width: 1440px;
+  box-sizing: border-box;
+  padding: 42px clamp(18px, 3vw, 44px) 80px !important;
+  container: competitor-intelligence / inline-size;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-alert {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-alert button { margin: 0; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-summary { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-summary p { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-summary details { margin-top: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-summary summary { cursor: pointer; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-error-summary pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head > div > p { margin: 7px 0 0; max-width: 760px; color: var(--navy-600); font-size: 13px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-insight-caption { margin: -5px 0 13px; color: var(--navy-600); font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-insight-empty { margin: 0; color: var(--navy-600); font-size: 12px; line-height: 1.6; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list { display: grid; gap: 8px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list > button,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list > article {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 9px;
+  background: var(--studio-panel, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list > button { color: var(--foreground); text-align: left; cursor: pointer; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list > button:hover { border-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-rank { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--accent-500) 18%, transparent); color: var(--accent-500); font-size: 12px; font-weight: 800; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-name,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list > article > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list strong,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list small,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list small { display: block; margin-top: 3px; color: var(--navy-600); font-size: 10px; line-height: 1.4; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-score { color: var(--accent-500); font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list a { color: var(--accent-500); font-size: 11px; font-weight: 700; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-chart { display: grid; gap: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-chart > div { display: grid; gap: 5px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-chart > div > div { display: flex; justify-content: space-between; gap: 10px; min-width: 0; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-chart strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-chart > div > div > span { color: var(--navy-600); white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-track { display: block; height: 7px; overflow: hidden; border-radius: 99px; background: var(--studio-line, rgba(148,163,184,.2)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-track > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent-500), var(--accent-400)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-selected-rank { width: 42px; height: 42px; flex: 0 0 42px; font-size: 17px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split { grid-template-columns: minmax(0, 1fr); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp { grid-template-columns: 32px minmax(0, 1fr); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head { align-items: flex-start; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-more > summary { cursor: pointer; color: var(--accent-500); font-size: 12px; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-more[open] > summary { margin-bottom: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 0 18px;
+  border-bottom: 1px solid var(--studio-line, var(--ivory-300));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head h1 {
+  display: block;
+  min-width: 0;
+  margin: 0 !important;
+  letter-spacing: -.035em;
+  color: var(--foreground);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-pill {
+  white-space: nowrap;
+  background: var(--studio-panel, var(--ivory-50));
+  border-radius: 8px;
+}
+
+/* KPI strip — equal rhythm, quieter surfaces, clear number hierarchy */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi {
+  min-width: 0;
+  min-height: 104px;
+  padding: 17px 18px 17px 20px;
+  gap: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  background: var(--studio-panel-raised, var(--ivory-50));
+  box-shadow: none;
+  transition: border-color .18s ease, transform .18s ease;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--c) 55%, var(--studio-line, var(--ivory-300)));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi::before { width: 3px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi strong {
+  font-size: 27px;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi strong.is-text { font-size: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi small {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+/* Analytics — three balanced panels with consistent height and padding */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card {
+  min-height: 194px;
+  display: flex;
+  flex-direction: column;
+  padding: 17px 18px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card {
+  min-width: 0;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 12px;
+  padding: 18px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+  box-shadow: none;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 15px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--studio-line, var(--ivory-300));
+  font-size: 14px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card h2 svg { color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: 14px;
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row > svg {
+  width: 112px;
+  height: 112px;
+  flex: 0 0 112px !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row > div {
+  min-width: 0;
+  flex: 1 1 0 !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row ul { gap: 11px !important; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row li {
+  grid-template-columns: 9px minmax(0, 1fr) auto !important;
+  gap: 7px !important;
+  font-size: 11px !important;
+  line-height: 1.35;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row li > span:first-child {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 3px !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row li strong {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal analytics bars — slim, flat, precise; remove neon glow */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row > div > div,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card > div[style*="display: grid"] > div {
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card [style*="height: 10px"] {
+  height: 7px !important;
+  border-radius: 99px !important;
+  background: var(--studio-line, rgba(148,163,184,.2)) !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card [style*="height: 100%"][style*="linear-gradient"] {
+  background: var(--bar-color, #38bdf8) !important;
+  box-shadow: none !important;
+  border-radius: 99px !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card [style*="grid-template-columns: minmax(0,1fr) auto"] strong {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Main workspace — fixed, calm navigation rail and flexible content area */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split {
+  display: grid;
+  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card { padding: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head h2 { margin: 0; padding: 0; border: 0; }
+
+/* Competitor list — compact rows, predictable text wrapping and selection */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-list { display: grid; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 68px !important;
+  padding: 10px 11px !important;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-left: 3px solid var(--c);
+  border-radius: 9px !important;
+  background: var(--studio-panel, var(--ivory-50));
+  text-align: left;
+  transition: border-color .18s ease, background .18s ease;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp:hover,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp.is-selected {
+  border-color: color-mix(in srgb, var(--c) 65%, var(--studio-line, var(--ivory-300)));
+  background: color-mix(in srgb, var(--c) 8%, var(--studio-panel, var(--ivory-50)));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp > svg { width: 40px; height: 40px; }
+
+/* Discovery queries and activity list */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-queries,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-results { display: grid; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query {
+  min-height: 54px !important;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
+  gap: 9px;
+  padding: 9px 10px !important;
+  border-radius: 9px !important;
+  background: var(--studio-panel, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query-icon { width: 32px; height: 32px; border-radius: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query span.t { font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-note { font-size: 12px; line-height: 1.6; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity button {
+  min-height: 55px !important;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 10px 0 !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity strong { font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity small,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity time { font-size: 10px; }
+
+/* Selected competitor panel */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 19px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 12px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title { flex: 1 1 300px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title h2 {
+  margin: 0 !important;
+  font-size: 19px !important;
+  line-height: 1.35;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title p { margin-top: 6px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-badge { margin-bottom: 7px; border-radius: 6px; padding: 4px 9px; }
+
+/* Tabs — clean segmented navigation, no excessive colour blocks */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tabs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--studio-line, var(--ivory-300));
+  padding: 0 0 10px;
+  scrollbar-width: thin;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab.is-active {
+  border-color: color-mix(in srgb, var(--c) 45%, var(--studio-line, var(--ivory-300)));
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+}
+
+/* Profile cards and business detail rows */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-sub {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 10px;
+  background: var(--studio-panel, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-sub h3 {
+  margin: 0 0 13px;
+  font-size: 13px;
+  font-weight: 700;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chip { padding: 5px 9px; border-radius: 6px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl {
+  display: grid;
+  grid-template-columns: minmax(105px, .8fr) minmax(0, 1.2fr);
+  gap: 11px 15px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dt { color: var(--navy-600); font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-brand { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 11px; }
+
+/* Forms and evidence: consistent grid and comfortable reading width */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-profile-form,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-evidence-layout > form {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 12px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px 15px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-form-grid > label { min-width: 0; align-content: start; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-social-fields { margin-top: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-evidence-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(250px, .8fr);
+  gap: 15px;
+  align-items: start;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-snapshot-history article {
+  display: grid;
+  gap: 7px;
+  margin-top: 9px;
+  padding: 13px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 9px;
+  background: var(--studio-panel, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-snapshot-history article strong { font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-snapshot-history article span,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-snapshot-history article small { font-size: 11px; line-height: 1.5; color: var(--navy-600); }
+
+/* Analysis: editorial grid, distinct sections, readable insight blocks */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-summary {
+  min-width: 0;
+  padding: 19px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-left: 3px solid #8b7cf6 !important;
+  border-radius: 10px;
+  background: var(--studio-panel, var(--ivory-50));
+  line-height: 1.7;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-summary p { margin: 9px 0 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid > article,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid > article,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid > article {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 10px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+  line-height: 1.65;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid > article h3,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid > article h4,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid > article h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid > article p,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid > article p,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid > article p {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.65;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-insight-section { margin-top: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-insight-section h3 {
+  margin: 0 0 7px;
+  color: var(--navy-600);
+  font-size: 11px;
+  letter-spacing: .015em;
+  text-transform: uppercase;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-insight-section ul { margin: 0; padding-left: 17px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-insight-section li { margin: 5px 0; font-size: 12px; line-height: 1.6; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-insight-section p { margin: 0; color: var(--navy-600); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-opportunities > article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  margin: 10px 0;
+  padding: 16px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 10px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-opportunities > article h4 { margin: 9px 0 5px; font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-opportunities > article p { margin: 5px 0; font-size: 12px; line-height: 1.6; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-opportunities > article small { font-size: 11px; color: var(--navy-600); line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-action-plan,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-content-ideas { margin-top: 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid > article,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid > article { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid > article .button { margin-top: auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-data-limit {
+  margin-top: 16px;
+  padding: 15px 17px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 10px;
+  background: var(--studio-panel, var(--ivory-50));
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Comparison table and post filters */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 11px;
+  margin-bottom: 15px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters label { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-comparison-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 10px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-comparison-table { min-width: 850px; border-collapse: collapse; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-comparison-table th,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-comparison-table td {
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--studio-line, var(--ivory-300));
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.5;
+  vertical-align: top;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-comparison-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--studio-panel, var(--ivory-50));
+  color: var(--navy-600);
+  font-weight: 700;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-metric-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-metric-grid > div {
+  min-width: 78px;
+  padding: 8px 10px;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 8px;
+  background: var(--studio-panel, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-metric-grid span { display: block; color: var(--navy-600); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-metric-grid strong { display: block; margin-top: 3px; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Responsive behavior */
+@media (max-width: 1180px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split { grid-template-columns: minmax(230px, .75fr) minmax(0, 1.5fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-evidence-layout { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+@media (max-width: 680px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head { align-items: flex-start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head-actions { justify-content: flex-start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-grid2,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-form-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row { flex-wrap: wrap; justify-content: flex-start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dd { margin-bottom: 8px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-opportunities > article { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 420px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-filters { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-head { padding: 14px; }
+}
+
+/* ================================================================
+   COMPETITOR INTELLIGENCE — LAYOUT REFINEMENT V2
+   Layout-only refinement: preserves theme, typography, buttons,
+   component behavior, data, state and API integrations.
+================================================================ */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page {
+  gap: 20px !important;
+}
+
+/* Give the top area a clearer, more deliberate rhythm. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head {
+  padding: 4px 0 17px;
+  margin-bottom: 1px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis {
+  gap: 12px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpi {
+  min-height: 96px;
+  padding: 15px 16px 15px 19px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--studio-panel-raised, #111c30) 92%, var(--c) 8%);
+}
+
+/* Analytics: consistent card heights and more balanced chart placement. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card {
+  width: 100%;
+  min-width: 0;
+  min-height: 190px;
+  padding: 16px;
+  border-radius: 11px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:first-child > div {
+  display: grid !important;
+  flex: 1;
+  align-content: start;
+  gap: 12px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card h2 {
+  margin-bottom: 13px;
+  padding-bottom: 10px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row {
+  align-items: flex-start;
+  gap: 11px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row > svg {
+  width: 104px;
+  height: 104px;
+  flex-basis: 104px !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row li {
+  font-size: 11px !important;
+}
+
+/* Main workspace becomes a clean full-width sequence instead of
+   squeezing the profile into a narrow right-hand column. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+/* Competitor selector spans the full row; discovery and activity
+   sit neatly beneath it in two equal containers. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card {
+  min-width: 0;
+  padding: 15px;
+  border-radius: 11px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child {
+  grid-column: 1 / -1;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child .ci-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp {
+  min-height: 70px !important;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 9px;
+  padding: 9px 10px !important;
+  border-radius: 9px !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp > svg {
+  width: 36px;
+  height: 36px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp strong {
+  font-size: 11px;
+  line-height: 1.4;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp small {
+  font-size: 10px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:nth-child(2),
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:nth-child(3) {
+  height: 100%;
+}
+
+/* Discovery actions: equal-height compact rows. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query {
+  min-height: 48px !important;
+  padding: 8px 10px !important;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-activity button {
+  min-height: 48px !important;
+  padding: 8px 0 !important;
+}
+
+/* The selected competitor gets the full canvas. Header, tabs and
+   profile/action panels align to one shared content width. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main {
+  min-width: 0;
+  gap: 13px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card {
+  padding: 17px;
+  border-radius: 11px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-head {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 17px;
+  border-radius: 10px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title {
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-title h2 {
+  font-size: 18px !important;
+  line-height: 1.35;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-actions {
+  justify-content: flex-end;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tabs {
+  gap: 7px;
+  padding: 0 0 11px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tab {
+  padding: 8px 13px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-grid2 {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  gap: 12px;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-sub {
+  padding: 17px;
+  border-radius: 10px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl {
+  grid-template-columns: minmax(115px, .75fr) minmax(0, 1.25fr);
+  gap: 10px 13px;
+}
+
+/* Make analysis and comparison content follow a consistent card grid. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid {
+  gap: 12px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-grid > article,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-idea-grid > article,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-observed-post-grid > article {
+  border-radius: 10px;
+  padding: 16px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-opportunities > article {
+  border-radius: 10px;
+  padding: 15px 16px;
+}
+
+/* Tablet and mobile: gracefully return to stacked containers. */
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child {
+    grid-column: 1 / -1;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-head {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 640px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child .ci-list,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child {
+    grid-column: auto;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-chart-row {
+    flex-wrap: nowrap;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main-head {
+    grid-template-columns: 48px minmax(0, 1fr);
+    padding: 13px;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-dl dd {
+    margin-bottom: 7px;
+  }
+}
+
+/* ================================================================
+   V3 ALIGNMENT FIX — selected competitor profile workspace
+   Both inner containers now use one shared full-width column.
+   Actions become a compact horizontal action strip, eliminating
+   the oversized empty panel and uneven column proportions.
+================================================================ */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-main-head,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-tabs,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+/* Overview profile and actions align to the same full-width edges. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+/* Profile details use a balanced label/value grid across the wider card. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:first-child .ci-dl {
+  grid-template-columns: minmax(150px, .32fr) minmax(0, .68fr);
+  column-gap: 20px;
+  row-gap: 11px;
+}
+/* Actions are displayed as three equal-width controls, not a tall stack. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:nth-child(2) .ci-stack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 12px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:nth-child(2) .ci-stack > * {
+  width: 100%;
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:nth-child(2) .ci-note {
+  margin-top: 12px;
+}
+/* Keep all content areas flush with the same container edges. */
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main {
+  width: 100%;
+  min-width: 0;
+  align-items: stretch;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > * {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:nth-child(2) .ci-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:first-child .ci-dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:first-child .ci-dl dd {
+    margin-bottom: 7px;
+  }
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-analysis-view :is(p, li, dd, small, strong, summary) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-social-performance,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-full-analysis {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-social-performance {
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-social-performance .campaign-section-heading {
+  margin: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-social-performance .campaign-section-heading h3,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-full-analysis h3 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 15px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-social-performance .campaign-section-heading p,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-insight-context,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-note,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-empty {
+  margin: 5px 0 0;
+  color: var(--navy-600);
+  font-size: 12px;
+  line-height: 1.6;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-grid > article,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-pillar-list > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 9px;
+  padding: 12px;
+  background: var(--studio-panel, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-grid > article > span {
+  color: var(--navy-600);
+  font-size: 11px;
+  font-weight: 650;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-grid > article > strong {
+  color: var(--foreground);
+  font-size: 16px;
+  line-height: 1.4;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-grid > article > p,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-pillar-list > div > p {
+  margin: 0;
+  color: var(--navy-600);
+  font-size: 12px;
+  line-height: 1.55;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-performance-grid > .competitor-performance-note {
+  grid-column: 1 / -1;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-pillar-list {
+  display: grid;
+  gap: 8px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-pillar-list > div > strong {
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.45;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-full-analysis {
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 11px;
+  padding: 14px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-full-analysis > summary {
+  color: var(--accent-600);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-full-analysis[open] > summary {
+  margin-bottom: 4px;
+}
+
+@container competitor-intelligence (max-width: 960px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child {
+    grid-column: 1 / -1;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card {
+    height: 100%;
+  }
+}
+
+@container competitor-intelligence (max-width: 640px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child {
+    grid-column: auto;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head {
+    align-items: flex-start;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head-actions {
+    justify-content: flex-start;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:nth-child(2) .ci-stack,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:first-child .ci-dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-main > .ci-card.ci-main > .ci-grid2 > .ci-sub:first-child .ci-dl {
+    gap: 3px;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page {
+    padding: 26px 16px 48px !important;
+  }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-head {
+    min-height: 0;
+    padding-bottom: 14px;
+  }
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-split { grid-template-columns: minmax(0, 1fr) !important; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tabs {
+  position: sticky;
+  top: 76px;
+  z-index: 9;
+  margin: 0 -4px;
+  padding: 7px 4px 10px;
+  background: var(--studio-panel-raised, var(--ivory-50));
+  box-shadow: 0 8px 12px -12px var(--foreground);
+  scroll-margin-top: 88px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-evidence-layout {
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, .9fr);
+  align-items: start;
+  gap: 16px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-snapshot-history { min-width: 0; align-content: start; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-snapshot-history > article { overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card { display: flex; flex-direction: column; min-height: 244px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:nth-child(1) { border-top: 3px solid ${CHART.cyan}; background: linear-gradient(155deg, color-mix(in srgb, ${CHART.cyan} 8%, var(--studio-panel-raised, var(--ivory-50))) 0%, var(--studio-panel-raised, var(--ivory-50)) 46%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:nth-child(2) { border-top: 3px solid ${CHART.pink}; background: linear-gradient(155deg, color-mix(in srgb, ${CHART.pink} 8%, var(--studio-panel-raised, var(--ivory-50))) 0%, var(--studio-panel-raised, var(--ivory-50)) 46%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:nth-child(3) { border-top: 3px solid ${CHART.amber}; background: linear-gradient(155deg, color-mix(in srgb, ${CHART.amber} 8%, var(--studio-panel-raised, var(--ivory-50))) 0%, var(--studio-panel-raised, var(--ivory-50)) 46%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card > h2 { font-size: 15px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:nth-child(1) > h2 svg { color: ${CHART.cyan}; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:nth-child(2) > h2 svg { color: ${CHART.pink}; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:nth-child(3) > h2 svg { color: ${CHART.amber}; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side { display: flex !important; flex-direction: column; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-list { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-side > .ci-card:first-child { grid-column: auto !important; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head > div > h2 { margin: 0 0 7px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-card-head .ci-insight-caption { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-more { padding: 14px 16px; }
+@container competitor-intelligence (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@container competitor-intelligence (max-width: 960px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:last-child { grid-column: 1 / -1; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-evidence-layout { grid-template-columns: minmax(0, 1.3fr) minmax(260px, .9fr); }
+}
+@container competitor-intelligence (max-width: 520px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-list,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts { grid-template-columns: minmax(0, 1fr) !important; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-charts > .ci-card:last-child { grid-column: auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-profile-list > button,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-top-post-list > article { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .competitor-evidence-layout { grid-template-columns: minmax(0, 1fr); }
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders { display: grid; gap: 16px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 0 15px; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading h2 { margin: 2px 0 5px; font-size: clamp(23px, 2vw, 30px); letter-spacing: -.035em; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading p:not(.ci-kicker) { margin: 0; color: var(--navy-600); font-size: 13px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-kicker { margin: 0; color: var(--accent-500); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-setup-note { margin: 0; padding: 10px 13px; border-left: 3px solid var(--accent-500); border-radius: 7px; background: var(--studio-panel, var(--ivory-50)); color: var(--navy-600); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-card { display: grid; grid-template-columns: minmax(250px, .72fr) minmax(0, 1.6fr); gap: 0; min-width: 0; overflow: hidden; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 16px; background: var(--studio-panel-raised, var(--ivory-50)); box-shadow: 0 8px 24px rgb(2 8 23 / 14%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-card { grid-template-columns: minmax(280px, .78fr) minmax(0, 1.5fr); border-radius: 20px; box-shadow: 0 18px 44px rgb(2 8 23 / 22%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-panel,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-panel { min-width: 0; padding: clamp(18px, 2.2vw, 28px); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-panel { border-right: 1px solid var(--studio-line, var(--ivory-300)); background: color-mix(in srgb, var(--accent-500) 6%, var(--studio-panel-raised, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-panel { display: flex; flex-direction: column; align-items: stretch; padding: clamp(20px, 2.1vw, 28px); background: linear-gradient(155deg, color-mix(in srgb, var(--accent-500) 12%, var(--studio-panel-raised, var(--ivory-50))), var(--studio-panel-raised, var(--ivory-50)) 60%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-heading { display: grid; grid-template-columns: 54px minmax(0, 1fr); align-items: center; gap: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo { position: relative; display: grid; width: 54px; height: 54px; place-items: center; overflow: hidden; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 13px; background: var(--studio-panel, var(--ivory-50)); color: var(--accent-500); font-size: 21px; font-weight: 800; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--studio-panel, var(--ivory-50)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo.ci-logo-text-mark { border-color: #d4af37; border-radius: 50%; background: #3e2723; color: #d4af37; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-site-logo-mark { display: none; width: 100%; height: 100%; place-items: center; font-family: Georgia, serif; font-size: 22px; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo.ci-logo-missing.ci-logo-has-text .ci-site-logo-mark,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo.ci-logo-text-mark .ci-site-logo-mark { display: grid; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo.ci-logo-missing.ci-logo-has-text .ci-logo-fallback { display: none; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo.ci-logo-text-mark .ci-logo-fallback { display: none; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-logo-fallback { display: none; padding: 5px; color: var(--navy-600); font-size: 9px; font-weight: 600; line-height: 1.2; text-align: center; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo.ci-logo-missing .ci-logo-fallback,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo:not(:has(img)) .ci-logo-fallback { display: block; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-rank-label { color: var(--accent-500); font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-heading h3 { margin: 3px 0 0; font-size: 18px; line-height: 1.3; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-logo { width: 64px; height: 64px; border-radius: 17px; box-shadow: 0 5px 18px rgb(0 0 0 / 15%); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-summary { margin-top: 20px; color: var(--foreground); font-size: 13px; font-weight: 650; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts { display: grid; gap: 11px; margin: 20px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts { gap: 0; margin: 14px 0 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts > div { grid-template-columns: 68px minmax(0, 1fr); padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--studio-line, var(--ivory-300)) 75%, transparent); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts > div { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 10px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts dt { color: var(--navy-600); font-size: 11px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts dd { min-width: 0; margin: 0; color: var(--foreground); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-facts a,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-post a { color: var(--accent-500); font-weight: 700; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-block { padding-top: 13px; border-top: 1px solid var(--studio-line, var(--ivory-300)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-block { margin-top: auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-block > strong { font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-block > p { margin: 7px 0 0; color: var(--navy-600); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-refresh-research { margin-top: 10px; min-height: 30px; padding: 5px 9px; font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-links a { padding: 5px 8px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 7px; color: var(--accent-500); font-size: 10px; font-weight: 700; text-decoration: none; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions { padding-top: 14px; border-top: 1px solid var(--studio-line, var(--ivory-300)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions .button { flex: 1 1 auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions .button { min-height: 34px; padding: 7px 10px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 13px; padding-bottom: 11px; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-panel { padding: clamp(20px, 2.1vw, 28px); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-heading h3 { margin: 3px 0 0; font-size: 17px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-heading > span { color: var(--navy-600); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-posts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-posts { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px; align-items: stretch; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-post { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 13px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 10px; background: var(--studio-panel, var(--ivory-50)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-post { min-height: 210px; padding: 16px; border-radius: 14px; background: color-mix(in srgb, var(--studio-panel, var(--ivory-50)) 88%, var(--accent-500)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-topline { display: flex; flex-wrap: wrap; gap: 7px; color: var(--navy-600); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-rank { color: var(--accent-500); font-weight: 800; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-post h4 { margin: 8px 0 2px; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-hook { margin: 7px 0; color: var(--navy-600); font-size: 11px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-metrics > span { padding: 5px 7px; border-radius: 6px; background: color-mix(in srgb, var(--accent-500) 9%, transparent); color: var(--navy-600); font-size: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-metrics strong { color: var(--foreground); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-ranking-note { margin: 0 0 9px; color: var(--navy-600); font-size: 10px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-strategy { margin: 7px 0 10px; color: var(--foreground); font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-strategy p { margin: 3px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-strategy small,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary small { display: block; margin-top: 5px; color: var(--navy-600); font-size: 9px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-post > a { margin-top: auto; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading { padding: 4px 0 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading h2 { font-size: clamp(27px, 3vw, 36px); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-automation-note { padding: 12px 15px; border-radius: 12px; background: var(--studio-panel, var(--ivory-50)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-empty-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 15px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-post-ranking-note { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--accent-500) 6%, var(--studio-panel, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary { border-radius: 14px; }
+@media (max-width: 920px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-card { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-panel { border-right: 0; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-social-block { margin-top: 0; }
+}
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts { padding: 16px; border: 1px dashed var(--studio-line, var(--ivory-300)); border-radius: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts p { margin: 5px 0 0; color: var(--navy-600); font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; background: color-mix(in srgb, var(--accent-500) 4%, var(--studio-panel, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts::before { content: "!"; display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--accent-500) 14%, transparent); color: var(--accent-500); font-weight: 800; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts p { grid-column: 2; margin: -7px 0 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--studio-line, var(--ivory-300)); border-left: 3px solid var(--accent-500); border-radius: 10px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary h4 { margin: 0 0 6px; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary ul { display: grid; gap: 4px; margin: 0; padding-left: 17px; color: var(--navy-600); font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary small { margin-top: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-details { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--studio-line, var(--ivory-300)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-details > summary { cursor: pointer; color: var(--accent-500); font-size: 11px; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-form > label { display: grid; gap: 4px; min-width: 0; font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-form > .button { align-self: end; }
+@container competitor-intelligence (max-width: 780px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-card { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-panel { border-right: 0; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); }
+}
+@container competitor-intelligence (max-width: 520px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-posts,
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-form { grid-template-columns: minmax(0, 1fr); }
+}
+
+`}</style>
+
+      <div className="ci-head">
+        <div><h1>Find the posts people care about</h1><p>See what earns views and interactions across your leading competitors, then adapt those patterns for your brand.</p></div>
+        <div className="ci-head-actions">
+          <span className="ci-pill" title="Public sources only. Nothing is scraped or estimated. Social posts and private metrics are not collected."><Lightbulb size={13} aria-hidden="true" /> Public sources only</span>
+          {data?.dataCollection.websiteSearchAvailable && <button className="button button-outline" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Finding and analyzing…" : "Find top 3 & analyze"}</button>}
+          <button className="button button-gold" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add competitor</button>
         </div>
-        <div className="competitor-hero-visual" aria-hidden="true">
-          <div className="competitor-hero-chart">
-            <span /><span /><span /><span /><span />
-            <TrendingUp />
-          </div>
-        </div>
-        <button className="button competitor-hero-action" type="button" onClick={() => startNewProfile()}>Add competitor <ArrowRight size={15} aria-hidden="true" /></button>
       </div>
-      <div className="competitor-evidence-banner" role="note">
-        <span className="competitor-evidence-icon"><Lightbulb size={18} aria-hidden="true" /></span>
-        <div><strong>Evidence-first research</strong><span>Public homepages can be searched and scanned. Social profile links may be discovered; social posts and private metrics are not collected.</span></div>
-      </div>
-      {error && <div className="notice notice-error" role="alert">{error}<button className="button button-outline" type="button" onClick={() => void load()}>Try again</button></div>}
+
+      {data && <p className="ci-note ci-automation-note" role="status">{!data.dataCollection.websiteSearchAvailable ? "Public website discovery is not configured yet. Add a web search API key to enable automatic competitor discovery." : data.brand.industry || data.brand.products || data.brand.description ? "Automatic discovery uses your Brand Profile and public website search. Post metrics appear only when connected, approved sources provide them." : "Add your service or industry to Brand Profile to start automatic discovery."}{busy === "discovery" ? " Finding and analyzing up to three profiles…" : ""}</p>}
+      {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void (retryDiscovery ? discoverAndAnalyze() : load())}>{retryDiscovery ? "Retry discovery" : "Try again"}</button></div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {loading && <p className="loading-label">Loading competitor research…</p>}
 
       {showProfileForm && (profileFormPlacement === "page" || Boolean(data?.competitors.length)) && renderProfileForm()}
 
-      <section className="competitor-discovery-section">
-        <div className="campaign-section-heading"><div><p className="card-kicker competitor-section-label"><Compass size={15} aria-hidden="true" /> DISCOVERY WORKSPACE</p><h2>Research leads for {data?.brand.name || "your brand"}</h2><p>Search suggestions use your saved business context. Verify each result before adding it.</p></div>{data?.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Discovering and analyzing…" : "Auto-discover & analyze"}</button>}</div>
-        {searchQueries.length ? <div className="competitor-query-grid">{searchQueries.slice(0, 3).map(({ label, query }, index) => {
-          const QueryIcon = [Compass, BarChart3, Building2][index] ?? Search;
-          return <button key={query} type="button" onClick={() => void searchWebsites(query)} disabled={searchBusy}><span className="competitor-query-icon"><QueryIcon size={17} aria-hidden="true" /></span><span className="competitor-query-label">{label}</span><small>{searchBusy && activeSearchQuery === query ? "Searching…" : "Search public web"}<ArrowRight size={14} aria-hidden="true" /></small></button>;
-        })}</div> : <p>Add your industry and market in Brand Profile to get search suggestions.</p>}
-        {!data?.dataCollection.websiteSearchAvailable && <p className="competitor-search-setup">In-dashboard search needs a Tavily API key. Add TAVILY_API_KEY to apps/api/.env and restart the API server.</p>}
-        {searchQueries.length > 0 && <p className="competitor-discovery-note"><Search size={13} aria-hidden="true" /> Use public company pages and profiles as sources. This app does not fetch arbitrary URLs or scrape social platforms.</p>}
-        {searchError && <p className="competitor-search-error" role="alert">{searchError}</p>}
-        {searchBusy && <p className="competitor-search-status" role="status">Finding company websites…</p>}
-        {!searchBusy && activeSearchQuery && !searchError && <section className="competitor-search-results" aria-live="polite">
-          <div className="competitor-search-results-heading"><h3>Websites for “{activeSearchQuery}”</h3><span>{searchResults.length} found · {data?.dataCollection.websiteSearchProvider}</span></div>
-          {!searchResults.length ? <p>No website results found. Try a broader search.</p> : <div className="competitor-search-results-list">{searchResults.map((result) => <article key={result.domain}><div><strong>{result.title}</strong><span>{result.domain}</span></div><div><a href={result.url} target="_blank" rel="noreferrer">Open website</a><button type="button" onClick={() => startNewProfile({ name: result.title.slice(0, 191), websiteUrl: result.url })}>Add profile</button></div></article>)}</div>}
-        </section>}
-      </section>
-
-      {data && <div className="competitor-overview-grid">
-        <article><span className="competitor-stat-icon competitor-stat-icon--profiles"><UsersRound size={16} aria-hidden="true" /></span><span className="card-kicker competitor-stat-label">TRACKED PROFILES</span><strong>{data.competitors.length}</strong><p>Competitors in this brand workspace</p></article>
-        <article><span className="competitor-stat-icon competitor-stat-icon--observations"><FileText size={16} aria-hidden="true" /></span><span className="card-kicker competitor-stat-label">SOURCED OBSERVATIONS</span><strong>{data.competitors.reduce((total, item) => total + item.snapshots.length, 0)}</strong><p>Dated snapshots in recent history</p></article>
-        <article><span className="competitor-stat-icon competitor-stat-icon--analysis"><Brain size={16} aria-hidden="true" /></span><span className="card-kicker competitor-stat-label">AI ANALYSES</span><strong>{data.competitors.reduce((total, item) => total + item.snapshots.filter((snapshot) => snapshot.analysisJson).length, 0)}</strong><p>Saved evidence-based reports</p></article>
-        <article><span className="competitor-stat-icon competitor-stat-icon--monitoring"><Radio size={16} aria-hidden="true" /></span><span className="card-kicker competitor-stat-label">AUTOMATIC MONITORING</span><strong>Not connected</strong><p>Refresh with a new sourced observation</p></article>
-      </div>}
-
-      {data && data.competitors.length === 0 && <section className="competitor-empty-research">
-        <div className="competitor-empty-art" aria-hidden="true"><Compass size={42} /><span /><span /><span /></div>
-        <div className="competitor-empty-copy"><p className="card-kicker">YOUR RESEARCH SET STARTS HERE</p><h2>Start your competitive research set</h2><p>Add a competitor profile, then record sourced public observations. Intelligence and reports grow from dated evidence—not guessed statistics.</p>
-          <button className="button button-gold" type="button" onClick={() => startNewProfile(undefined, "empty")}>Add your first competitor <ArrowRight size={15} aria-hidden="true" /></button>
+      {data && <div className="ci-leaders">
+        <div className="ci-leaders-heading">
+          <div><p className="ci-kicker">COMPETITOR SNAPSHOT</p><h2>Leading businesses</h2><p>Business details, public social channels, and the posts with the strongest recorded engagement.</p></div>
         </div>
-        {showProfileForm && profileFormPlacement === "empty" && renderProfileForm()}
-      </section>}
-
-      {data && data.competitors.length > 0 && <section className="competitor-directory">
-        <div className="campaign-section-heading"><div><p className="card-kicker competitor-section-label"><UsersRound size={15} aria-hidden="true" /> YOUR COMPETITORS</p><h2>Research set</h2></div><button className="button button-outline" type="button" onClick={() => void load()}>Refresh</button></div>
-        <div className="competitor-directory-list">{data.competitors.map((competitor) => <button className={`competitor-directory-card${competitor.id === selectedId ? " is-selected" : ""}`} type="button" key={competitor.id} onClick={() => { setSelectedId(competitor.id); setShowProfileForm(false); }}>
-          <span>{competitor.category.replace("-", " ")}</span><strong>{competitor.name}</strong><small>{competitor.industry || "Industry not entered"} · {competitor.snapshots.length} snapshots</small>
-        </button>)}</div>
-      </section>}
-
-      {selected && <section className="competitor-workspace">
-        <div className="competitor-workspace-heading"><div><p className="card-kicker">{selected.category.toUpperCase().replace("-", " ")} · {selected.location || "Location not recorded"}</p><h2>{selected.name}</h2><p>{selected.industry || "Industry not recorded"}{latest ? ` · Last observed ${new Date(latest.observedAt).toLocaleString()}` : " · No observation snapshots yet"}</p></div><div className="campaign-workflow-actions"><button className="button button-outline" type="button" onClick={() => editProfile(selected)}>Edit profile</button><button className="button button-outline" type="button" onClick={() => exportReport(selected)}>Export report</button><button className="button button-outline" type="button" onClick={() => void removeCompetitor(selected)} disabled={busy === "remove"}>Remove</button></div></div>
-        <nav className="competitor-tabs" aria-label="Competitor intelligence sections">{([
-          ["overview", "Profile", UsersRound],
-          ["evidence", "Evidence", FileText],
-          ["analysis", "Analysis", Brain],
-          ["compare", "Compare", BarChart3],
-        ] as const).map(([key, label, Icon]) => <button type="button" key={key} className={tab === key ? "is-active" : ""} onClick={() => setTab(key)}><span><Icon size={15} aria-hidden="true" />{label}</span></button>)}</nav>
-
-        {tab === "overview" && <div className="competitor-view-grid">
-          <article className="competitor-detail-card"><h3>Business profile</h3><div className="competitor-profile-completeness"><span>Profile completeness</span><strong>{profileCompleteness(selected)}%</strong></div><p>{selected.overview || "No sourced overview entered."}</p><dl>
-            <dt>Products/services</dt><dd>{selected.products || "Not recorded"}</dd>
-            <dt>Target audience</dt><dd>{selected.audience || "Not recorded"}</dd>
-            <dt>Unique value</dt><dd>{selected.uniqueValue || "Not recorded"}</dd>
-            <dt>Brand voice</dt><dd>{selected.brandVoice || "Not recorded"}</dd>
-            <dt>Research keywords</dt><dd>{selected.keywords.join(", ") || "None recorded"}</dd>
-            {selected.websiteUrl && <><dt>Website</dt><dd><a href={selected.websiteUrl} target="_blank" rel="noreferrer">{selected.websiteUrl}</a></dd></>}
-          </dl><div className="competitor-link-list">{Object.entries(selected.socialProfiles).filter(([, url]) => Boolean(url)).map(([platform, url]) => <a key={platform} href={url} target="_blank" rel="noreferrer">{platform} profile ↗</a>)}</div></article>
-          <article className="competitor-detail-card"><span className="card-kicker competitor-section-label"><FileText size={15} aria-hidden="true" /> NEXT STEP</span><h3>Analyze public evidence</h3><p>Scan the Brand Kit and competitor websites, then analyze observations recorded from Instagram, LinkedIn, Facebook, or other public sources.</p><button className="button button-gold" type="button" onClick={() => void analyzeLatest()} disabled={busy === "analysis"}>{busy === "analysis" ? "Scanning and analyzing…" : "Scan websites & analyze"}</button><p className="competitor-instagram-limit">Profile links alone do not provide post content or metrics. This app does not scrape Instagram, LinkedIn, or Facebook; add dated public observations under Evidence for channel analysis.</p><button className="button button-outline" type="button" onClick={() => { const platform = (["Instagram", "LinkedIn", "Facebook"] as const).find((name) => selected.socialProfiles[name]) ?? "Instagram"; setObservedPlatform(platform); setSourceLabel(`Public ${platform} profile observation`); setSourceUrl(selected.socialProfiles[platform] ?? ""); setTab("evidence"); }}>Add social evidence</button>{latest?.analysisJson && <button className="button button-outline" type="button" onClick={() => setTab("analysis")}>View action plan</button>}</article>
-          <div className="competitor-data-limit"><strong>Data available</strong><p>Public website homepages are scanned on request. Social links can be discovered there; private analytics and social post collection are not connected.</p></div>
-          {activity.length > 0 && <section className="competitor-activity-feed"><div className="campaign-section-heading"><div><p className="card-kicker">MANUAL ACTIVITY HISTORY</p><h3>Recent research activity</h3></div></div>{activity.map((entry) => <button type="button" key={entry.id} onClick={() => { setSelectedId(entry.competitorId); setTab(entry.analyzed ? "analysis" : "evidence"); }}><strong>{entry.competitor}</strong><span>{entry.postCount} posts · {entry.sourceCount} sources · {entry.analyzed ? "analysis saved" : "observation saved"}</span><time>{new Date(entry.observedAt).toLocaleDateString()}</time></button>)}</section>}
-        </div>}
-
-        {tab === "evidence" && <div className="competitor-evidence-layout">
-          <form className="competitor-profile-form" onSubmit={(event) => void recordSnapshot(event)}>
-            <div className="campaign-section-heading"><div><p className="card-kicker">MANUAL DATA COLLECTION</p><h3>Save a sourced observation</h3><p>Enter only details you can verify from a public or authorized source. Every snapshot is timestamped and retained.</p></div></div>
-            <div className="competitor-form-grid">
-              <label>Source label<input required minLength={2} maxLength={160} value={sourceLabel} placeholder="Official Instagram profile, public webpage…" onChange={(event) => setSourceLabel(event.target.value)} /></label>
-              <label>Source URL<input type="url" value={sourceUrl} placeholder="https://" onChange={(event) => setSourceUrl(event.target.value)} /></label>
-              <label>Platform<select value={observedPlatform} onChange={(event) => { const platform = event.target.value as SocialPlatform; setObservedPlatform(platform); setSourceLabel(`Public ${platform} profile observation`); setSourceUrl(selected.socialProfiles[platform] ?? ""); }}><option value="Instagram">Instagram</option><option value="LinkedIn">LinkedIn</option><option value="Facebook">Facebook</option>{socialPlatforms.filter((platform) => !["Instagram", "LinkedIn", "Facebook"].includes(platform)).map((platform) => <option value={platform} key={platform}>{platform}</option>)}</select></label>
-              <label>Observation date<input required type="date" max={new Date().toISOString().slice(0, 10)} value={observationDate} onChange={(event) => setObservationDate(event.target.value)} /></label>
-              <label>Public post URL (optional)<input type="url" value={postUrl} placeholder="https://" onChange={(event) => setPostUrl(event.target.value)} /></label>
-              {postUrl && <label>Post publication date (if known)<input type="date" max={new Date().toISOString().slice(0, 10)} value={postPublishedDate} onChange={(event) => setPostPublishedDate(event.target.value)} /></label>}
-              {numberFields.map(({ key, label }) => <label key={key}>{label}<input type="number" min="0" step="1" value={metricValues[key] ?? ""} onChange={(event) => setMetricValues({ ...metricValues, [key]: event.target.value })} /></label>)}
-              {postUrl && <>
-                <label>Post format<input value={postFormat} maxLength={60} onChange={(event) => setPostFormat(event.target.value)} /></label>
-                <label>Post topic<input value={postTopic} maxLength={500} onChange={(event) => setPostTopic(event.target.value)} /></label>
-                <label>Hook or opening<textarea rows={2} value={postHook} maxLength={1000} onChange={(event) => setPostHook(event.target.value)} /></label>
-                <label>Caption approach<textarea rows={2} value={postApproach} maxLength={1500} onChange={(event) => setPostApproach(event.target.value)} /></label>
-                <label>Call to action<input value={postCta} maxLength={500} onChange={(event) => setPostCta(event.target.value)} /></label>
-              </>}
-              <label>Website or conversion observations<textarea rows={3} value={websiteFindings} placeholder="One observation per line, with page or source context" onChange={(event) => setWebsiteFindings(event.target.value)} /></label>
-              <label>SEO observations<textarea rows={3} value={seoFindings} placeholder="Visible titles, headings, or topic coverage; not search rank" onChange={(event) => setSeoFindings(event.target.value)} /></label>
-              <label>Audience questions or concern themes<textarea rows={3} value={audienceThemes} placeholder="Summarize themes only; avoid names or sensitive personal data" onChange={(event) => setAudienceThemes(event.target.value)} /></label>
-              <label>Visible response patterns<textarea rows={3} value={responsePatterns} onChange={(event) => setResponsePatterns(event.target.value)} /></label>
-              <label>Visible offers or campaigns<textarea rows={3} value={visibleCampaigns} onChange={(event) => setVisibleCampaigns(event.target.value)} /></label>
-              <label>Brand and creative observations<textarea rows={3} value={creativeNotes} onChange={(event) => setCreativeNotes(event.target.value)} /></label>
-              <label>Additional observation notes<textarea rows={3} value={observationNotes} onChange={(event) => setObservationNotes(event.target.value)} /></label>
-            </div>
-            <button className="button button-gold" type="submit" disabled={busy === "snapshot" || !sourceLabel.trim()}>{busy === "snapshot" ? "Saving observation…" : "Save dated observation"}</button>
-          </form>
-          <div className="competitor-snapshot-history"><h3>Observation history</h3>{selected.snapshots.length ? selected.snapshots.map((snapshot) => <article key={snapshot.id}>
-            <strong>{new Date(snapshot.observedAt).toLocaleString()}</strong><span>{snapshot.sources.map((source) => source.label).join(" · ")}</span>
-            <small>{snapshot.observations.platformMetrics.length} platform metric records · {snapshot.observations.posts.length} post records · {snapshot.analysisJson ? "AI analysis saved" : "Not analyzed"}</small>
-            {snapshot.sources.map((source) => source.url && <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.url}</a>)}
-          </article>) : <p>No observations yet. Save a sourced observation to unlock analysis.</p>}</div>
-        </div>}
-
-        {tab === "analysis" && <div className="competitor-analysis-view">
-          <div className="competitor-analysis-toolbar"><div><span className="card-kicker">WEBSITE + EVIDENCE ANALYSIS</span><p>{latest ? `Using ${latest.sources.length} source(s), ${latest.observations.posts.length} recorded post(s).` : "Scan the Brand Kit and competitor websites to get started."}{latest?.analysisProvider ? ` Provider: ${latest.analysisProvider}.` : ""}</p></div><button className="button button-gold" type="button" onClick={() => void analyzeLatest()} disabled={busy === "analysis"}>{busy === "analysis" ? "Scanning and analyzing…" : analysis ? "Refresh analysis" : "Scan websites & analyze"}</button></div>
-          {!analysis && <div className="section-empty-state"><h3>No saved analysis yet</h3><p>Run website analysis now, then add social posts for deeper channel insights.</p></div>}
-          {analysis && <>
-            <div className="competitor-analysis-summary"><span className="card-kicker">EXECUTIVE SUMMARY · AI INTERPRETATION</span><p>{analysis.summary}</p></div>
-            <div className="competitor-analysis-grid">
-              <article><h3>Positioning & differentiation</h3><p><strong>Position:</strong> {analysis.positioning.position}</p><p><strong>Value proposition:</strong> {analysis.positioning.valueProposition}</p><p><strong>Voice:</strong> {analysis.positioning.voiceAndMessaging}</p><p><strong>How your brand could differ:</strong> {analysis.positioning.differentiation}</p><InsightList title="Evidence notes" items={analysis.positioning.evidence} /></article>
-              <article><h3>Content intelligence</h3><InsightList title="Observed or inferred pillars" items={analysis.content.pillars.map((pillar) => `${pillar.name} — ${pillar.evidence}`)} /><InsightList title="Formats and patterns" items={[...analysis.content.formats, ...analysis.content.patterns]} /><InsightList title="Repetition and gaps" items={analysis.content.repetitionAndGaps} /></article>
-              <article><h3>Audience conversation themes</h3><InsightList title="Questions and concerns" items={[...analysis.audience.questions, ...analysis.audience.concerns]} /><InsightList title="Discussion triggers and unmet needs" items={[...analysis.audience.discussionTriggers, ...analysis.audience.unmetNeeds]} /><p><strong>Sentiment:</strong> {analysis.audience.sentiment}</p><p>{analysis.audience.privacyNote}</p></article>
-              <article><h3>Brand & creative signals</h3><InsightList title="Identity signals" items={analysis.creative.identitySignals} /><InsightList title="Distinctive approaches" items={analysis.creative.distinctiveApproaches} /><InsightList title="Differentiate without copying" items={analysis.creative.differentiationIdeas} /></article>
-              <article><h3>Website, SEO & visible campaigns</h3><InsightList title="Website and conversion observations" items={[...analysis.websiteAndCampaigns.websiteFindings, ...analysis.websiteAndCampaigns.conversionFindings]} /><InsightList title="Visible SEO evidence" items={analysis.websiteAndCampaigns.seoFindings} /><InsightList title="Public campaign observations" items={analysis.websiteAndCampaigns.visibleCampaigns} /><InsightList title="Limits" items={analysis.websiteAndCampaigns.evidenceLimits} /></article>
-              <article><h3>SWOT · evidence-informed hypotheses</h3><InsightList title="Strengths" items={analysis.swot.strengths} /><InsightList title="Weaknesses" items={analysis.swot.weaknesses} /><InsightList title="Opportunities" items={analysis.swot.opportunities} /><InsightList title="Threats" items={analysis.swot.threats} /></article>
-            </div>
-            <section className="competitor-opportunities"><div className="campaign-section-heading"><div><p className="card-kicker">RANKED STRATEGIC HYPOTHESES · SCORES 1–5</p><h3>Opportunity finder</h3></div></div>{analysis.opportunities.map((item, index) => <article key={`${index}-${item.title}`}><div><span>Impact {item.impact}/5 · Ease {item.ease}/5 · Advantage {item.advantage}/5 · Audience fit {item.audienceRelevance}/5 · Conversion {item.conversionPotential}/5</span><h4>{item.title}</h4><p>{item.explanation}</p><p><strong>Action:</strong> {item.action}</p><small>Evidence or hypothesis: {item.evidence}</small></div><Link className="button button-outline" href={`/dashboard/campaigns?goal=${encodeURIComponent(item.action)}&name=${encodeURIComponent(item.title)}`}>Plan campaign</Link></article>)}</section>
-            <section className="competitor-action-plan"><div className="campaign-section-heading"><div><p className="card-kicker">OUTPERFORM ACTION PLAN · RECOMMENDATIONS</p><h3>Specific moves for {data?.brand.name}</h3></div></div><div className="competitor-analysis-grid">
-              <InsightList title="Start doing" items={analysis.actionPlan.start} />
-              <InsightList title="Stop or reconsider" items={analysis.actionPlan.stop} />
-              <InsightList title="Do differently" items={analysis.actionPlan.doDifferently} />
-              <InsightList title="Formats and topics to prioritize" items={[...analysis.actionPlan.formatsToPrioritize, ...analysis.actionPlan.topicsToOwn]} />
-              <InsightList title="Address these audience needs" items={analysis.actionPlan.audienceNeeds} />
-              <InsightList title="Improve engagement" items={analysis.actionPlan.engagement} />
-              <InsightList title="Strengthen positioning and conversion" items={[...analysis.actionPlan.positioning, ...analysis.actionPlan.conversion]} />
-            </div></section>
-            <section className="competitor-content-ideas"><div className="campaign-section-heading"><div><p className="card-kicker">ORIGINAL IDEAS · INSIGHT TO ACTION</p><h3>Content to make next</h3><p>These are original directions informed by evidence, not copied posts.</p></div></div><div className="competitor-idea-grid">{analysis.contentIdeas.map((idea, index) => <article key={`${index}-${idea.title}`}><span>{idea.format}</span><h4>{idea.title}</h4><p>{idea.opportunity}</p><p><strong>Hook:</strong> {idea.hook}</p><p><strong>Message:</strong> {idea.message}</p><p><strong>CTA:</strong> {idea.callToAction}</p><small>{idea.differentiation}</small><Link className="button button-gold" href={`/dashboard/create?idea=${encodeURIComponent(actionBrief(idea))}`}>Create original content</Link></article>)}</div></section>
-            <div className="competitor-data-limit"><strong>Data limitations and research confidence</strong><ul>{analysis.dataLimits.map((limit, index) => <li key={`${index}-${limit}`}>{limit}</li>)}</ul><p>AI-generated analysis is interpretation, not verified market research. It cannot establish causes, private performance, market rank, or future results.</p></div>
-          </>}
-          {analysis && analysis.content.reverseEngineering.length > 0 && <section className="competitor-reverse-engineering"><h3>Post strategy breakdown</h3>{analysis.content.reverseEngineering.map((item, index) => <details key={`${index}-${item.postReference}`}><summary>{item.postReference} · strategic lesson</summary><dl><dt>Hook</dt><dd>{item.hook}</dd><dt>Story and emotion</dt><dd>{item.story} · {item.emotionalTrigger}</dd><dt>Audience need and value</dt><dd>{item.audienceNeed} · {item.value}</dd><dt>Visual and CTA</dt><dd>{item.visualApproach} · {item.callToAction}</dd><dt>Engagement method</dt><dd>{item.engagementApproach}</dd><dt>Evidence</dt><dd>{item.evidence}</dd><dt>Takeaway</dt><dd>{item.lesson}</dd></dl></details>)}</section>}
-        </div>}
-
-        {tab === "compare" && <div className="competitor-comparison-view"><div className="competitor-comparison-toolbar"><div><p className="card-kicker">OBSERVED VALUES ONLY</p><h3>Side-by-side comparison</h3><p>Values are shown only when captured in each competitor’s latest sourced snapshot. No score combines missing metrics.</p></div><label>Platform<select value={comparisonPlatform} onChange={(event) => setComparisonPlatform(event.target.value)}><option value="all">All platforms</option>{socialPlatforms.map((platform) => <option key={platform}>{platform}</option>)}</select></label></div>
-          <div className="competitor-own-position"><span className="card-kicker">YOUR BRAND · {data?.brand.name}</span><p>{data?.brand.description || data?.brand.products || "Add your offer and positioning in Brand Profile to sharpen comparison."}</p><small>{data?.brand.industry || "Industry not recorded"} · Audience: {data?.brand.audience || "Not recorded"} · Voice: {data?.brand.tone || "Not recorded"}</small>{data?.brand.website && <a href={data.brand.website} target="_blank" rel="noreferrer">Brand Kit website ↗</a>}<Link href="/onboarding">Update Brand Profile</Link></div>
-          <div className="competitor-comparison-table-wrap"><table className="competitor-comparison-table"><thead><tr><th>Competitor</th><th>Category</th><th>Platform</th><th>Followers</th><th>Following</th><th>Total posts</th><th>Observed post likes</th><th>Observed comments</th><th>Posts captured</th><th>Last observed</th></tr></thead><tbody>{data?.competitors.map((competitor) => {
-            const snapshot = competitor.snapshots[0];
-            const platformMetrics = snapshot?.observations.platformMetrics.filter((item) => comparisonPlatform === "all" || item.platform === comparisonPlatform) ?? [];
-            const posts = snapshot?.observations.posts.filter((post) => comparisonPlatform === "all" || post.platform === comparisonPlatform) ?? [];
-            const sum = (key: "likes" | "comments") => posts.reduce((total, post) => total + (post.metrics[key] ?? 0), 0);
-            const byPlatform = (key: "followers" | "following" | "totalPosts") => platformMetrics
-              .filter((item) => item.metrics[key] !== undefined)
-              .map((item) => `${item.platform}: ${metricNumber(item.metrics[key])}`).join(" · ") || "Not captured";
-            return <tr key={competitor.id}><th>{competitor.name}</th><td>{competitor.category}</td><td>{platformMetrics.map((item) => item.platform).join(", ") || "Not captured"}</td><td>{byPlatform("followers")}</td><td>{byPlatform("following")}</td><td>{byPlatform("totalPosts")}</td><td>{posts.length ? sum("likes").toLocaleString() : "Not captured"}</td><td>{posts.length ? sum("comments").toLocaleString() : "Not captured"}</td><td>{posts.length || "Not captured"}</td><td>{snapshot ? new Date(snapshot.observedAt).toLocaleDateString() : "Not captured"}</td></tr>;
-          })}</tbody></table></div>
-        </div>}
-      </section>}
-
-      {selected && <section className="competitor-observed-content">
-        <div className="campaign-section-heading"><div><p className="card-kicker">OBSERVED CONTENT · {observedPosts.length} RECORDS</p><h3>Top-performing post evidence</h3><p>Ranked only from engagement counts that you captured. If no metrics were supplied, this is a catalog, not a performance ranking.</p></div></div>
-        <div className="competitor-post-filters"><label>Platform<select value={postPlatformFilter} onChange={(event) => setPostPlatformFilter(event.target.value)}><option value="all">All platforms</option>{[...new Set(observedPosts.map((post) => post.platform))].map((platform) => <option key={platform}>{platform}</option>)}</select></label><label>Format<select value={postFormatFilter} onChange={(event) => setPostFormatFilter(event.target.value)}><option value="all">All formats</option>{[...new Set(observedPosts.map((post) => post.format.toLowerCase()))].map((format) => <option key={format}>{format}</option>)}</select></label><label>Topic contains<input value={postTopicFilter} onChange={(event) => setPostTopicFilter(event.target.value)} placeholder="Filter topic" /></label><label>Published since<input type="date" value={postDateFilter} onChange={(event) => setPostDateFilter(event.target.value)} /></label><label>Sort<select value={postSort} onChange={(event) => setPostSort(event.target.value as "engagement" | "date")}><option value="engagement">Captured engagement</option><option value="date">Published date</option></select></label></div>
-        {!displayedPosts.length ? <p className="campaign-history-empty">No posts match this filter. Record public post URLs and optional engagement metrics in Evidence.</p> : <div className="competitor-observed-post-grid">{displayedPosts.map((post, index) => <article key={`${post.url}-${index}`}><div><span>{post.platform} · {post.format}</span><h4>{post.topic || "Topic not recorded"}</h4></div><p><strong>Hook:</strong> {post.hook || "Not recorded"}</p><p><strong>Caption:</strong> {post.captionApproach || "Not recorded"}</p><p><strong>CTA:</strong> {post.callToAction || "Not recorded"}</p><MetricGrid metrics={post.metrics} /><a href={post.url} target="_blank" rel="noreferrer">Open source post ↗</a></article>)}</div>}
-      </section>}
-    </section>
+        {!data.dataCollection.websiteSearchAvailable && <p className="ci-setup-note">Automatic discovery needs a web search connection. Your saved profiles and public evidence are still shown below.</p>}
+        {rankedCompetitors.length ? rankedCompetitors.map(({ competitor, interactions, measuredPosts }, index) => {
+          const snapshot = competitor.snapshots[0] ?? null;
+          const allPosts = [...new Map(competitor.snapshots.flatMap((item) => item.observations.posts).map((post) => [post.url, post])).values()];
+          const measuredPostsList = allPosts.filter((post) => postInteractions(post) !== null || typeof post.metrics.views === "number");
+          const posts = [...(measuredPostsList.length ? measuredPostsList : allPosts)].sort((left, right) => {
+            const leftViews = left.metrics.views;
+            const rightViews = right.metrics.views;
+            if (typeof leftViews === "number" && typeof rightViews === "number") return rightViews - leftViews;
+            if (typeof leftViews === "number") return -1;
+            if (typeof rightViews === "number") return 1;
+            return (postInteractions(right) ?? -1) - (postInteractions(left) ?? -1);
+          }).slice(0, 3);
+          const reverseEngineering = snapshot?.analysisJson?.content.reverseEngineering ?? [];
+          const patterns = snapshot?.analysisJson?.content.patterns
+            .filter((pattern) => !/^(not available|no patterns? (?:were )?available|insufficient (?:data|evidence)|not enough evidence)/i.test(pattern.trim()))
+            .slice(0, 3) ?? [];
+          const socialLinks = Object.entries(competitor.socialProfiles).filter((entry): entry is [string, string] => Boolean(entry[1]));
+          const placeholderOverview = competitor.overview?.startsWith("Automatically discovered from a public web search") ?? false;
+          const offer = competitor.products || (placeholderOverview ? "Business description not verified yet" : competitor.overview) || competitor.industry || "Not listed in public profile";
+          const savedLogoUrl = snapshot?.observations.websiteResearch?.competitorWebsite?.logoUrl || "";
+          let logoUrl = savedLogoUrl;
+          try { if (logoUrl && new URL(logoUrl).pathname === "/") logoUrl = ""; } catch { logoUrl = ""; }
+          const logoText = snapshot?.observations.websiteResearch?.competitorWebsite?.logoText || "";
+          return <article className="ci-leader-card" key={competitor.id}>
+            <section className="ci-company-panel">
+              <div className="ci-company-heading">
+                <span className={`ci-company-logo${logoText ? " ci-logo-has-text" : ""}${logoText && !logoUrl ? " ci-logo-text-mark" : ""}`}>{logoUrl ? <img src={logoUrl} alt={`${competitor.name} logo`} onError={(event) => { event.currentTarget.style.display = "none"; event.currentTarget.parentElement?.classList.add("ci-logo-missing"); }} /> : null}{logoText && <span className="ci-site-logo-mark">{logoText}</span>}<span className="ci-logo-fallback">Logo unavailable</span></span>
+                <div><span className="ci-rank-label">COMPETITOR {String(index + 1).padStart(2, "0")}</span><h3>{competitor.name}</h3></div>
+              </div>
+              <div className="ci-company-summary">{offer}</div>
+              <dl className="ci-company-facts">
+                <div><dt>Location</dt><dd>{competitor.location || "Not listed"}</dd></div>
+                <div><dt>Website</dt><dd>{competitor.websiteUrl ? <a href={competitor.websiteUrl} target="_blank" rel="noreferrer">{new URL(competitor.websiteUrl).hostname} ↗</a> : "No website saved"}</dd></div>
+              </dl>
+              <div className="ci-social-block"><strong>Social channels</strong>{socialLinks.length ? <div className="ci-social-links">{socialLinks.map(([platform, url]) => <a key={platform} href={url} target="_blank" rel="noreferrer">{platform} ↗</a>)}</div> : <p>No public accounts linked on the company website.</p>}</div>
+              <div className="ci-company-actions"><button className="button button-outline" type="button" onClick={() => editProfile(competitor)}>Edit</button><button className="button button-outline" type="button" onClick={() => exportReport(competitor)}>Export report</button><button className="button button-outline ci-refresh-research" type="button" onClick={() => void refreshWebsiteFindings(competitor)} disabled={busy === "website"}>{busy === "website" ? "Scanning…" : "Refresh site"}</button></div>
+            </section>
+            <section className="ci-content-panel">
+              <div className="ci-content-heading"><div><p className="ci-kicker">SOCIAL CONTENT</p><h3>Standout posts & strategy</h3></div><span>{posts.length} post{posts.length === 1 ? "" : "s"} with saved evidence</span></div>
+              {posts.length ? <><div className="ci-post-ranking-note">{measuredPostsList.length ? "Ranked by recorded views first, then likes, comments and shares. Counts are a snapshot of public data." : "Post examples found, but no public view or interaction counts were available to rank performance."}</div><div className="ci-leader-posts">{posts.map((post, postIndex) => {
+                const interactions = postInteractions(post);
+                const postRef = `${post.url} ${post.topic} ${post.hook}`.toLowerCase();
+                const reverse = reverseEngineering.find((item) => item.postReference && (postRef.includes(item.postReference.toLowerCase()) || item.postReference.toLowerCase().includes(post.url.toLowerCase()) || (post.topic.length > 12 && item.postReference.toLowerCase().includes(post.topic.slice(0, 40).toLowerCase()))));
+                return <article className="ci-leader-post" key={`${post.url}-${postIndex}`}>
+                  <div className="ci-post-topline"><span className="ci-post-rank">{typeof post.metrics.views === "number" ? `TOP VIEWS #${postIndex + 1}` : `POST #${postIndex + 1}`}</span><span>{post.platform} · {post.format || "Format not recorded"}</span></div>
+                  <h4>{post.topic || "Post topic not recorded"}</h4>
+                  {post.hook && <p className="ci-post-hook">“{post.hook}”</p>}
+                  <div className="ci-post-metrics">{post.metrics.views !== undefined && <span><strong>{post.metrics.views.toLocaleString()}</strong> views</span>}{post.metrics.likes !== undefined && <span><strong>{post.metrics.likes.toLocaleString()}</strong> likes</span>}{post.metrics.comments !== undefined && <span><strong>{post.metrics.comments.toLocaleString()}</strong> comments</span>}{post.metrics.shares !== undefined && <span><strong>{post.metrics.shares.toLocaleString()}</strong> shares</span>}{interactions === null && post.metrics.views === undefined && <span>Performance counts unavailable</span>}</div>
+                  {reverse ? <div className="ci-post-strategy"><strong>Why it may attract attention</strong><p>{[reverse.hook, reverse.emotionalTrigger, reverse.audienceNeed, reverse.visualApproach, reverse.engagementApproach].filter(Boolean).join(" · ")}</p><small>Content interpretation · {reverse.evidence || "Based on the cited post content; not proof of what caused its results."}</small></div> : (post.hook || post.captionApproach || post.callToAction) ? <div className="ci-post-strategy"><strong>Visible content tactic</strong><p>{[post.hook && `Opening: ${post.hook.slice(0, 180)}`, post.captionApproach && post.captionApproach !== post.hook ? `Caption: ${post.captionApproach.slice(0, 180)}` : "", post.callToAction && `Call to action: ${post.callToAction}`].filter(Boolean).join(" · ")}</p><small>Observed in the post. No causal performance claim.</small></div> : <p className="ci-post-strategy">Post details were not captured, so its attention tactic cannot be assessed yet.</p>}
+                  <a href={post.url} target="_blank" rel="noreferrer">View original post ↗</a>
+                </article>;
+              })}</div></> : <div className="ci-no-posts"><strong>No post-level evidence available yet</strong><p>{socialLinks.length ? "Public account links were found, but post content and public performance counts have not been collected. Connect an eligible platform or save post links and visible counts to identify what performs." : "No public social account links or post metrics were found. Add an account link or public post evidence to research this company."}</p></div>}
+              {patterns.length > 0 && <div className="ci-strategy-summary"><h4>Recurring content tactics</h4><ul>{patterns.map((pattern, patternIndex) => <li key={`${patternIndex}-${pattern}`}>{pattern}</li>)}</ul><small>These are content-based interpretations. The recorded post metrics show association only, not that a tactic caused the results.</small></div>}
+              <details className="ci-record-details" onToggle={(event) => { if (event.currentTarget.open) setSelectedId(competitor.id); }}>
+                <summary>Add public post evidence</summary>
+                <form className="ci-record-form" onSubmit={(event) => void recordSnapshot(event, competitor)}>
+                  <label>Source label<input required minLength={2} maxLength={160} value={sourceLabel} onChange={(event) => setSourceLabel(event.target.value)} /></label>
+                  <label>Source URL<input type="url" value={sourceUrl} placeholder="https://" onChange={(event) => setSourceUrl(event.target.value)} /></label>
+                  <label>Platform<select value={observedPlatform} onChange={(event) => setObservedPlatform(event.target.value as SocialPlatform)}>{socialPlatforms.map((platform) => <option key={platform}>{platform}</option>)}</select></label>
+                  <label>Public post URL<input type="url" value={postUrl} placeholder="https://" onChange={(event) => setPostUrl(event.target.value)} /></label>
+                  <label>Format<input value={postFormat} onChange={(event) => setPostFormat(event.target.value)} /></label>
+                  <label>Post topic<input value={postTopic} onChange={(event) => setPostTopic(event.target.value)} /></label>
+                  {postMetricFields.map(({ key, label }) => <label key={key}>{label}<input type="number" min="0" value={metricValues[key] ?? ""} onChange={(event) => setMetricValues({ ...metricValues, [key]: event.target.value })} /></label>)}
+                  <button className="button button-gold" type="submit" disabled={busy === "snapshot"}>{busy === "snapshot" ? "Saving…" : "Save post evidence"}</button>
+                </form>
+              </details>
+            </section>
+          </article>;
+        }) : <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Set your industry and location in Brand Profile, then discover individual businesses with a homepage logo.</p><div className="ci-empty-actions">{data.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Searching…" : "Discover competitors"}</button>}<button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
+      </div>}
+      {showProfileForm && renderProfileForm()}
+      {notice && <p className="form-success" role="status">{notice}</p>}
+      {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void (retryDiscovery ? discoverAndAnalyze() : load())}>{retryDiscovery ? "Retry" : "Try again"}</button></div>}
+      {loading && <p className="loading-label">Loading competitor intelligence…</p>}    </section>
   );
 }
