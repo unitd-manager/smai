@@ -10091,8 +10091,9 @@ body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot
 .dashboard-mini-calendar-header > a { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; color: var(--studio-accent-soft, var(--accent-400)); font-size: 10px; text-decoration: none; }
 .dashboard-mini-calendar-month { margin-bottom: 7px; color: var(--studio-text); }
 .dashboard-mini-calendar-month > strong { font-size: 12px; font-weight: 600; }
-.dashboard-mini-calendar-arrow { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 1px solid var(--studio-line); border-radius: 8px; color: var(--studio-text); background: color-mix(in srgb, var(--studio-panel-raised) 72%, var(--studio-panel)); cursor: pointer; }
-.dashboard-mini-calendar-arrow:hover { border-color: color-mix(in srgb, var(--accent-400) 50%, var(--studio-line)); color: var(--studio-accent-soft, var(--accent-400)); }
+.dashboard-mini-calendar-arrow { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 1px solid var(--studio-line); border-radius: 8px; color: var(--accent-500); background: var(--studio-panel); cursor: pointer; transition: border-color .16s ease, background .16s ease, color .16s ease; }
+.dashboard-mini-calendar-arrow:hover { border-color: color-mix(in srgb, var(--accent-500) 48%, var(--studio-line)); background: var(--studio-panel); color: var(--accent-500); }
+.dashboard-mini-calendar-arrow:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 2px; }
 .dashboard-mini-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
 .dashboard-mini-calendar-weekday { display: grid; height: 20px; place-items: center; color: var(--studio-muted); font-size: 9px; font-weight: 550; }
 .dashboard-mini-calendar-day { position: relative; display: grid; min-width: 0; height: 29px; place-items: center; border: 1px solid transparent; border-radius: 8px; color: var(--studio-text); background: transparent; font: inherit; font-size: 10px; cursor: pointer; }
@@ -10200,7 +10201,7 @@ html[data-theme-preset] body .app-shell .create-page .create-form .surprise-butt
 html[data-theme-preset] body .app-shell .create-page .create-form .surprise-button:hover { background: color-mix(in srgb, var(--action-primary) 12%, var(--studio-panel-raised)); }
 html[data-theme-preset] body .app-shell .create-page .create-brief-section textarea { min-height: 126px; border: 1px solid var(--studio-line); border-radius: 10px; padding: 14px; background: var(--studio-panel-raised); color: var(--studio-text); font: 14px/1.6 var(--font-inter), Inter, sans-serif; }
 html[data-theme-preset] body .app-shell .create-page .create-brief-section textarea::placeholder { color: var(--studio-muted); }
-html[data-theme-preset] body .app-shell .create-configuration-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 12px; }
+html[data-theme-preset] body .app-shell .create-configuration-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; gap: 12px; }
 html[data-theme-preset] body .app-shell .create-config-card { display: grid; min-width: 0; gap: 16px; border: 1px solid var(--studio-line); border-radius: 11px; padding: 16px; background: color-mix(in srgb, var(--studio-panel-raised) 46%, var(--studio-panel)); }
 html[data-theme-preset] body .app-shell .create-config-card > h2 { padding-bottom: 12px; border-bottom: 1px solid var(--studio-line); }
 html[data-theme-preset] body .app-shell .create-config-card .create-fieldset legend { margin-bottom: 8px; color: var(--studio-muted); font-size: 12px; font-weight: 550; }
@@ -10433,7 +10434,7 @@ html[data-theme-preset] body .app-shell .publishing-hub .created-platforms > spa
 /* Saved Designs: artwork-led library layout, scoped to this page. */
 html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(130px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: end;
   gap: 12px;
   margin: 24px 0 0;
@@ -10451,7 +10452,6 @@ html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar > la
   font-weight: 700;
 }
 html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar input[type="search"],
-html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar .compact-select,
 html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar .compact-select-trigger {
   width: 100%;
   min-width: 0;
@@ -10463,13 +10463,15 @@ html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar .com
   color: var(--foreground);
   font: inherit;
 }
+html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar .compact-select { width: 100%; min-width: 0; }
+html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar .design-search { grid-column: span 2; }
 html[data-theme-mode] body .app-shell .designs-page .design-library-toolbar .design-favorites-filter {
   display: flex;
-  grid-column: 1 / -1;
+  grid-column: auto;
   align-items: center;
   justify-self: start;
   gap: 8px;
-  min-height: 24px;
+  min-height: 42px;
   font-size: 13px;
 }
 html[data-theme-mode] body .app-shell .designs-page .design-library-summary {
@@ -12273,6 +12275,335 @@ html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-
 @media (max-width: 520px) {
   html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel { padding: 16px; }
   html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel .dashboard-campaign-list { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Light-theme Dashboard surfaces stay white; retain blue-purple accents on controls. */
+html[data-theme-mode="light"] body .app-shell .workspace-dashboard.dashboard-redesign :is(
+  .dashboard-hero,
+  .dashboard-hero-next,
+  .dashboard-stat-card,
+  .dashboard-analytics-panel,
+  .dashboard-upcoming-panel,
+  .dashboard-campaign-panel,
+  .dashboard-recent-panel,
+  .dashboard-mini-calendar,
+  .dashboard-insight-card,
+  .dashboard-shortcut-card,
+  .dashboard-more-tools
+) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  background-image: none !important;
+  box-shadow: 0 5px 20px rgb(20 35 60 / 5%);
+}
+html[data-theme-mode="light"] body .app-shell .workspace-dashboard.dashboard-redesign :is(
+  .dashboard-hero-next-icon,
+  .dashboard-stat-icon,
+  .dashboard-shortcut-icon,
+  .dashboard-upcoming-date,
+  .dashboard-campaign-item,
+  .dashboard-competitor-row,
+  .dashboard-feature-card,
+  .dashboard-campaign-item em
+) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  background-image: none !important;
+}
+html[data-theme-mode="light"] body .app-shell .workspace-dashboard.dashboard-redesign :is(
+  .dashboard-hero-next:hover,
+  .dashboard-shortcut-card:hover,
+  .dashboard-feature-card:hover
+) { background: #fff !important; }
+
+/* Keep Campaigns panels neutral in light mode; selected controls retain their accent. */
+html[data-theme-mode="light"] body .app-shell .dashboard-content.campaign-page :is(
+  .campaign-moments,
+  .campaign-moment-card,
+  .campaign-form,
+  .campaign-strategy-section,
+  .campaign-history-section,
+  .campaign-capability-note,
+  .campaign-concept-card,
+  .campaign-insight-card,
+  .campaign-funnel-grid > article,
+  .campaign-pillars > article,
+  .campaign-history-card,
+  .campaign-draft-card,
+  .campaign-timeline article,
+  .campaign-readiness-list,
+  .campaign-readiness-score
+) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  background-image: none !important;
+  color: var(--foreground);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.campaign-page :is(
+  .campaign-moments-heading p,
+  .campaign-moment-card p,
+  .campaign-moment-card small,
+  .campaign-form small,
+  .campaign-capability-note,
+  .campaign-concept-card p,
+  .campaign-insight-card p,
+  .campaign-history-card p,
+  .campaign-history-card small,
+  .campaign-draft-details p,
+  .campaign-draft-details small
+) { color: #52627a; }
+
+/* Saved Designs: keep custom-select wrappers transparent and align the toolbar rows. */
+html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: #fff;
+}
+html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .design-search { grid-column: span 2; }
+html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .compact-select { width: 100%; min-width: 0; min-height: 0; border: 0; border-radius: 0; padding: 0; background: transparent; }
+html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .compact-select-trigger {
+  min-height: 42px;
+  border-color: var(--studio-line);
+  border-radius: 9px;
+  padding: 0 11px;
+  background: #fff;
+  color: var(--foreground);
+}
+html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .design-favorites-filter {
+  grid-column: auto;
+  align-self: end;
+  min-height: 42px;
+}
+@media (max-width: 1050px) {
+  html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .design-search { grid-column: span 2; }
+}
+@media (max-width: 650px) {
+  html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .design-search { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) {
+  html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-mode="light"] body .app-shell .designs-page .design-library-toolbar .design-search { grid-column: auto; }
+}
+
+/* Video Studio: use the light surface for fields and dropdown triggers. */
+html[data-theme-mode="light"] body .app-shell .dashboard-content.video-studio-page .video-script-form :is(
+  input:not([type="checkbox"]):not([type="range"]),
+  textarea,
+  select,
+  .compact-select-trigger
+) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  color: var(--foreground);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.video-studio-page .video-advanced-workflows > summary {
+  border-color: var(--studio-line) !important;
+  background: #fff !important;
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.video-studio-page .video-advanced-workflows > summary:hover {
+  background: #fff !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.video-studio-page .video-script-form :is(input, textarea, select, .compact-select-trigger):focus-visible {
+  border-color: var(--accent-500) !important;
+  outline: 3px solid color-mix(in srgb, var(--accent-500) 20%, transparent);
+  outline-offset: 1px;
+}
+
+/* Keep Saved Designs filters on a clean, even grid; custom select roots stay unpainted. */
+html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+}
+html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar > label {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .design-search { grid-column: span 2; }
+html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .compact-select {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .compact-select-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .design-favorites-filter {
+  grid-column: auto;
+  align-self: end;
+  min-height: 42px;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.designs-page .design-library-toolbar :is(input[type="search"], .compact-select-trigger) {
+  border-color: var(--studio-line) !important;
+  background: #fff !important;
+  color: var(--foreground) !important;
+}
+@media (max-width: 1050px) {
+  html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 650px) {
+  html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .design-search,
+  html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .design-favorites-filter { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) {
+  html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-mode] body .app-shell .dashboard-content.designs-page .design-library-toolbar .design-search { grid-column: auto; }
+}
+
+/* Create: start both option panels at the same edge and keep light-mode surfaces neutral. */
+html[data-theme-preset] body .app-shell .dashboard-content.create-page .create-config-card {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page :is(.create-form, .create-config-card) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  background-image: none !important;
+  color: var(--foreground);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-step-number {
+  border-color: color-mix(in srgb, var(--accent-500) 24%, white);
+  background: #f5f3ff !important;
+  color: var(--accent-700) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-form .surprise-button {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  color: var(--accent-700) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-form .surprise-button:hover {
+  border-color: var(--accent-500);
+  background: #f5f3ff !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-config-card .create-check {
+  border-color: var(--studio-line) !important;
+  background: #f6f7fb !important;
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-config-card .create-check:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent-500) 55%, white) !important;
+  background: #f0edff !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-config-card .compact-select-trigger {
+  border-color: var(--studio-line) !important;
+  background: #fff !important;
+  color: var(--foreground) !important;
+}
+
+/* Analytics: remove dark-token surfaces from light insight tiles and schedule cells. */
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page :is(
+  .analytics-snapshot-card,
+  .analytics-insights-panel,
+  .analytics-insights-grid > article,
+  .analytics-instagram-detail > div,
+  .analytics-instagram-detail > a
+) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  background-image: none !important;
+  color: var(--foreground);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-insight-icon {
+  background: #f0edff !important;
+  color: var(--accent-700) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-insight-icon.is-muted {
+  background: #f3f5f8 !important;
+  color: #52627a !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-insights-grid > article p {
+  color: #52627a;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-period-switch button.is-active {
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-schedule-table :is(th, td) {
+  vertical-align: middle;
+  text-align: center;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-schedule-table th {
+  color: #52627a;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-schedule-table th:first-child {
+  text-align: left;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-schedule-table td {
+  border: 1px solid #e5e9f0;
+  background: #f5f7fb !important;
+  color: #52627a;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-schedule-table td[data-value]:not([data-value="0"]) {
+  border-color: color-mix(in srgb, var(--accent-500) 36%, white);
+  background: #f0edff !important;
+  color: var(--accent-700);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page .analytics-status-donut::before {
+  background: #fff;
+}
+
+/* Brand Kit: align the identity summary and form sections on clean light surfaces. */
+html[data-theme-mode="light"] body .app-shell .onboarding-content :is(.brand-kit-overview, .brand-kit-section) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  background-image: none !important;
+  color: var(--foreground);
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-overview :is(
+  .brand-kit-overview-copy > span,
+  .brand-kit-overview-copy p,
+  .brand-kit-palette > span,
+  .brand-kit-palette > small,
+  .brand-kit-overview-fonts > span
+) {
+  color: #52627a;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-overview :is(.brand-kit-overview-copy h2, .brand-kit-overview-fonts strong) {
+  color: #172b45;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section .form-section-heading h2 {
+  color: #172b45 !important;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section .form-section-heading p {
+  color: #52627a !important;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section .form-section-heading > span {
+  border-color: color-mix(in srgb, var(--accent-500) 24%, white);
+  background: #f5f3ff !important;
+  color: var(--accent-700) !important;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section :is(.field-grid > label, .country-field, .brand-kit-field-title) {
+  color: #24344d;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section :is(label > small, .brand-kit-help, .brand-kit-logo-unavailable small) {
+  color: #64748b;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section .autopilot-toggle {
+  border-color: var(--studio-line);
+  background: #f6f7fb !important;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section .autopilot-toggle :is(strong, small) {
+  color: #24344d !important;
+}
+html[data-theme-mode="light"] body .app-shell .onboarding-content .brand-kit-section :is(input:not([type="checkbox"]):not([type="file"]), textarea, .compact-select-trigger) {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  color: #172b45 !important;
 }
 
 /* Gallery: consistent contact-sheet cards, useful metadata, and a tidy selection workflow. */
