@@ -1,30 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   CalendarDays,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   CircleAlert,
-  FileVideo2,
-  Clock3,
   FileText,
+  FileVideo2,
   FolderOpen,
-  Image,
-  Search,
+  Image as ImageIcon,
   Sparkles,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
-import { PlatformIcon } from "@/components/platform-icon";
 
 type DashboardData = {
   workspace: { id: string; name: string; trialEndsAt: string };
   brand: { id: string; name: string } | null;
-  brandCount: number;
   trialExpired: boolean;
   trialDaysRemaining: number;
-  subscriptionStatus: string | null;
 };
 
 type Post = {
@@ -34,7 +30,6 @@ type Post = {
   scheduledAt: string | null;
   timezone: string;
   targets: Array<{
-    id: string;
     platform: string;
     status: string;
     publishedAt: string | null;
@@ -42,20 +37,43 @@ type Post = {
   }>;
 };
 
-type SocialAccount = { id: string; displayName: string | null; status: string };
-type DashboardCompetitor = { id: string; name: string; websiteUrl: string | null; snapshots: Array<{ observations: { posts: Array<{ url: string; topic: string; format: string; metrics: { views?: number; likes?: number; comments?: number } }> } }> };
-type CompetitorPreview = { competitors: DashboardCompetitor[] };
-type AutopilotPreview = { brand: { instagramAutopilotEnabled: boolean; instagramAutopilotNextRunAt: string | null }; latestRun: { status: string; error: string | null } | null; blockers: string[] };
+type Campaign = { id: string; name: string; startsAt: string; endsAt: string; status: string; campaign?: { lifecycle?: string } };
 
 type DashboardActivity = {
   draftCount: number;
-  draftPostCount: number;
-  scheduledCount: number;
-  publishedCount: number;
   failedCount: number;
   dailyPublished: number[];
-  upcomingPosts: Post[];
-  accounts: SocialAccount[];
+  scheduledPosts: Post[];
+  campaigns: Campaign[];
+};
+
+type DashboardCompetitor = {
+  id: string;
+  name: string;
+  websiteUrl: string | null;
+  socialProfiles: Partial<Record<string, string>>;
+  snapshots: Array<{
+    observations: {
+      posts: Array<{
+        topic: string;
+        format: string;
+        metrics: { views?: number; likes?: number; comments?: number };
+      }>;
+    };
+  }>;
+};
+
+type AutopilotPreview = {
+  brand: {
+    instagramAutopilotEnabled: boolean;
+    instagramAutopilotNextRunAt: string | null;
+  };
+  blockers: string[];
+};
+
+type DashboardState = {
+  workspace: DashboardData;
+  activity: DashboardActivity;
 };
 
 function getWeekStart(date: Date) {
@@ -70,17 +88,20 @@ function sameDay(first: Date, second: Date) {
     first.getDate() === second.getDate();
 }
 
-function postTime(post: Post) {
-  if (!post.scheduledAt) return "Any time";
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: post.timezone || undefined,
-    }).format(new Date(post.scheduledAt));
-  } catch {
-    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(post.scheduledAt));
-  }
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function scheduledPostDateKey(post: Post) {
+  if (!post.scheduledAt) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: post.timezone || undefined,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(post.scheduledAt));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function DashboardPerformanceChart({ values }: { values: number[] }) {
@@ -122,61 +143,197 @@ function DashboardPerformanceChart({ values }: { values: number[] }) {
   );
 }
 
+function DashboardMiniCalendar({ posts, campaigns, error }: { posts: Post[] | null; campaigns: Campaign[]; error: string }) {
+  const [month, setMonth] = useState(() => new Date(2000, 0, 1));
+  const [today, setToday] = useState<Date | null>(null);
+  const [selectedDay, setSelectedDay] = useState("");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const current = new Date();
+      const currentDay = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+      setToday(currentDay);
+      setMonth(new Date(current.getFullYear(), current.getMonth(), 1));
+      setSelectedDay(dateKey(currentDay));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const visibleDays = Array.from({ length: 42 }, (_, index) =>
+    new Date(month.getFullYear(), month.getMonth(), 1 - month.getDay() + index),
+  );
+  const postsByDay = new Map<string, Post[]>();
+  for (const post of posts ?? []) {
+    if (post.status !== "SCHEDULED") continue;
+    const key = scheduledPostDateKey(post);
+    if (!key) continue;
+    const dayPosts = postsByDay.get(key) ?? [];
+    dayPosts.push(post);
+    postsByDay.set(key, dayPosts);
+  }
+  const campaignsByDay = new Map<string, Campaign[]>();
+  for (const campaign of campaigns) {
+    const start = new Date(campaign.startsAt);
+    const end = new Date(campaign.endsAt);
+    for (const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate()); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      const key = dateKey(cursor);
+      const entries = campaignsByDay.get(key) ?? [];
+      entries.push(campaign);
+      campaignsByDay.set(key, entries);
+    }
+  }
+  const selectedPosts = postsByDay.get(selectedDay) ?? [];
+  const selectedCampaigns = [...new Map((campaignsByDay.get(selectedDay) ?? []).map((campaign) => [campaign.id, campaign])).values()];
+  const selectedDate = selectedDay
+    ? new Date(Number(selectedDay.slice(0, 4)), Number(selectedDay.slice(5, 7)) - 1, Number(selectedDay.slice(8, 10)))
+    : null;
+  const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(month);
+  const todayKey = today ? dateKey(today) : "";
+
+  function moveMonth(amount: number) {
+    setMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
+  }
+
+  return (
+    <section className="dashboard-mini-calendar" aria-labelledby="dashboard-mini-calendar-title">
+      <header className="dashboard-mini-calendar-header">
+        <div>
+          <p className="eyebrow">YOUR SCHEDULE</p>
+          <h2 id="dashboard-mini-calendar-title">Publishing calendar</h2>
+        </div>
+        <Link href="/dashboard/calendar">Open calendar <ArrowRight size={14} aria-hidden="true" /></Link>
+      </header>
+      <div className="dashboard-mini-calendar-month">
+        <button type="button" className="dashboard-mini-calendar-arrow" aria-label="Previous month" onClick={() => moveMonth(-1)}>
+          <ChevronLeft size={17} aria-hidden="true" />
+        </button>
+        <strong aria-live="polite">{monthLabel}</strong>
+        <button type="button" className="dashboard-mini-calendar-arrow" aria-label="Next month" onClick={() => moveMonth(1)}>
+          <ChevronRight size={17} aria-hidden="true" />
+        </button>
+      </div>
+      <div className="dashboard-mini-calendar-grid" role="group" aria-label={monthLabel}>
+        {["S", "M", "T", "W", "T", "F", "S"].map((weekday, index) => (
+          <span className="dashboard-mini-calendar-weekday" key={`${weekday}-${index}`}>{weekday}</span>
+        ))}
+        {visibleDays.map((date) => {
+          const key = dateKey(date);
+          const count = postsByDay.get(key)?.length ?? 0;
+          const campaignCount = campaignsByDay.get(key)?.length ?? 0;
+          const inMonth = date.getMonth() === month.getMonth();
+          return (
+            <button
+              type="button"
+              className={[
+                "dashboard-mini-calendar-day",
+                inMonth ? "" : "is-outside-month",
+                key === todayKey ? "is-today" : "",
+                key === selectedDay ? "is-selected" : "",
+                count ? "has-posts" : "",
+                campaignsByDay.has(key) ? "has-campaigns" : "",
+              ].filter(Boolean).join(" ")}
+              key={key}
+              aria-current={key === todayKey ? "date" : undefined}
+              aria-pressed={key === selectedDay}
+              aria-label={`${new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(date)}${count ? `, ${count} scheduled ${count === 1 ? "post" : "posts"}` : ""}${campaignCount ? `, ${campaignCount} campaign ${campaignCount === 1 ? "activity" : "activities"}` : ""}`}
+              onClick={() => {
+                setSelectedDay(key);
+                if (!inMonth) setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+              }}
+            >
+              <span>{date.getDate()}</span>
+              {(count > 0 || campaignsByDay.has(key)) && <i aria-hidden="true" />}
+            </button>
+          );
+        })}
+      </div>
+      <div className="dashboard-mini-calendar-selection" aria-live="polite">
+        <strong>{selectedDate
+          ? new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(selectedDate)
+          : "Select a date"}</strong>
+        {error
+          ? <span role="alert">Your schedule could not be loaded.</span>
+          : posts === null
+          ? <span>Loading your schedule…</span>
+          : selectedPosts.length || selectedCampaigns.length
+            ? <div className="dashboard-mini-calendar-posts">
+              {selectedPosts.slice(0, 2).map((post) => (
+                <Link href="/dashboard/posts" key={post.id}>
+                  <span>{post.title}</span>
+                  <time dateTime={post.scheduledAt ?? undefined}>
+                    {post.scheduledAt ? new Date(post.scheduledAt).toLocaleTimeString(undefined, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      timeZone: post.timezone || undefined,
+                    }) : ""}
+                  </time>
+                </Link>
+              ))}
+              {selectedPosts.length > 2 && <span className="dashboard-mini-calendar-more">+{selectedPosts.length - 2} more scheduled</span>}
+              {selectedCampaigns.map((campaign) => <Link className="dashboard-mini-calendar-campaign" href="/dashboard/campaigns" key={campaign.id}>
+                <span>{campaign.name}</span><small>Campaign · {(campaign.campaign?.lifecycle ?? campaign.status).toLowerCase().replaceAll("_", " ")}</small>
+              </Link>)}
+            </div>
+            : <span>No posts scheduled for this day.</span>}
+      </div>
+    </section>
+  );
+}
+
 const studioFeatures = [
   { label: "Create a post", detail: "Write and design on-brand content", href: "/dashboard/create", icon: Sparkles },
   { label: "Build a campaign", detail: "Plan around a goal or season", href: "/dashboard/campaigns", icon: CalendarDays },
   { label: "Create a video", detail: "Make product and brand videos", href: "/dashboard/videos", icon: FileVideo2 },
-  { label: "Browse templates", detail: "Choose an editable layout", href: "/dashboard/templates", icon: Image },
+  { label: "Browse templates", detail: "Choose an editable layout", href: "/dashboard/templates", icon: ImageIcon },
   { label: "Open your gallery", detail: "Find saved brand assets", href: "/dashboard/gallery", icon: FolderOpen },
-  { label: "Edit a saved design", detail: "Adjust artwork text and export", href: "/dashboard/designs", icon: Image },
-  { label: "View calendar", detail: "Review the publishing schedule", href: "/dashboard/calendar", icon: CalendarDays },
+  { label: "Edit a saved design", detail: "Adjust artwork text and export", href: "/dashboard/designs", icon: ImageIcon },
+  { label: "View calendar", detail: "Review your publishing schedule", href: "/dashboard/calendar", icon: CalendarDays },
   { label: "Marketing Brain", detail: "Turn brand and activity signals into next-step ideas", href: "/dashboard/marketing-brain", icon: Sparkles },
   { label: "Manage publishing", detail: "Review drafts, approvals, and scheduled posts", href: "/dashboard/posts", icon: FileText },
   { label: "Connect social channels", detail: "Manage the accounts used for publishing", href: "/dashboard/social-accounts", icon: FolderOpen },
 ];
 
+const featuredTools = [
+  studioFeatures[0],
+  studioFeatures[2],
+  studioFeatures[3],
+];
+
 export function DashboardClient() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [activity, setActivity] = useState<DashboardActivity | null>(null);
-  const [competitors, setCompetitors] = useState<DashboardCompetitor[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardState | null>(null);
+  const [competitors, setCompetitors] = useState<DashboardCompetitor[] | null>(null);
+  const [competitorError, setCompetitorError] = useState("");
   const [autopilot, setAutopilot] = useState<AutopilotPreview | null>(null);
+  const [autopilotError, setAutopilotError] = useState("");
   const [error, setError] = useState("");
-  const [weekOffset, setWeekOffset] = useState(0);
 
   useEffect(() => {
     let active = true;
-    apiRequest<DashboardData>("/api/dashboard")
-      .then((response) => { if (active) setData(response); })
+    apiRequest<{ competitors: DashboardCompetitor[] }>("/api/competitors")
+      .then(({ competitors: loaded }) => { if (active) setCompetitors(loaded); })
       .catch((requestError: unknown) => {
-        if (active) setError(requestError instanceof Error ? requestError.message : "Could not load your workspace.");
+        if (active) setCompetitorError(requestError instanceof Error ? requestError.message : "Could not load competitor findings.");
       });
-
-    apiRequest<CompetitorPreview>("/api/competitors")
-      .then((response) => { if (active) setCompetitors(response.competitors); })
-      .catch(() => { if (active) setCompetitors([]); });
     apiRequest<AutopilotPreview>("/api/brand-profile/instagram-autopilot/status")
       .then((response) => { if (active) setAutopilot(response); })
-      .catch(() => { if (active) setAutopilot(null); });
-
+      .catch((requestError: unknown) => {
+        if (active) setAutopilotError(requestError instanceof Error ? requestError.message : "Could not load Autopilot status.");
+      });
     Promise.all([
+      apiRequest<DashboardData>("/api/dashboard"),
       apiRequest<{ posts: Post[] }>("/api/posts?brandId=all&limit=100"),
       apiRequest<{ items: Array<{ status: string }> }>("/api/content?brandId=all"),
-      apiRequest<{ accounts: SocialAccount[] }>("/api/social-accounts"),
+      apiRequest<{ campaigns: Campaign[] }>("/api/campaigns").catch(() => ({ campaigns: [] })),
     ])
-      .then(([postResponse, contentResponse, accountResponse]) => {
+      .then(([workspace, postResponse, contentResponse, campaignResponse]) => {
         if (!active) return;
+
         const now = new Date();
         const posts = postResponse.posts;
         const isFailed = (post: Post) =>
           post.status === "FAILED" || post.targets.some((target) => target.status === "FAILED");
         const failedPosts = posts.filter(isFailed);
-        const publishedPosts = posts.filter((post) =>
-          !isFailed(post) && (post.status === "PUBLISHED" || post.targets.some((target) => target.status === "PUBLISHED")),
-        );
-        const draftPosts = posts.filter((post) => !isFailed(post) && post.status === "DRAFT");
-        const upcomingPosts = posts
-          .filter((post) => !isFailed(post) && post.status === "SCHEDULED" && post.scheduledAt && new Date(post.scheduledAt) >= now)
-          .sort((first, second) => new Date(first.scheduledAt!).getTime() - new Date(second.scheduledAt!).getTime());
+        const scheduledPosts = posts.filter((post) => post.status === "SCHEDULED" && post.scheduledAt);
         const startOfWeek = getWeekStart(now);
         const dailyPublished = Array.from({ length: 7 }, (_, index) => {
           const date = new Date(startOfWeek);
@@ -190,119 +347,186 @@ export function DashboardClient() {
             ),
           ).map((post) => post.id)).size;
         });
-        setActivity({
-          draftCount: contentResponse.items.filter((item) => item.status === "DRAFT").length,
-          draftPostCount: draftPosts.length,
-          scheduledCount: upcomingPosts.length,
-          publishedCount: publishedPosts.length,
-          failedCount: failedPosts.length,
-          dailyPublished,
-          upcomingPosts,
-          accounts: accountResponse.accounts,
+
+        setDashboard({
+          workspace,
+          activity: {
+            draftCount: contentResponse.items.filter((item) => item.status === "DRAFT").length,
+            failedCount: failedPosts.length,
+            dailyPublished,
+            scheduledPosts,
+            campaigns: campaignResponse.campaigns,
+          },
         });
       })
       .catch((requestError: unknown) => {
-        if (active) setError(requestError instanceof Error ? requestError.message : "Could not load your publishing activity.");
+        if (active) setError(requestError instanceof Error ? requestError.message : "Could not load your dashboard.");
       });
+
     return () => { active = false; };
   }, []);
 
-  const weekDays = useMemo(() => {
-    const start = getWeekStart(new Date());
-    start.setDate(start.getDate() + weekOffset * 7);
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + index);
-      return date;
-    });
-  }, [weekOffset]);
-
-  const dateRange = `${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(weekDays[0]!)} – ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(weekDays[6]!)}`;
-  const scheduledCount = activity?.scheduledCount ?? 0;
-  const publishedCount = activity?.publishedCount ?? 0;
-  const draftCount = activity?.draftCount ?? 0;
-  const failedCount = activity?.failedCount ?? 0;
+  const workspace = dashboard?.workspace;
+  const activity = dashboard?.activity;
+  const verifiedCompetitors = competitors?.filter((competitor) => competitor.websiteUrl) ?? [];
 
   return (
-    <section className="dashboard-content workspace-dashboard">
-      <header className="dashboard-welcome">
-        <div className="dashboard-welcome-copy">
-          <p className="eyebrow">YOUR MARKETING STUDIO</p>
-          <h1>{data?.brand?.name ?? data?.workspace.name ?? "Your workspace"}</h1>
-          <p>Your AI-powered workspace for planning, creating, and scheduling on-brand content.</p>
+    <section className="dashboard-content workspace-dashboard dashboard-redesign">
+      <header className="dashboard-hero">
+        <div className="dashboard-hero-copy">
+          <p className="eyebrow"><span className="dashboard-hero-dot" /> YOUR CREATIVE WORKSPACE</p>
+          <h1>Make every scroll <span>stop.</span></h1>
+          <p>{workspace?.brand?.name
+            ? `Create and plan on-brand content for ${workspace.brand.name}.`
+            : "Plan your next idea, then bring it to life with AI images, video, and ready-to-edit designs."}</p>
+          <div className="dashboard-hero-actions">
+            <Link className="button button-gold" href="/dashboard/create"><Sparkles size={16} aria-hidden="true" /> Start creating <ArrowRight size={15} aria-hidden="true" /></Link>
+            <Link className="dashboard-hero-secondary" href="/dashboard/analytics">See publishing activity <ArrowRight size={14} aria-hidden="true" /></Link>
+          </div>
         </div>
-        <div className="dashboard-welcome-actions">
-          <Link className="button button-outline" href="/dashboard/calendar"><CalendarDays size={16} aria-hidden="true" /> View calendar</Link>
-          <Link className="button button-gold" href="/dashboard/create"><Sparkles size={16} aria-hidden="true" /> Create content</Link>
+        <div className="dashboard-hero-art" aria-hidden="true">
+          <div className="dashboard-art-orbit" />
+          <div className="dashboard-art-card dashboard-art-card-back"><ImageIcon size={20} aria-hidden="true" /><span>IMAGE</span></div>
+          <div className="dashboard-art-card dashboard-art-card-front"><FileVideo2 size={22} /><span>VIDEO</span><i /></div>
+          <div className="dashboard-art-card dashboard-art-card-side"><Sparkles size={18} /><span>DESIGN</span></div>
+          <span className="dashboard-art-spark dashboard-art-spark-one">✦</span>
+          <span className="dashboard-art-spark dashboard-art-spark-two">✧</span>
         </div>
       </header>
 
       {error && <div className="notice notice-error" role="alert">{error}</div>}
-      {data?.trialExpired && <div className="notice notice-gold">Your trial has ended. You can still view your workspace; upgrade to create or schedule content.</div>}
+      {workspace?.trialExpired && <div className="notice notice-gold">Your trial has ended. You can still view your workspace; upgrade to create or schedule content.</div>}
 
-      <section className="dashboard-stat-grid" aria-label="Publishing statistics">
+      <section className="dashboard-stat-grid dashboard-redesign-stats" aria-label="Publishing statistics">
         <article className="dashboard-stat-card">
-          <span>Upcoming posts</span><strong>{activity ? scheduledCount : "—"}</strong>
-          <small>{activity?.upcomingPosts[0]?.scheduledAt
-            ? `Next · ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(activity.upcomingPosts[0].scheduledAt))}`
-            : "Ready when you are"}</small>
-          <span className="dashboard-stat-icon"><CalendarDays size={21} aria-hidden="true" /></span>
-        </article>
-        <article className="dashboard-stat-card">
-          <span>Published posts</span><strong>{activity ? publishedCount : "—"}</strong>
-          <small>Across connected channels</small>
-          <span className="dashboard-stat-icon"><CheckCircle2 size={21} aria-hidden="true" /></span>
-        </article>
-        <article className="dashboard-stat-card">
-          <span>Content drafts</span><strong>{activity ? draftCount : "—"}</strong>
+          <span>Content drafts</span><strong>{activity ? activity.draftCount : "—"}</strong>
           <small>Saved and ready to review</small>
           <span className="dashboard-stat-icon"><FileText size={21} aria-hidden="true" /></span>
         </article>
         <article className="dashboard-stat-card">
-          <span>Needs attention</span><strong>{activity ? failedCount : "—"}</strong>
-          <small>{failedCount ? "Review publishing issues" : "No failed posts"}</small>
+          <span>Needs attention</span><strong>{activity ? activity.failedCount : "—"}</strong>
+          <small>{activity?.failedCount ? "Review publishing issues" : "No failed posts"}</small>
           <span className="dashboard-stat-icon"><CircleAlert size={21} aria-hidden="true" /></span>
         </article>
       </section>
 
-      <section className="dashboard-product-grid" aria-label="Product features">
-        <div className="dashboard-product-heading"><div><p className="eyebrow">YOUR WORKSPACE</p><h2>What would you like to work on?</h2></div></div>
-        <div className="dashboard-feature-grid">
-          {studioFeatures.map((feature) => <Link className="dashboard-feature-card" href={feature.href} key={feature.href}>
-            <span className="dashboard-feature-icon"><feature.icon size={19} aria-hidden="true" /></span>
-            <span><strong>{feature.label}</strong><small>{feature.detail}</small></span><ArrowRight size={16} aria-hidden="true" />
-          </Link>)}
+      <section className="dashboard-creative-section" aria-labelledby="dashboard-tools-title">
+        <div className="dashboard-redesign-heading">
+          <div><p className="eyebrow">THE AI STUDIO</p><h2 id="dashboard-tools-title">Start with a spark</h2><p>Choose a format and make it your own.</p></div>
+          <Link href="/dashboard/create">Explore all tools <ArrowRight size={15} aria-hidden="true" /></Link>
+        </div>
+        <div className="dashboard-creative-grid">
+          {featuredTools.map(({ label, detail, href, icon: Icon }, index) => (
+            <Link className={`dashboard-creative-card dashboard-creative-card-${index + 1}`} href={href} key={href}>
+              <span className="dashboard-creative-art"><Icon size={30} aria-hidden="true" /><span>{index === 0 ? "CREATE" : index === 1 ? "MOTION" : "DESIGN"}</span></span>
+              <span className="dashboard-creative-copy"><strong>{label}</strong><small>{detail}</small></span>
+              <span className="dashboard-creative-arrow" aria-hidden="true"><ArrowRight size={17} /></span>
+            </Link>
+          ))}
         </div>
       </section>
 
-      <div className="dashboard-insight-grid">
-        <section className="dashboard-insight-card" aria-label="Competitor snapshot">
-          <header><div><p className="eyebrow">MARKET SNAPSHOT</p><h2>Competitor intelligence</h2></div><Link href="/dashboard/competitors" aria-label="Open competitor intelligence"><ArrowRight size={17} /></Link></header>
-          {competitors.length ? competitors.filter((competitor) => competitor.websiteUrl).slice(0, 3).map((competitor) => {
-            const posts = competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts);
-            const strongest = [...posts].sort((a, b) => ((b.metrics.views ?? 0) + (b.metrics.likes ?? 0) + (b.metrics.comments ?? 0)) - ((a.metrics.views ?? 0) + (a.metrics.likes ?? 0) + (a.metrics.comments ?? 0)))[0];
-            return <div className="dashboard-competitor-row" key={competitor.id}><strong>{competitor.name}</strong><span>{strongest ? `${strongest.format || "Post"}${strongest.topic ? ` · ${strongest.topic}` : ""} · ${strongest.metrics.views !== undefined ? `${strongest.metrics.views.toLocaleString()} views` : strongest.metrics.likes !== undefined ? `${strongest.metrics.likes.toLocaleString()} likes` : "metrics saved"}` : "No post performance recorded yet"}</span></div>;
-          }) : <p className="dashboard-insight-empty">Add verified competitor profiles to see their standout content here.</p>}
-          <Link className="dashboard-insight-link" href="/dashboard/competitors">View competitor findings <ArrowRight size={14} /></Link>
+      <section className="dashboard-more-tools" aria-labelledby="dashboard-more-tools-title">
+        <div className="dashboard-redesign-heading dashboard-more-tools-heading">
+          <div><p className="eyebrow">YOUR WORKSPACE</p><h2 id="dashboard-more-tools-title">More ways to move forward</h2></div>
+        </div>
+        <div className="dashboard-feature-grid">
+          {studioFeatures.slice(1, 2).concat(studioFeatures.slice(4)).map(({ label, detail, href, icon: Icon }) => (
+            <Link className="dashboard-feature-card" href={href} key={href}>
+              <span className="dashboard-feature-icon"><Icon size={19} aria-hidden="true" /></span>
+              <span><strong>{label}</strong><small>{detail}</small></span>
+              <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <div className="dashboard-redesign-main-grid">
+        <section className="dashboard-panel dashboard-analytics-panel" aria-label="Publishing analytics">
+          <div className="dashboard-panel-heading">
+            <div><p className="eyebrow">CHANNEL PULSE</p><h2>Publishing activity</h2><p>Confirmed live posts this week</p></div>
+            <Link href="/dashboard/analytics">Open analytics <ArrowRight size={13} aria-hidden="true" /></Link>
+          </div>
+          {activity ? (
+            <>
+              <div className="dashboard-performance-summary">
+                <strong>{activity.dailyPublished.reduce((sum, count) => sum + count, 0)}</strong>
+                <span>live posts confirmed this week</span>
+              </div>
+              <DashboardPerformanceChart values={activity.dailyPublished} />
+              {!activity.dailyPublished.some((count) => count > 0) && <p className="dashboard-chart-empty">Activity will appear after a connected platform confirms published posts.</p>}
+            </>
+          ) : <p className="dashboard-panel-empty" role={error ? "alert" : "status"}>{error ? "Publishing activity could not be loaded." : "Loading publishing activity…"}</p>}
         </section>
+
+        <DashboardMiniCalendar posts={activity?.scheduledPosts ?? null} campaigns={activity?.campaigns ?? []} error={error} />
+      </div>
+
+      <div className="dashboard-insight-grid dashboard-redesign-insights">
+        <section className="dashboard-insight-card" aria-label="Competitor snapshot">
+          <header>
+            <div><p className="eyebrow">MARKET SNAPSHOT</p><h2>Competitor intelligence</h2></div>
+            <Link href="/dashboard/competitors" aria-label="Open competitor intelligence"><ArrowRight size={17} aria-hidden="true" /></Link>
+          </header>
+          {verifiedCompetitors.slice(0, 3).map((competitor) => {
+            const posts = competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts);
+            const strongest = [...posts].sort((first, second) =>
+              ((second.metrics.views ?? 0) + (second.metrics.likes ?? 0) + (second.metrics.comments ?? 0)) -
+              ((first.metrics.views ?? 0) + (first.metrics.likes ?? 0) + (first.metrics.comments ?? 0)),
+            )[0];
+            const engagement = strongest?.metrics.views !== undefined
+              ? `${strongest.metrics.views.toLocaleString()} views`
+              : strongest?.metrics.likes !== undefined ? `${strongest.metrics.likes.toLocaleString()} likes` : "metrics saved";
+            const linkedPlatforms = Object.keys(competitor.socialProfiles ?? {});
+            return (
+              <div className="dashboard-competitor-row" key={competitor.id}>
+                <strong>{competitor.name}</strong>
+                <span>{strongest
+                  ? `${strongest.format || "Post"}${strongest.topic ? ` · ${strongest.topic}` : ""} · ${engagement}`
+                  : linkedPlatforms.length
+                    ? `${linkedPlatforms.join(" · ")} linked · Open snapshot for post research`
+                    : competitor.websiteUrl ? "Website snapshot saved · Open to review findings" : "Profile saved · Add public post evidence"}</span>
+              </div>
+            );
+          })}
+          {competitorError
+            ? <p className="dashboard-insight-empty" role="alert">Competitor findings could not be loaded: {competitorError}</p>
+            : !competitors
+              ? <p className="dashboard-insight-empty" role="status">Loading competitor findings…</p>
+              : !verifiedCompetitors.length
+              ? <p className="dashboard-insight-empty">Add verified competitor profiles to see their standout content here.</p>
+              : null}
+          <Link className="dashboard-insight-link" href="/dashboard/competitors">View competitor findings <ArrowRight size={14} aria-hidden="true" /></Link>
+        </section>
+
         <section className="dashboard-insight-card" aria-label="Weekly Autopilot">
-          <header><div><p className="eyebrow">WEEKLY CONTENT</p><h2>Autopilot</h2></div><Sparkles size={18} aria-hidden="true" /></header>
-          <strong className="dashboard-autopilot-state">{autopilot?.brand.instagramAutopilotEnabled ? "Weekly generation is on" : "Weekly generation is off"}</strong>
-          <p>{autopilot?.brand.instagramAutopilotEnabled
-            ? autopilot.brand.instagramAutopilotNextRunAt ? `Next batch · ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(autopilot.brand.instagramAutopilotNextRunAt))}. Sent for your review.` : "The next brand-specific batch will be sent for your review."
-            : autopilot?.blockers?.length ? autopilot.blockers[0] : "Turn on weekly generation in Publishing settings."}</p>
-          <Link className="dashboard-insight-link" href={autopilot?.brand.instagramAutopilotEnabled ? "/dashboard/instagram-autopilot" : "/dashboard/settings/publishing"}>{autopilot?.brand.instagramAutopilotEnabled ? "View Autopilot" : "Set up Autopilot"} <ArrowRight size={14} /></Link>
+          <header>
+            <div><p className="eyebrow">WEEKLY CONTENT</p><h2>Autopilot</h2></div>
+            <Sparkles size={18} aria-hidden="true" />
+          </header>
+          {autopilotError
+            ? <p className="dashboard-autopilot-state" role="alert">{autopilotError}</p>
+            : autopilot
+              ? <>
+                <strong className="dashboard-autopilot-state">{autopilot.brand.instagramAutopilotEnabled ? "Weekly generation is on" : "Weekly generation is off"}</strong>
+                <p>{autopilot.brand.instagramAutopilotEnabled
+                  ? autopilot.brand.instagramAutopilotNextRunAt
+                    ? `Next batch · ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(autopilot.brand.instagramAutopilotNextRunAt))}. Sent for your review.`
+                    : "The next brand-specific batch will be sent for your review."
+                  : autopilot.blockers[0] ?? "Turn on weekly generation in Publishing settings."}</p>
+              </>
+              : <p className="dashboard-panel-empty" role="status">Loading Autopilot status…</p>}
+          <Link className="dashboard-insight-link" href={autopilot?.brand.instagramAutopilotEnabled ? "/dashboard/instagram-autopilot" : "/dashboard/settings/publishing"}>
+            {autopilot?.brand.instagramAutopilotEnabled ? "View Autopilot" : "Set up Autopilot"} <ArrowRight size={14} aria-hidden="true" />
+          </Link>
         </section>
       </div>
 
-      <section className="dashboard-panel dashboard-analytics-panel" aria-label="Publishing analytics">
-        <div className="dashboard-panel-heading"><div><h2>Publishing activity</h2><p>Confirmed live posts this week</p></div><Link href="/dashboard/analytics">Open analytics <ArrowRight size={13} aria-hidden="true" /></Link></div>
-        {activity ? <><div className="dashboard-performance-summary"><strong>{activity.dailyPublished.reduce((sum, count) => sum + count, 0)}</strong><span>live posts confirmed this week</span></div><DashboardPerformanceChart values={activity.dailyPublished} />{!activity.dailyPublished.some((count) => count > 0) && <p className="dashboard-chart-empty">Activity will appear after a connected platform confirms published posts.</p>}</> : <p className="dashboard-panel-empty" role="status">Loading publishing activity…</p>}
-      </section>
-
-      {activity?.upcomingPosts.length ? <section className="dashboard-upcoming-strip"><header><h2>Coming up</h2><Link href="/dashboard/calendar">Open calendar <ArrowRight size={13} /></Link></header>{activity.upcomingPosts.slice(0, 3).map((post) => <Link href="/dashboard/posts" key={post.id}><span>{post.title}</span><small>{post.scheduledAt ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: post.timezone || undefined }).format(new Date(post.scheduledAt)) : "Draft"}</small></Link>)}</section> : null}
-      {data && data.trialDaysRemaining > 0 && data.subscriptionStatus === "trialing" && (
-        <p className="dashboard-trial-note">Your trial has {data.trialDaysRemaining} {data.trialDaysRemaining === 1 ? "day" : "days"} left. <Link href="/pricing">Explore plans <ArrowRight size={12} /></Link></p>
+      {workspace && workspace.trialDaysRemaining > 0 && (
+        <p className="dashboard-trial-note">
+          Your trial has {workspace.trialDaysRemaining} {workspace.trialDaysRemaining === 1 ? "day" : "days"} left.
+          {" "}<Link href="/dashboard/settings">Explore plans <ArrowRight size={13} aria-hidden="true" /></Link>
+        </p>
       )}
     </section>
   );

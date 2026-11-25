@@ -193,7 +193,7 @@ export function PublishingSettingsPanel() {
       <section className="publishing-timezone-card autopilot-settings-card" aria-labelledby="autopilot-settings-title">
         <div className="autopilot-settings-details">
           <strong id="autopilot-settings-title">Weekly Autopilot</strong>
-          <p>When enabled, Autopilot uses your saved brand profile to prepare a weekly batch, emails it to your approval address, and queues approved posts in your brand time zone. It selects connected channels automatically; Instagram is currently the only live publishing integration.</p>
+          <p>Creates a brand-aware weekly batch and emails it for approval.</p>
           <div className="autopilot-settings-meta">
             <p><span>Connected channel</span><strong>{autopilot?.brand.connectedPlatforms.join(", ") || "None"}</strong></p>
             {autopilot?.brand.instagramAutopilotNextRunAt && <p><span>Next weekly batch</span><strong>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(autopilot.brand.instagramAutopilotNextRunAt))} ({timezone})</strong></p>}

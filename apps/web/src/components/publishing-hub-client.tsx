@@ -8,7 +8,10 @@ import { ApprovalsClient } from "@/components/approvals-client";
 export function PublishingHubClient() {
   const [view, setView] = useState<"queue" | "approvals">("queue");
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("view") === "approvals") setView("approvals");
+    if (new URLSearchParams(window.location.search).get("view") === "approvals") {
+      const timer = window.setTimeout(() => setView("approvals"), 0);
+      return () => window.clearTimeout(timer);
+    }
   }, []);
 
   return (

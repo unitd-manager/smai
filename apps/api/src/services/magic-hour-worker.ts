@@ -157,6 +157,7 @@ async function submitVideo(job: Job, input: Input, audioFilePath?: string) {
       resolution,
       model: "ltx-2.5",
       style: { prompt },
+      audio: true,
     }) }, slot);
   } else {
     const audio = audioFilePath ?? str(input, "magicHourAudioFilePath");
@@ -213,12 +214,42 @@ async function downloadOutput(url: string, jobId: string) {
   return { fullPath, key: fileName, size: bytes.byteLength };
 }
 
+async function ensureMagicHourAudioTrack(videoPath: string) {
+  const ffmpeg = await resolveExecutable("ffmpeg");
+  const ffprobe = await resolveExecutable("ffprobe");
+  const { stdout: streamTypes } = await execFileAsync(ffprobe, [
+    "-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", videoPath,
+  ], { windowsHide: true });
+  if (streamTypes.split(/\r?\n/).some((value) => value.trim() === "audio")) return;
+
+  const musicPath = path.join(apiRoot, "assets", "music", "calm-horizon.wav");
+  const { stdout: durationText } = await execFileAsync(ffprobe, [
+    "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", videoPath,
+  ], { windowsHide: true });
+  const duration = Number.parseFloat(durationText.trim());
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error("Could not determine the Magic Hour video duration before adding its audio track.");
+
+  const temporaryPath = videoPath.replace(/\.mp4$/i, ".with-audio.mp4");
+  await execFileAsync(ffmpeg, [
+    "-y",
+    "-stream_loop", "-1", "-i", musicPath,
+    "-i", videoPath,
+    "-map", "1:v:0", "-map", "0:a:0",
+    "-t", duration.toFixed(3),
+    "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+    "-movflags", "+faststart",
+    temporaryPath,
+  ], { windowsHide: true, timeout: 240_000 });
+  await rename(temporaryPath, videoPath);
+}
+
 async function finish(job: Job, input: Input, project: Record<string, unknown>) {
   const downloads = project.downloads;
   const output = Array.isArray(downloads) ? downloads.find((item) => item && typeof item === "object" && typeof (item as Record<string, unknown>).url === "string") as Record<string, unknown> | undefined : undefined;
   const url = output?.url;
   if (typeof url !== "string") throw new Error("Magic Hour completed the project without a downloadable video URL.");
   const file = await downloadOutput(url, job.id);
+  await ensureMagicHourAudioTrack(file.fullPath);
   await watermarkVideo(job, file.fullPath);
   file.size = (await stat(file.fullPath)).size;
   const thumbnailPath = file.fullPath.replace(/\.mp4$/i, ".jpg");

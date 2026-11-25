@@ -180,7 +180,11 @@ router.post("/:id/execute", requireWritableWorkspace, async (req, res, next) => 
       return;
     }
     if (mode === "autonomous" && items.some((item) => item.platforms.some((platform) => platform !== "Instagram"))) {
-      res.status(422).json({ error: "Scheduled publishing is currently connected to Instagram only. Remove unsupported channels before sending this plan for approval." });
+      res.status(422).json({ error: "Autonomous publishing is currently connected to Instagram only. Remove other channels or send this plan for human approval." });
+      return;
+    }
+    if (mode === "approval" && items.some((item) => item.platforms.some((platform) => !["Instagram", "Facebook"].includes(platform)))) {
+      res.status(422).json({ error: "Live approval publishing is currently integrated for Instagram and Facebook Pages. Remove other channels from this plan or keep those items as drafts." });
       return;
     }
     const contentIds = [...new Set(items.map((item) => item.contentId))];
@@ -198,14 +202,32 @@ router.post("/:id/execute", requireWritableWorkspace, async (req, res, next) => 
       select: { bannedWords: true },
     });
     const bannedWords = jsonStrings(profile?.bannedWords);
-    const account = mode === "autonomous"
-      ? await prisma.socialAccount.findFirst({
+    const needsInstagram = items.some((item) => item.platforms.includes("Instagram"));
+    const needsFacebook = items.some((item) => item.platforms.includes("Facebook"));
+    const [account, facebookAccount] = await Promise.all([
+      needsInstagram
+        ? prisma.socialAccount.findFirst({
           where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
           select: { id: true },
         })
-      : null;
+        : null,
+      needsFacebook
+        ? prisma.socialAccount.findFirst({
+          where: { workspaceId: req.workspace!.id, provider: "facebook", status: "CONNECTED" },
+          select: { id: true },
+        })
+        : null,
+    ]);
     if (mode === "autonomous" && !account) {
       res.status(409).json({ error: "Autonomous publishing needs a connected Instagram account for this brand. Connect it in Social Accounts, then retry." });
+      return;
+    }
+    if (mode === "approval" && needsInstagram && !account) {
+      res.status(409).json({ error: "Connect an Instagram Professional account before sending Instagram items into the approval publishing queue." });
+      return;
+    }
+    if (mode === "approval" && needsFacebook && !facebookAccount) {
+      res.status(409).json({ error: "Connect a Facebook Page with publishing permission before sending Facebook items into the approval publishing queue." });
       return;
     }
 
@@ -329,7 +351,7 @@ router.post("/:id/execute", requireWritableWorkspace, async (req, res, next) => 
             resellerId: req.workspace!.resellerId,
             postId: post.id,
             platform,
-            socialAccountId: platform === "Instagram" ? account?.id ?? null : null,
+            socialAccountId: platform === "Instagram" ? account?.id ?? null : platform === "Facebook" ? facebookAccount?.id ?? null : null,
             captionOverride: entry.caption,
             media: entry.media,
             status: "PENDING",

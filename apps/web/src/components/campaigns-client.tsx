@@ -166,6 +166,8 @@ type CampaignDetailResponse = ContentPlanResponse & { items: GeneratedItem[]; pu
 type PublisherCapabilities = {
   instagramConnected: boolean;
   instagramLivePublishingIntegrated: boolean;
+  facebookConnected: boolean;
+  facebookLivePublishingIntegrated: boolean;
   otherSelectedPlatformsAreDraftOnly: string[];
 };
 
@@ -193,6 +195,16 @@ function localDateOffset(days: number) {
 
 type CampaignMoment = { title: string; date: Date; angle: string; outcome: string };
 
+function localDateValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function occasionCampaignStartDate(occasionDate: string, offset: number, durationDays: number) {
+  const start = new Date(`${occasionDate}T12:00:00`);
+  start.setDate(start.getDate() + offset - Math.min(7, durationDays - 1));
+  return localDateValue(start < new Date() ? new Date(Date.now() + 86_400_000) : start);
+}
+
 function upcomingCampaignMoments(country: string, industry: string): CampaignMoment[] {
   const now = new Date();
   const year = now.getFullYear();
@@ -215,7 +227,30 @@ function upcomingCampaignMoments(country: string, industry: string): CampaignMom
   );
   const moments = dates.flatMap((item) => [year, year + 1].map((eventYear) => ({ ...item, date: new Date(eventYear, item.month, item.day, 12) })))
     .filter((item) => item.date.getTime() > now.getTime() && item.date.getTime() < now.getTime() + 121 * 86_400_000)
-    .map(({ month: _month, day: _day, ...item }) => item);
+    .map((item) => ({ title: item.title, angle: item.angle, outcome: item.outcome, date: item.date }));
+  for (const eventYear of [year, year + 1]) {
+    const thanksgiving = new Date(eventYear, 10, 1, 12);
+    thanksgiving.setDate(1 + ((4 - thanksgiving.getDay() + 7) % 7) + 21);
+    const blackFriday = new Date(thanksgiving);
+    blackFriday.setDate(thanksgiving.getDate() + 1);
+    if (blackFriday > now && blackFriday.getTime() < now.getTime() + 121 * 86_400_000) {
+      moments.push({ title: "Black Friday", date: blackFriday, angle: "Share a clear, accurate offer with its terms and end date", outcome: "Offer discovery and conversions" });
+    }
+  }
+  if (india) {
+    const regionalDates = [
+      { year: 2026, month: 0, day: 14, title: "Pongal / Makar Sankranti" },
+      { year: 2027, month: 0, day: 15, title: "Pongal / Makar Sankranti" },
+      { year: 2026, month: 10, day: 8, title: "Diwali" },
+      { year: 2027, month: 9, day: 29, title: "Diwali" },
+    ];
+    for (const event of regionalDates) {
+      const eventDate = new Date(event.year, event.month, event.day, 12);
+      if (eventDate > now && eventDate.getTime() < now.getTime() + 121 * 86_400_000) {
+        moments.push({ title: event.title, date: eventDate, angle: "Use local cultural context and only make claims or offers approved by your brand", outcome: "Relevant community engagement" });
+      }
+    }
+  }
   const season = india
     ? now.getMonth() >= 2 && now.getMonth() <= 5 ? "Summer" : now.getMonth() >= 5 && now.getMonth() <= 8 ? "Monsoon" : "Winter"
     : now.getMonth() >= 2 && now.getMonth() <= 4 ? "Spring" : now.getMonth() >= 5 && now.getMonth() <= 7 ? "Summer" : now.getMonth() >= 8 && now.getMonth() <= 10 ? "Autumn" : "Winter";
@@ -257,6 +292,8 @@ export function CampaignsClient() {
   const [formats, setFormats] = useState<CampaignFormat[]>(["post", "carousel"]);
   const [selectedPlatforms, setSelectedPlatforms] = useState(["Instagram", "LinkedIn"]);
   const [startDate, setStartDate] = useState(() => localDateOffset(1));
+  const [occasionDate, setOccasionDate] = useState("");
+  const [occasionOffset, setOccasionOffset] = useState(-2);
   const [durationDays, setDurationDays] = useState(14);
   const [campaignId, setCampaignId] = useState("");
   const [campaignLifecycle, setCampaignLifecycle] = useState("");
@@ -335,8 +372,9 @@ export function CampaignsClient() {
     setPrimaryKpi("Reach");
     setPrimaryTarget("Compare with the previous 14-day period");
     setGoal(`${moment.angle}. Intended outcome: ${moment.outcome}. Use verified business details only. Do not invent offers, discounts, prices, or claims.`);
-    const daysUntilMoment = Math.ceil((moment.date.getTime() - Date.now()) / 86_400_000);
-    setStartDate(localDateOffset(Math.max(1, daysUntilMoment - 7)));
+    const eventDate = localDateValue(moment.date);
+    setOccasionDate(eventDate);
+    setStartDate(occasionCampaignStartDate(eventDate, occasionOffset, durationDays));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -623,21 +661,17 @@ export function CampaignsClient() {
     <section className="dashboard-content campaign-page">
       <p className="eyebrow">YOUR STUDIO · CAMPAIGNS</p>
       <h1>Campaign intelligence</h1>
-      <p className="dashboard-lead">Build a goal-led strategy, review the audience and creative direction, generate a sequenced set of drafts, and check readiness before sending anything to publishing.</p>
+      <p className="dashboard-lead">Turn a marketing goal into a sequenced, reviewable content plan.</p>
       {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
       <div className="campaign-capability-note" role="note">
-        Strategy and copy are AI recommendations based on your brief and saved brand profile. External market/trend research is not connected. Instagram is the only live social publisher in this project; other selected channels are content drafts, not live publishing. Metrics are shown only when actual campaign-attributed data is available.
+        Strategy and copy are AI recommendations based on your brief and saved brand profile. External market/trend research is not connected. Instagram and Facebook Page text/image publishing are integrated; other selected channels are content drafts. Metrics are shown only when actual campaign-attributed data is available.
       </div>
       <section className="campaign-moments" aria-label="Upcoming campaign ideas">
         <div className="campaign-moments-heading"><div><p className="eyebrow">BRAND CALENDAR</p><h2>Campaign ideas coming up</h2><p>Ideas use your saved industry and country. Outcomes are goals, not guaranteed results.</p></div><span>{brandMarket.country || "Global dates"}</span></div>
         <div className="campaign-moments-grid">{upcomingCampaignMoments(brandMarket.country, brandMarket.industry).map((moment) => <article className="campaign-moment-card" key={`${moment.title}-${moment.date.toISOString()}`}><time dateTime={moment.date.toISOString()}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(moment.date)}</time><h3>{moment.title}</h3><p>{moment.angle}</p><small>Goal: {moment.outcome}</small><button type="button" className="button button-outline" onClick={() => applyCampaignMoment(moment)}>Use this idea</button></article>)}</div>
       </section>
       {publisherCapabilities && <div className="campaign-capability-note" role="status">
-        {selectedPlatforms.includes("Instagram")
-          ? publisherCapabilities.instagramConnected
-            ? "An Instagram account is connected. Publishing still depends on Instagram permissions and public media-hosting readiness."
-            : "No Instagram account is connected to this workspace yet. Campaign drafts can still be created; connect an account before publishing."
-          : "Instagram is not selected for this campaign."}
+        {[...(selectedPlatforms.includes("Instagram") ? [publisherCapabilities.instagramConnected ? "Instagram is connected" : "Instagram is not connected"] : []), ...(selectedPlatforms.includes("Facebook") ? [publisherCapabilities.facebookConnected ? "Facebook Page is connected" : "Facebook Page is not connected"] : [])].join(" · ") || "No live publishing channel is selected."} Publishing requires the platform permissions and public media-hosting readiness where images are used.
         {publisherCapabilities.otherSelectedPlatformsAreDraftOnly.length > 0 && ` Draft-only channels: ${publisherCapabilities.otherSelectedPlatformsAreDraftOnly.join(", ")}.`}
       </div>}
       <form className="create-form campaign-form" onSubmit={(event) => void createCampaign(event)}>
@@ -698,11 +732,27 @@ export function CampaignsClient() {
             </div>
           </fieldset>
           <div className="create-select-grid">
+            <label>Occasion timing
+              <CompactSelect aria-label="Occasion campaign timing" value={occasionOffset} onChange={(event) => {
+                const offset = Number(event.target.value);
+                setOccasionOffset(offset);
+                if (occasionDate) setStartDate(occasionCampaignStartDate(occasionDate, offset, durationDays));
+              }}>
+                <option value={-2}>Main occasion post · 2 days before</option>
+                <option value={0}>Main occasion post · event date</option>
+                <option value={2}>Main occasion post · 2 days after</option>
+              </CompactSelect>
+              <small>The daily campaign sequence starts about a week before the selected occasion date.</small>
+            </label>
             <label>Start date
               <input required type="date" min={localDateOffset(1)} value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </label>
             <label>Campaign duration
-              <CompactSelect aria-label="Campaign duration" value={durationDays} onChange={(event) => setDurationDays(Number(event.target.value))}>
+              <CompactSelect aria-label="Campaign duration" value={durationDays} onChange={(event) => {
+                const days = Number(event.target.value);
+                setDurationDays(days);
+                if (occasionDate) setStartDate(occasionCampaignStartDate(occasionDate, occasionOffset, days));
+              }}>
                 <option value={7}>1 week</option><option value={14}>2 weeks</option><option value={30}>30 days</option>
               </CompactSelect>
             </label>

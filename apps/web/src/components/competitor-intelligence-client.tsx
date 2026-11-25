@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, ArrowRight, BarChart3, Brain, Building2, CheckCircle2, Circle, Compass, FileText, Lightbulb, Plus, RefreshCw, Search, UsersRound } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Brain, Building2, CheckCircle2, Circle, Compass, FileText, Plus, RefreshCw, Search, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { apiRequest } from "@/lib/api";
 
@@ -110,6 +110,8 @@ type CompetitorResponse = {
     instagramAccountConnected: boolean;
     instagramCompetitorInsightsAvailable: boolean;
     instagramCompetitorInsightsMessage: string;
+    youtubeApiAvailable: boolean;
+    xApiAvailable: boolean;
     message: string;
   };
 };
@@ -204,7 +206,8 @@ function captureMetrics(values: Record<string, string>, fields: Array<{ key: key
 function exportReport(competitor: CompetitorProfile) {
   const safe = (value: string) => value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
   const latest = competitor.snapshots[0] ?? null;
-  const topPosts = [...(latest?.observations.posts ?? [])].sort((left, right) => {
+  const allPosts = [...new Map(competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts).map((post) => [post.url, post])).values()];
+  const topPosts = [...allPosts].sort((left, right) => {
     const leftInteractions = postInteractions(left);
     const rightInteractions = postInteractions(right);
     if (leftInteractions !== null && rightInteractions !== null) return rightInteractions - leftInteractions;
@@ -213,14 +216,27 @@ function exportReport(competitor: CompetitorProfile) {
   }).slice(0, 3);
   const summary = latest?.analysisJson?.summary.slice(0, 700) ?? "No content analysis has been saved for this profile yet.";
   const tactics = latest?.analysisJson?.content.patterns.slice(0, 3) ?? [];
-  const capturedViews = topPosts.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
-  const capturedInteractions = topPosts.reduce((total, post) => total + (postInteractions(post) ?? 0), 0);
-  const headlineStats = `<div class="stats"><div><span>Posts reviewed</span><strong>${topPosts.length}</strong></div><div><span>Recorded views</span><strong>${capturedViews ? capturedViews.toLocaleString() : "—"}</strong></div><div><span>Recorded interactions</span><strong>${capturedInteractions ? capturedInteractions.toLocaleString() : "—"}</strong></div></div>`;
+  const platformMetrics = latest?.observations.platformMetrics ?? [];
+  const socialLinks = Object.entries(competitor.socialProfiles).filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const businessSummary = competitor.products || competitor.overview || latest?.observations.websiteResearch?.competitorWebsite?.description || competitor.industry || "Business summary not yet recorded.";
+  const businessFacts = [competitor.audience && `Audience: ${competitor.audience}`, competitor.uniqueValue && `Positioning: ${competitor.uniqueValue}`, competitor.brandVoice && `Voice: ${competitor.brandVoice}`].filter((item): item is string => Boolean(item));
+  const platformSummary = platformMetrics.map(({ platform, metrics }) => `${platform}: ${Object.entries(metrics).filter(([, value]) => typeof value === "number").map(([key, value]) => `${key} ${Number(value).toLocaleString()}`).join(", ")}`).filter(Boolean);
+  const socialLinksMarkup = socialLinks.length
+    ? `<div class="socials">${socialLinks.map(([platform, url]) => `<a href="${safe(url)}">${safe(platform)}</a>`).join("")}</div>`
+    : "<p>No public social links were recorded.</p>";
+  const metricCards = platformMetrics.length
+    ? platformSummary.map((summary) => `<div class="metric-line">${safe(summary)}</div>`).join("")
+    : "<p>Platform audience metrics have not been captured.</p>";
+  const postsWithViews = topPosts.filter((post) => post.metrics.views !== undefined);
+  const postsWithInteractions = topPosts.filter((post) => postInteractions(post) !== null);
+  const capturedViews = postsWithViews.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
+  const capturedInteractions = postsWithInteractions.reduce((total, post) => total + (postInteractions(post) ?? 0), 0);
+  const headlineStats = `<div class="stats"><div><span>Posts captured</span><strong>${allPosts.length}</strong></div><div><span>Views · top ${postsWithViews.length}</span><strong>${postsWithViews.length ? capturedViews.toLocaleString() : "—"}</strong></div><div><span>Interactions · top ${postsWithInteractions.length}</span><strong>${postsWithInteractions.length ? capturedInteractions.toLocaleString() : "—"}</strong></div></div>`;
   const postCards = topPosts.length ? topPosts.map((post, index) => {
     const interactions = postInteractions(post);
     return `<article class="post"><div class="rank">0${index + 1}</div><div class="post-body"><h3>${safe(post.topic || post.format || "Public social post")}</h3><p>${safe(post.platform)} · ${safe(post.format)}</p><div class="metrics"><span><b>${post.metrics.views?.toLocaleString() ?? "—"}</b> views</span><span><b>${post.metrics.likes?.toLocaleString() ?? "—"}</b> likes</span><span><b>${post.metrics.comments?.toLocaleString() ?? "—"}</b> comments</span><span><b>${post.metrics.shares?.toLocaleString() ?? "—"}</b> shares</span></div><a href="${safe(post.url)}">View original post ↗</a><small>${interactions === null && post.metrics.views === undefined ? "No public performance counts recorded" : "Recorded public metrics; counts do not establish why a post performed."}</small></div></article>`;
   }).join("") : `<p class="empty">No public posts with saved evidence yet. Add post links and visible metrics in the Evidence tab.</p>`;
-  const reportContent = `${headlineStats}<section class="summary"><div class="eyebrow">The takeaway</div><h2>What stands out</h2><p>${safe(summary)}</p></section><section><div class="section-heading"><div class="eyebrow">Public post evidence</div><h2>Posts to study</h2></div><p class="muted">Up to three posts from the latest saved observation, ranked by available recorded performance counts.</p><div class="posts">${postCards}</div></section>${tactics.length ? `<section><div class="section-heading"><div class="eyebrow">Creative cues</div><h2>Patterns worth exploring</h2></div><ul>${tactics.map((item) => `<li>${safe(item)}</li>`).join("")}</ul><p class="muted">Observed patterns are clues, not proof of what caused engagement.</p></section>` : ""}${latest?.analysisJson?.positioning.differentiation ? `<section class="takeaway"><div class="eyebrow">Your next move</div><h2>Make the idea your own</h2><p>${safe(latest.analysisJson.positioning.differentiation.slice(0, 600))}</p></section>` : ""}`;
+  const reportContent = `${headlineStats}<section class="summary"><div class="eyebrow">Business snapshot</div><h2>What they do</h2><p>${safe(businessSummary)}</p><p>${safe([competitor.industry, competitor.location].filter(Boolean).join(" · ") || "Industry and location not recorded")}</p><p>${competitor.websiteUrl ? `<a href="${safe(competitor.websiteUrl)}">${safe(competitor.websiteUrl)}</a>` : "Website not recorded"}</p>${socialLinksMarkup}${businessFacts.length ? `<ul>${businessFacts.map((item) => `<li>${safe(item)}</li>`).join("")}</ul>` : ""}</section><section><div class="section-heading"><div class="eyebrow">Platform reach</div><h2>Recorded channel metrics</h2></div>${metricCards}</section><section class="summary"><div class="eyebrow">The takeaway</div><h2>What stands out</h2><p>${safe(summary)}</p></section><section><div class="section-heading"><div class="eyebrow">Public post evidence</div><h2>Posts to study</h2></div><p class="muted">Posts are ranked by recorded views, then interactions.</p><div class="posts">${postCards}</div></section>${tactics.length ? `<section><div class="section-heading"><div class="eyebrow">Creative cues</div><h2>Patterns worth exploring</h2></div><ul>${tactics.map((item) => `<li>${safe(item)}</li>`).join("")}</ul><p class="muted">Observed patterns are clues, not proof of what caused engagement.</p></section>` : ""}${latest?.analysisJson?.positioning.differentiation ? `<section class="takeaway"><div class="eyebrow">Your next move</div><h2>Make the idea your own</h2><p>${safe(latest.analysisJson.positioning.differentiation.slice(0, 600))}</p></section>` : ""}`;
   const printWindow = window.open("", "_blank");
   if (!printWindow) { window.alert("Allow pop-ups to export this report as a PDF."); return; }
   printWindow.document.open();
@@ -650,12 +666,10 @@ export function CompetitorIntelligenceClient() {
       setTab("analysis");
       const scanned = response.research.scannedWebsiteCount;
       const accounts = response.research.discoveredSocialProfiles;
-      const addedAccounts = response.research.addedSocialProfiles;
       const collectedPosts = response.research.collectedSocialPosts;
-      const result = `Analysis updated. Reviewed ${scanned} website${scanned === 1 ? "" : "s"}, found ${accounts} social link${accounts === 1 ? "" : "s"}${addedAccounts ? ` and saved ${addedAccounts} to this profile` : ""}, and collected ${collectedPosts} public post${collectedPosts === 1 ? "" : "s"} where connected APIs allow it.`;
-      setNotice(response.research.warnings.length
-        ? `${result} ${response.research.warnings.join(" ")}`
-        : result);
+      setNotice(collectedPosts
+        ? `Research updated · ${collectedPosts} posts across ${accounts} channels.`
+        : `Research updated · ${scanned} websites scanned. Review channel access below.`);
     } catch (requestError) {
       // Website and social observations are persisted before AI generation.
       // Reload them even when the analysis provider fails so refreshed logos
@@ -705,23 +719,19 @@ export function CompetitorIntelligenceClient() {
       });
       if (!response.analysisQueue.length) {
         await load();
-        setNotice([response.message, ...response.searchWarnings].join(" "));
+        setNotice(response.discovered.length ? "Competitor snapshots are up to date." : "No new competitor profiles found. Try a narrower market or location.");
         return true;
       }
 
       const analyzed: string[] = [];
       const failures: string[] = [];
-      const researchWarnings = new Set<string>();
-      let collectedSocialPosts = 0;
       for (const competitor of response.analysisQueue) {
         try {
-          const result = await apiRequest<{ research?: { collectedSocialPosts?: number; warnings?: string[] } }>(`/api/competitors/${encodeURIComponent(competitor.id)}/analyze`, {
+          await apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}/analyze`, {
             method: "POST",
             body: JSON.stringify({}),
           });
           analyzed.push(competitor.name);
-          collectedSocialPosts += result.research?.collectedSocialPosts ?? 0;
-          result.research?.warnings?.forEach((warning) => researchWarnings.add(warning));
         } catch (requestError) {
           failures.push(`${competitor.name}: ${requestError instanceof Error ? requestError.message : "Analysis failed."}`);
         }
@@ -730,9 +740,9 @@ export function CompetitorIntelligenceClient() {
       await load(false);
       setSelectedId(response.analysisQueue[0]!.id);
       setTab("analysis");
-      const researchSummary = researchWarnings.size ? ` ${[...researchWarnings].slice(0, 3).join(" ")}` : "";
-      const searchSummary = response.searchWarnings.length ? ` ${response.searchWarnings.join(" ")}` : "";
-      setNotice(`Found ${response.discovered.length} new profile${response.discovered.length === 1 ? "" : "s"}; analyzed ${analyzed.length} and collected ${collectedSocialPosts} public post${collectedSocialPosts === 1 ? "" : "s"} where connected APIs allow it.${researchSummary}${searchSummary}`);
+      setNotice(response.discovered.length
+        ? `${response.discovered.length} competitor snapshot${response.discovered.length === 1 ? "" : "s"} added. Open a card to review profile, channel, and post research.`
+        : `${analyzed.length} competitor snapshot${analyzed.length === 1 ? "" : "s"} refreshed.`);
       if (failures.length) {
         setRetryDiscovery(true);
         setError(`Some analyses could not finish: ${failures.join(" ")}`);
@@ -2139,15 +2149,19 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
 `}</style>
 
       <div className="ci-head">
-        <div><h1>Find the posts people care about</h1><p>See what earns views and interactions across your leading competitors, then adapt those patterns for your brand.</p></div>
+        <div><h1>Competitor intelligence</h1><p>Profile the market, find standout posts, and export the strategy.</p></div>
         <div className="ci-head-actions">
-          <span className="ci-pill" title="Public sources only. Nothing is scraped or estimated. Social posts and private metrics are not collected."><Lightbulb size={13} aria-hidden="true" /> Public sources only</span>
           {data?.dataCollection.websiteSearchAvailable && <button className="button button-outline" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Finding and analyzing…" : "Find top 3 & analyze"}</button>}
           <button className="button button-gold" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add competitor</button>
         </div>
       </div>
 
-      {data && <p className="ci-note ci-automation-note" role="status">{!data.dataCollection.websiteSearchAvailable ? "Public website discovery is not configured yet. Add a web search API key to enable automatic competitor discovery." : data.brand.industry || data.brand.products || data.brand.description ? "Automatic discovery uses your Brand Profile and public website search. Post metrics appear only when connected, approved sources provide them." : "Add your service or industry to Brand Profile to start automatic discovery."}{busy === "discovery" ? " Finding and analyzing up to three profiles…" : ""}</p>}
+      {data && <div className="ci-access-strip" aria-label="Post research access">
+        <span className={data.dataCollection.instagramCompetitorInsightsAvailable ? "is-ready" : ""}>Instagram {data.dataCollection.instagramCompetitorInsightsAvailable ? "API ready" : "Meta access needed"}</span>
+        <span className={data.dataCollection.youtubeApiAvailable ? "is-ready" : ""}>YouTube {data.dataCollection.youtubeApiAvailable ? "API ready" : "API key needed"}</span>
+        <span className={data.dataCollection.xApiAvailable ? "is-ready" : ""}>X {data.dataCollection.xApiAvailable ? "API ready" : "API token needed"}</span>
+        <Link href="/dashboard/system-status">Setup details <ArrowRight size={13} aria-hidden="true" /></Link>
+      </div>}
       {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void (retryDiscovery ? discoverAndAnalyze() : load())}>{retryDiscovery ? "Retry discovery" : "Try again"}</button></div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {loading && <p className="loading-label">Loading competitor research…</p>}
@@ -2158,8 +2172,8 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
         <div className="ci-leaders-heading">
           <div><p className="ci-kicker">COMPETITOR SNAPSHOT</p><h2>Leading businesses</h2><p>Business details, public social channels, and the posts with the strongest recorded engagement.</p></div>
         </div>
-        {!data.dataCollection.websiteSearchAvailable && <p className="ci-setup-note">Automatic discovery needs a web search connection. Your saved profiles and public evidence are still shown below.</p>}
-        {rankedCompetitors.length ? rankedCompetitors.map(({ competitor, interactions, measuredPosts }, index) => {
+        {!data.dataCollection.websiteSearchAvailable && <p className="ci-setup-note">Website discovery unavailable · Add profiles manually.</p>}
+        {rankedCompetitors.length ? <div className="ci-snapshot-list">{rankedCompetitors.map(({ competitor }, index) => {
           const snapshot = competitor.snapshots[0] ?? null;
           const allPosts = [...new Map(competitor.snapshots.flatMap((item) => item.observations.posts).map((post) => [post.url, post])).values()];
           const measuredPostsList = allPosts.filter((post) => postInteractions(post) !== null || typeof post.metrics.views === "number");
@@ -2182,7 +2196,28 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
           let logoUrl = savedLogoUrl;
           try { if (logoUrl && new URL(logoUrl).pathname === "/") logoUrl = ""; } catch { logoUrl = ""; }
           const logoText = snapshot?.observations.websiteResearch?.competitorWebsite?.logoText || "";
-          return <article className="ci-leader-card" key={competitor.id}>
+          const websiteReport = snapshot?.observations.websiteResearch?.competitorWebsite;
+          const postAccessLimits = socialLinks.flatMap(([platform]) => {
+            if (platform === "Instagram" && !data.dataCollection.instagramCompetitorInsightsAvailable) return ["Instagram post metrics need an eligible professional account, Facebook Login, and Meta Business Discovery permissions."];
+            if (platform === "YouTube" && !data.dataCollection.youtubeApiAvailable) return ["YouTube post metrics need the YouTube Data API key in the API environment."];
+            if ((platform === "X" || platform === "Twitter") && !data.dataCollection.xApiAvailable) return ["X post metrics need the X API bearer token in the API environment."];
+            if (["Facebook", "LinkedIn", "TikTok", "Pinterest"].includes(platform)) return [`${platform} profiles are linked; post analytics are not connected for this platform.`];
+            return [];
+          });
+          const researchWarnings = snapshot?.observations.websiteResearch?.warnings.filter((warning) => /instagram|youtube|\bx\b|facebook|linkedin|tiktok|pinterest/i.test(warning)) ?? [];
+          const topPostViews = measuredPostsList.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
+          const topPostInteractions = measuredPostsList.reduce((total, post) => total + (postInteractions(post) ?? 0), 0);
+          return <details className="ci-leader-card ci-snapshot-card" key={competitor.id} open={selectedId === competitor.id} onToggle={(event) => {
+            if (event.currentTarget.open && selectedId !== competitor.id) setSelectedId(competitor.id);
+            else if (!event.currentTarget.open && selectedId === competitor.id) setSelectedId("");
+          }}>
+            <summary className="ci-snapshot-summary">
+              <span className={`ci-company-logo${logoText ? " ci-logo-has-text" : ""}${logoText && !logoUrl ? " ci-logo-text-mark" : ""}`}>{logoUrl ? <img src={logoUrl} alt="" onError={(event) => { event.currentTarget.style.display = "none"; event.currentTarget.parentElement?.classList.add("ci-logo-missing"); }} /> : null}{logoText && <span className="ci-site-logo-mark">{logoText}</span>}<span className="ci-logo-fallback">{competitor.name.slice(0, 1)}</span></span>
+              <span className="ci-snapshot-identity"><small>SNAPSHOT {String(index + 1).padStart(2, "0")} · {categoryMeta[competitor.category]?.label ?? "Competitor"}</small><strong>{competitor.name}</strong><span>{websiteReport?.description || offer}</span><span className="ci-snapshot-platforms">{socialLinks.length ? socialLinks.map(([platform]) => <em key={platform}>{platform}</em>) : <em>Website research</em>}</span></span>
+              <span className="ci-snapshot-metrics"><span><strong>{allPosts.length}</strong><small>posts</small></span><span><strong>{topPostViews ? topPostViews.toLocaleString() : "—"}</strong><small>views</small></span><span><strong>{topPostInteractions ? topPostInteractions.toLocaleString() : "—"}</strong><small>interactions</small></span></span>
+              <span className="ci-snapshot-open"><span>{selectedId === competitor.id ? "Close snapshot" : "Open snapshot"}</span><ArrowRight size={16} aria-hidden="true" /></span>
+            </summary>
+            <div className="ci-snapshot-details">
             <section className="ci-company-panel">
               <div className="ci-company-heading">
                 <span className={`ci-company-logo${logoText ? " ci-logo-has-text" : ""}${logoText && !logoUrl ? " ci-logo-text-mark" : ""}`}>{logoUrl ? <img src={logoUrl} alt={`${competitor.name} logo`} onError={(event) => { event.currentTarget.style.display = "none"; event.currentTarget.parentElement?.classList.add("ci-logo-missing"); }} /> : null}{logoText && <span className="ci-site-logo-mark">{logoText}</span>}<span className="ci-logo-fallback">Logo unavailable</span></span>
@@ -2190,15 +2225,19 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
               </div>
               <div className="ci-company-summary">{offer}</div>
               <dl className="ci-company-facts">
+                <div><dt>What they do</dt><dd>{websiteReport?.description || offer}</dd></div>
                 <div><dt>Location</dt><dd>{competitor.location || "Not listed"}</dd></div>
                 <div><dt>Website</dt><dd>{competitor.websiteUrl ? <a href={competitor.websiteUrl} target="_blank" rel="noreferrer">{new URL(competitor.websiteUrl).hostname} ↗</a> : "No website saved"}</dd></div>
+                {competitor.audience && <div><dt>Audience</dt><dd>{competitor.audience}</dd></div>}
+                {competitor.uniqueValue && <div><dt>Positioning</dt><dd>{competitor.uniqueValue}</dd></div>}
+                {competitor.brandVoice && <div><dt>Brand voice</dt><dd>{competitor.brandVoice}</dd></div>}
               </dl>
-              <div className="ci-social-block"><strong>Social channels</strong>{socialLinks.length ? <div className="ci-social-links">{socialLinks.map(([platform, url]) => <a key={platform} href={url} target="_blank" rel="noreferrer">{platform} ↗</a>)}</div> : <p>No public accounts linked on the company website.</p>}</div>
+              <div className="ci-social-block"><strong>Social channels</strong>{socialLinks.length ? <div className="ci-social-links">{socialLinks.map(([platform, url]) => <a key={platform} href={url} target="_blank" rel="noreferrer">{platform} ↗</a>)}</div> : <p>No public accounts linked on the company website.</p>}{researchWarnings.length > 0 && <details className="ci-research-warnings"><summary>Data access notes · {researchWarnings.length}</summary><ul>{researchWarnings.slice(0, 6).map((warning, warningIndex) => <li key={`${warningIndex}-${warning}`}>{warning}</li>)}</ul></details>}</div>
               <div className="ci-company-actions"><button className="button button-outline" type="button" onClick={() => editProfile(competitor)}>Edit</button><button className="button button-outline" type="button" onClick={() => exportReport(competitor)}>Export report</button><button className="button button-outline ci-refresh-research" type="button" onClick={() => void refreshWebsiteFindings(competitor)} disabled={busy === "website"}>{busy === "website" ? "Scanning…" : "Refresh site"}</button></div>
             </section>
             <section className="ci-content-panel">
               <div className="ci-content-heading"><div><p className="ci-kicker">SOCIAL CONTENT</p><h3>Standout posts & strategy</h3></div><span>{posts.length} post{posts.length === 1 ? "" : "s"} with saved evidence</span></div>
-              {posts.length ? <><div className="ci-post-ranking-note">{measuredPostsList.length ? "Ranked by recorded views first, then likes, comments and shares. Counts are a snapshot of public data." : "Post examples found, but no public view or interaction counts were available to rank performance."}</div><div className="ci-leader-posts">{posts.map((post, postIndex) => {
+              {posts.length ? <><div className="ci-post-ranking-note">Top posts ranked by recorded views and interactions.</div><div className="ci-leader-posts">{posts.map((post, postIndex) => {
                 const interactions = postInteractions(post);
                 const postRef = `${post.url} ${post.topic} ${post.hook}`.toLowerCase();
                 const reverse = reverseEngineering.find((item) => item.postReference && (postRef.includes(item.postReference.toLowerCase()) || item.postReference.toLowerCase().includes(post.url.toLowerCase()) || (post.topic.length > 12 && item.postReference.toLowerCase().includes(post.topic.slice(0, 40).toLowerCase()))));
@@ -2210,9 +2249,9 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
                   {reverse ? <div className="ci-post-strategy"><strong>Why it may attract attention</strong><p>{[reverse.hook, reverse.emotionalTrigger, reverse.audienceNeed, reverse.visualApproach, reverse.engagementApproach].filter(Boolean).join(" · ")}</p><small>Content interpretation · {reverse.evidence || "Based on the cited post content; not proof of what caused its results."}</small></div> : (post.hook || post.captionApproach || post.callToAction) ? <div className="ci-post-strategy"><strong>Visible content tactic</strong><p>{[post.hook && `Opening: ${post.hook.slice(0, 180)}`, post.captionApproach && post.captionApproach !== post.hook ? `Caption: ${post.captionApproach.slice(0, 180)}` : "", post.callToAction && `Call to action: ${post.callToAction}`].filter(Boolean).join(" · ")}</p><small>Observed in the post. No causal performance claim.</small></div> : <p className="ci-post-strategy">Post details were not captured, so its attention tactic cannot be assessed yet.</p>}
                   <a href={post.url} target="_blank" rel="noreferrer">View original post ↗</a>
                 </article>;
-              })}</div></> : <div className="ci-no-posts"><strong>No post-level evidence available yet</strong><p>{socialLinks.length ? "Public account links were found, but post content and public performance counts have not been collected. Connect an eligible platform or save post links and visible counts to identify what performs." : "No public social account links or post metrics were found. Add an account link or public post evidence to research this company."}</p></div>}
+              })}</div></> : <div className="ci-no-posts"><strong>No post metrics captured</strong>{postAccessLimits.length ? <ul>{[...new Set(postAccessLimits)].map((limit) => <li key={limit}>{limit}</li>)}</ul> : <p>Link a public profile or add a post URL and visible metrics below.</p>}<a href="#add-public-post-evidence" onClick={(event) => { event.preventDefault(); const details = event.currentTarget.closest(".ci-content-panel")?.querySelector<HTMLDetailsElement>(".ci-record-details"); if (details) { details.open = true; details.scrollIntoView({ behavior: "smooth", block: "center" }); } }}>Add post evidence</a></div>}
               {patterns.length > 0 && <div className="ci-strategy-summary"><h4>Recurring content tactics</h4><ul>{patterns.map((pattern, patternIndex) => <li key={`${patternIndex}-${pattern}`}>{pattern}</li>)}</ul><small>These are content-based interpretations. The recorded post metrics show association only, not that a tactic caused the results.</small></div>}
-              <details className="ci-record-details" onToggle={(event) => { if (event.currentTarget.open) setSelectedId(competitor.id); }}>
+              <details className="ci-record-details">
                 <summary>Add public post evidence</summary>
                 <form className="ci-record-form" onSubmit={(event) => void recordSnapshot(event, competitor)}>
                   <label>Source label<input required minLength={2} maxLength={160} value={sourceLabel} onChange={(event) => setSourceLabel(event.target.value)} /></label>
@@ -2221,13 +2260,18 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
                   <label>Public post URL<input type="url" value={postUrl} placeholder="https://" onChange={(event) => setPostUrl(event.target.value)} /></label>
                   <label>Format<input value={postFormat} onChange={(event) => setPostFormat(event.target.value)} /></label>
                   <label>Post topic<input value={postTopic} onChange={(event) => setPostTopic(event.target.value)} /></label>
+                  <label>Published date<input type="date" value={postPublishedDate} onChange={(event) => setPostPublishedDate(event.target.value)} /></label>
+                  <label>Opening hook<input value={postHook} maxLength={1000} onChange={(event) => setPostHook(event.target.value)} placeholder="First line or visual hook" /></label>
+                  <label>Caption approach<input value={postApproach} maxLength={1500} onChange={(event) => setPostApproach(event.target.value)} placeholder="How the post frames its message" /></label>
+                  <label>Call to action<input value={postCta} maxLength={500} onChange={(event) => setPostCta(event.target.value)} placeholder="What the post asks viewers to do" /></label>
                   {postMetricFields.map(({ key, label }) => <label key={key}>{label}<input type="number" min="0" value={metricValues[key] ?? ""} onChange={(event) => setMetricValues({ ...metricValues, [key]: event.target.value })} /></label>)}
                   <button className="button button-gold" type="submit" disabled={busy === "snapshot"}>{busy === "snapshot" ? "Saving…" : "Save post evidence"}</button>
                 </form>
               </details>
             </section>
-          </article>;
-        }) : <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Set your industry and location in Brand Profile, then discover individual businesses with a homepage logo.</p><div className="ci-empty-actions">{data.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Searching…" : "Discover competitors"}</button>}<button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
+            </div>
+          </details>;
+        })}</div> : <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Set your industry and location in Brand Profile, then discover individual businesses with a homepage logo.</p><div className="ci-empty-actions">{data.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Searching…" : "Discover competitors"}</button>}<button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
       </div>}
       {showProfileForm && renderProfileForm()}
       {notice && <p className="form-success" role="status">{notice}</p>}

@@ -342,6 +342,8 @@ router.get("/", async (req, res, next) => {
       accounts,
       instagramConfigured: isInstagramConfigured(),
       facebookConfigured: isFacebookConfigured(),
+      instagramRedirectUri: env.INSTAGRAM_REDIRECT_URI ?? null,
+      facebookRedirectUri: env.FACEBOOK_REDIRECT_URI ?? null,
       mediaPublishingConfigured,
       mediaPublishingMessage,
     });

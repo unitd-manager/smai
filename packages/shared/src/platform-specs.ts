@@ -57,14 +57,6 @@ export const platformSpecs = {
     videoMaxSeconds: 140,
     source: "https://help.x.com/en/using-x",
   },
-  Telegram: {
-    captionCharacters: 4096,
-    hashtags: 5,
-    formats: ["image", "video", "text"],
-    imageRatios: ["1:1", "4:5", "16:9", "9:16"],
-    videoMaxSeconds: 3600,
-    source: "https://core.telegram.org/",
-  },
   "Google Business": {
     captionCharacters: 1500,
     hashtags: 3,
@@ -76,8 +68,8 @@ export const platformSpecs = {
 } as const;
 
 export const platformRules = {
-  lastReviewed: "2026-11-05",
-  note: "Targets were reviewed in product configuration on this date, not independently revalidated against every platform's current documentation. Confirm current rules in the linked documentation before publishing.",
+  lastReviewed: "2026-11-24",
+  note: "These eight channels are selected for broad business-marketing utility and official publishing APIs. Selection does not imply an integration is enabled: Instagram is the only live social publisher currently implemented; other channels remain draft-only until their official API, OAuth review, and publishing adapters are completed.",
   platforms: platformSpecs,
 } as const;
 

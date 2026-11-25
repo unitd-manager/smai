@@ -141,7 +141,7 @@ export function ContentPlansClient() {
     <section className="dashboard-content content-plans-page">
       <p className="eyebrow">YOUR STUDIO · STRATEGY</p>
       <h1>Content plans</h1>
-      <p className="dashboard-lead">Content is the individual post, caption, and design. A plan groups those posts with dates and approval status. Create coordinated batches in Campaigns, then manage each post in Posts and Queue.</p>
+      <p className="dashboard-lead">Manage post batches, dates, and approval status.</p>
       <div className="content-plan-toolbar">
         <Link className="button button-gold" href="/dashboard/campaigns">Build a campaign</Link>
         <Link href="/dashboard/posts">Open posts and queue</Link>

@@ -139,26 +139,26 @@ approvalEmailRouter.post("/batch/:token", async (req, res, next) => {
       res.status(409).json({ error: "Every post in this batch must have a publishing date and at least one destination." });
       return;
     }
-    const accountByBrandId = new Map<string, string>();
+    const accountByBrandPlatform = new Map<string, string>();
     if (input.status === "APPROVED") {
-      const instagramApprovals = approvals.filter(({ post }) => post.targets.some(({ platform }) => platform === "Instagram"));
-      const brandIds = [...new Set(instagramApprovals.map(({ post }) => post.brandId))];
+      const liveApprovals = approvals.filter(({ post }) => post.targets.some(({ platform }) => ["Instagram", "Facebook"].includes(platform)));
+      const brandIds = [...new Set(liveApprovals.map(({ post }) => post.brandId))];
       const accounts = await prisma.socialAccount.findMany({
-        where: { workspaceId: claims.workspaceId, provider: "instagram", status: "CONNECTED" },
+        where: { workspaceId: claims.workspaceId, provider: { in: ["instagram", "facebook"] }, status: "CONNECTED" },
         orderBy: { createdAt: "asc" },
-        select: { id: true, brandId: true },
+        select: { id: true, brandId: true, provider: true },
       });
       for (const brandId of brandIds) {
-        const account = accounts.find((item) => item.brandId === brandId) ?? accounts.find((item) => item.brandId === null);
-        if (!account) {
-          res.status(409).json({ error: "Connect an Instagram Professional account for every brand in this batch before approving it for live publishing." });
-          return;
+        const platforms = [...new Set(liveApprovals.filter(({ post }) => post.brandId === brandId).flatMap(({ post }) => post.targets.map(({ platform }) => platform).filter((platform) => ["Instagram", "Facebook"].includes(platform))))];
+        for (const platform of platforms) {
+          const provider = platform.toLowerCase();
+          const account = accounts.find((item) => item.brandId === brandId && item.provider === provider) ?? accounts.find((item) => item.brandId === null && item.provider === provider);
+          if (!account) {
+            res.status(409).json({ error: `Connect a ${platform === "Facebook" ? "Facebook Page" : "Instagram Professional account"} for every brand in this batch before approving it for live publishing.` });
+            return;
+          }
+          accountByBrandPlatform.set(`${brandId}:${platform}`, account.id);
         }
-        accountByBrandId.set(brandId, account.id);
-      }
-      if (accountByBrandId.size !== brandIds.length) {
-        res.status(409).json({ error: "An Instagram account could not be matched to every brand in this batch." });
-        return;
       }
     }
     try {
@@ -175,19 +175,22 @@ approvalEmailRouter.post("/batch/:token", async (req, res, next) => {
           });
           if (updated.count !== 1) throw new Error("APPROVAL_BATCH_ALREADY_HANDLED");
           if (input.status === "APPROVED") {
-            const instagramTargets = approval.post.targets.filter(({ platform }) => platform === "Instagram");
-            const otherTargets = approval.post.targets.filter(({ platform }) => platform !== "Instagram");
-            await tx.post.update({ where: { id: approval.postId }, data: { status: instagramTargets.length ? "SCHEDULED" : "DRAFT" } });
-            if (instagramTargets.length) await tx.postTarget.updateMany({
-              where: { postId: approval.postId, workspaceId: claims.workspaceId, platform: "Instagram" },
-              data: { status: "PENDING", socialAccountId: accountByBrandId.get(approval.post.brandId)! },
-            });
+            const liveTargets = approval.post.targets.filter(({ platform }) => ["Instagram", "Facebook"].includes(platform));
+            const otherTargets = approval.post.targets.filter(({ platform }) => !["Instagram", "Facebook"].includes(platform));
+            await tx.post.update({ where: { id: approval.postId }, data: { status: liveTargets.length ? "SCHEDULED" : "DRAFT" } });
+            for (const platform of ["Instagram", "Facebook"]) {
+              const accountId = accountByBrandPlatform.get(`${approval.post.brandId}:${platform}`);
+              if (accountId) await tx.postTarget.updateMany({
+                where: { postId: approval.postId, workspaceId: claims.workspaceId, platform },
+                data: { status: "PENDING", socialAccountId: accountId },
+              });
+            }
             if (otherTargets.length) await tx.postTarget.updateMany({
-              where: { postId: approval.postId, workspaceId: claims.workspaceId, platform: { not: "Instagram" } },
+              where: { postId: approval.postId, workspaceId: claims.workspaceId, platform: { notIn: ["Instagram", "Facebook"] } },
               data: { status: "DEMO_ONLY", socialAccountId: null },
             });
-            if (instagramTargets.length) await tx.publishJob.createMany({
-              data: instagramTargets.map((target) => ({
+            if (liveTargets.length) await tx.publishJob.createMany({
+              data: liveTargets.map((target) => ({
                 workspaceId: target.workspaceId,
                 resellerId: target.resellerId,
                 postId: approval.postId,
@@ -221,8 +224,8 @@ approvalEmailRouter.post("/batch/:token", async (req, res, next) => {
       }
       throw error;
     }
-    const liveCount = input.status === "APPROVED" ? approvals.filter(({ post }) => post.targets.some(({ platform }) => platform === "Instagram")).length : 0;
-    res.json({ ok: true, status: input.status, count: approvals.length, queuedForInstagram: liveCount, draftOnly: input.status === "APPROVED" ? approvals.length - liveCount : 0 });
+    const liveCount = input.status === "APPROVED" ? approvals.filter(({ post }) => post.targets.some(({ platform }) => ["Instagram", "Facebook"].includes(platform))).length : 0;
+    res.json({ ok: true, status: input.status, count: approvals.length, queuedForLivePublishing: liveCount, draftOnly: input.status === "APPROVED" ? approvals.length - liveCount : 0 });
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError || error instanceof z.ZodError) {
       res.status(410).json({ error: "This approval batch link is invalid or has expired." });
@@ -250,23 +253,25 @@ approvalEmailRouter.post("/batch/:token/item/:approvalId", async (req, res, next
       res.status(410).json({ error: "This post has already been reviewed." });
       return;
     }
-    let accountId: string | null = null;
+    const accountIdByPlatform = new Map<string, string>();
     if (input.status === "APPROVED") {
       if (!approval.post.scheduledAt || approval.post.targets.length === 0) {
         res.status(409).json({ error: "This item needs a publishing date and destination before it can be approved." });
         return;
       }
-      if (approval.post.targets.some(({ platform }) => platform === "Instagram")) {
-        const account = await prisma.socialAccount.findFirst({
-          where: { workspaceId: claims.workspaceId, provider: "instagram", status: "CONNECTED", OR: [{ brandId: approval.post.brandId }, { brandId: null }] },
-          orderBy: [{ brandId: "desc" }, { createdAt: "asc" }],
-          select: { id: true },
-        });
-        if (!account) {
-          res.status(409).json({ error: "Connect an Instagram Professional account before approving this post." });
-          return;
+      for (const platform of ["Instagram", "Facebook"]) {
+        if (approval.post.targets.some(({ platform: targetPlatform }) => targetPlatform === platform)) {
+          const account = await prisma.socialAccount.findFirst({
+            where: { workspaceId: claims.workspaceId, provider: platform.toLowerCase(), status: "CONNECTED", OR: [{ brandId: approval.post.brandId }, { brandId: null }] },
+            orderBy: [{ brandId: "desc" }, { createdAt: "asc" }],
+            select: { id: true },
+          });
+          if (!account) {
+            res.status(409).json({ error: `Connect a ${platform === "Facebook" ? "Facebook Page" : "Instagram Professional account"} before approving this post.` });
+            return;
+          }
+          accountIdByPlatform.set(platform, account.id);
         }
-        accountId = account.id;
       }
     }
     await prisma.$transaction(async (tx) => {
@@ -276,13 +281,13 @@ approvalEmailRouter.post("/batch/:token/item/:approvalId", async (req, res, next
       });
       if (updated.count !== 1) throw new Error("APPROVAL_ALREADY_HANDLED");
       if (input.status === "APPROVED") {
-        const instagramTargets = approval.post.targets.filter(({ platform }) => platform === "Instagram");
-        const otherTargets = approval.post.targets.filter(({ platform }) => platform !== "Instagram");
-        await tx.post.update({ where: { id: approval.postId }, data: { status: instagramTargets.length ? "SCHEDULED" : "DRAFT" } });
-        if (instagramTargets.length) await tx.postTarget.updateMany({ where: { postId: approval.postId, workspaceId: claims.workspaceId, platform: "Instagram" }, data: { status: "PENDING", socialAccountId: accountId } });
-        if (otherTargets.length) await tx.postTarget.updateMany({ where: { postId: approval.postId, workspaceId: claims.workspaceId, platform: { not: "Instagram" } }, data: { status: "DEMO_ONLY", socialAccountId: null } });
-        if (instagramTargets.length) await tx.publishJob.createMany({
-          data: instagramTargets.map((target) => ({ workspaceId: target.workspaceId, resellerId: target.resellerId, postId: approval.postId, targetId: target.id, runAt: approval.post.scheduledAt! })),
+        const liveTargets = approval.post.targets.filter(({ platform }) => ["Instagram", "Facebook"].includes(platform));
+        const otherTargets = approval.post.targets.filter(({ platform }) => !["Instagram", "Facebook"].includes(platform));
+        await tx.post.update({ where: { id: approval.postId }, data: { status: liveTargets.length ? "SCHEDULED" : "DRAFT" } });
+        for (const [platform, socialAccountId] of accountIdByPlatform) await tx.postTarget.updateMany({ where: { postId: approval.postId, workspaceId: claims.workspaceId, platform }, data: { status: "PENDING", socialAccountId } });
+        if (otherTargets.length) await tx.postTarget.updateMany({ where: { postId: approval.postId, workspaceId: claims.workspaceId, platform: { notIn: ["Instagram", "Facebook"] } }, data: { status: "DEMO_ONLY", socialAccountId: null } });
+        if (liveTargets.length) await tx.publishJob.createMany({
+          data: liveTargets.map((target) => ({ workspaceId: target.workspaceId, resellerId: target.resellerId, postId: approval.postId, targetId: target.id, runAt: approval.post.scheduledAt! })),
           skipDuplicates: true,
         });
       } else {
@@ -296,8 +301,8 @@ approvalEmailRouter.post("/batch/:token/item/:approvalId", async (req, res, next
         metadata: { approvalId: approval.id, comment: input.comment, batch: true, individual: true },
       } });
     });
-    const draftOnly = input.status === "APPROVED" && !approval.post.targets.some(({ platform }) => platform === "Instagram");
-    res.json({ ok: true, status: input.status, approvalId, queuedForInstagram: input.status === "APPROVED" && !draftOnly ? 1 : 0, draftOnly: draftOnly ? 1 : 0 });
+    const draftOnly = input.status === "APPROVED" && !approval.post.targets.some(({ platform }) => ["Instagram", "Facebook"].includes(platform));
+    res.json({ ok: true, status: input.status, approvalId, queuedForLivePublishing: input.status === "APPROVED" && !draftOnly ? 1 : 0, draftOnly: draftOnly ? 1 : 0 });
   } catch (error) {
     if (error instanceof Error && error.message === "APPROVAL_ALREADY_HANDLED") {
       res.status(409).json({ error: "This post has already been reviewed." });
@@ -347,21 +352,24 @@ approvalEmailRouter.post("/:token", async (req, res, next) => {
       res.status(410).json({ error: "This approval link has expired or has already been used." });
       return;
     }
-    let instagramAccountId: string | null = null;
+    const accountIdByPlatform = new Map<string, string>();
     if (input.status === "APPROVED" && existing.post.scheduledAt) {
-      if (existing.post.targets.some((target) => target.platform !== "Instagram")) {
-        res.status(409).json({ error: "Live publishing is currently connected for Instagram only. Update the post channels before approving it for publishing." });
+      const unsupported = existing.post.targets.filter((target) => !["Instagram", "Facebook"].includes(target.platform));
+      if (unsupported.length) {
+        res.status(409).json({ error: `Live publishing is not integrated for ${[...new Set(unsupported.map(({ platform }) => platform))].join(", ")}. Use the in-app approval queue to keep those channels as drafts.` });
         return;
       }
-      const account = await prisma.socialAccount.findFirst({
-        where: { workspaceId: existing.workspaceId, provider: "instagram", status: "CONNECTED" },
-        select: { id: true },
-      });
-      if (!account) {
-        res.status(409).json({ error: "Connect an Instagram Professional account before approving this scheduled post for live publishing." });
-        return;
+      for (const platform of [...new Set(existing.post.targets.map(({ platform }) => platform))]) {
+        const account = await prisma.socialAccount.findFirst({
+          where: { workspaceId: existing.workspaceId, provider: platform.toLowerCase(), status: "CONNECTED" },
+          select: { id: true },
+        });
+        if (!account) {
+          res.status(409).json({ error: `Connect ${platform === "Facebook" ? "a Facebook Page" : "an Instagram Professional account"} before approving this scheduled post for live publishing.` });
+          return;
+        }
+        accountIdByPlatform.set(platform, account.id);
       }
-      instagramAccountId = account.id;
     }
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.approval.updateMany({
@@ -371,7 +379,7 @@ approvalEmailRouter.post("/:token", async (req, res, next) => {
       if (result.count !== 1) return false;
       if (input.status === "APPROVED" && existing.post.scheduledAt) {
         await tx.post.update({ where: { id: existing.postId }, data: { status: "SCHEDULED" } });
-        await tx.postTarget.updateMany({ where: { postId: existing.postId, workspaceId: existing.workspaceId, platform: "Instagram" }, data: { status: "PENDING", socialAccountId: instagramAccountId } });
+        for (const [platform, socialAccountId] of accountIdByPlatform) await tx.postTarget.updateMany({ where: { postId: existing.postId, workspaceId: existing.workspaceId, platform }, data: { status: "PENDING", socialAccountId } });
         await tx.publishJob.createMany({
           data: existing.post.targets.map((target) => ({
             workspaceId: target.workspaceId,

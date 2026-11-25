@@ -506,9 +506,7 @@ export async function renderVideo(input: RenderVideoInput, callbacks: RenderCall
   const musicTracks = await listMusicTracks();
   const musicTrack = input.musicId
     ? musicTracks.find((track) => track.id === input.musicId)
-    : input.narration !== "text-only"
-      ? musicTracks.find((track) => track.id === "calm-horizon")
-      : undefined;
+    : musicTracks.find((track) => track.id === "calm-horizon");
   if (input.musicId && !musicTrack) throw new Error("The selected music track was not found or is no longer available.");
   let outputPath: string | undefined;
   let outputCompleted = false;
@@ -567,41 +565,50 @@ export async function renderVideo(input: RenderVideoInput, callbacks: RenderCall
     for (const [index, scene] of rawScenes.entries()) {
       const targetSceneDuration = targetSceneDurations[index]!;
       if (scene.dialogue?.length && scene.cast && scene.cast.length >= 2) {
-        const dialogueResult = await synthesizeDialogueScene({
-          scene,
-          sceneIndex: index,
-          cast: scene.cast,
-          voiceA: input.voice,
-          voiceB: input.voiceB,
-          voiceC: input.voiceC,
-          language: input.language,
-          audioDir,
-          ffmpegPath,
-          ffprobePath,
-          tts,
-          signal: callbacks.signal,
-        });
-        scenes.push({
-          ...scene,
-          audioFile: dialogueResult.audioFile,
-          dialogue: dialogueResult.dialogue,
-          durationSeconds: dialogueResult.durationSeconds,
-        });
-        await callbacks.updateProgress(8 + Math.round((index + 1) / rawScenes.length * 22), "Generating character dialogue");
-        continue;
+        try {
+          const dialogueResult = await synthesizeDialogueScene({
+            scene,
+            sceneIndex: index,
+            cast: scene.cast,
+            voiceA: input.voice,
+            voiceB: input.voiceB,
+            voiceC: input.voiceC,
+            language: input.language,
+            audioDir,
+            ffmpegPath,
+            ffprobePath,
+            tts,
+            signal: callbacks.signal,
+          });
+          scenes.push({
+            ...scene,
+            audioFile: dialogueResult.audioFile,
+            dialogue: dialogueResult.dialogue,
+            durationSeconds: dialogueResult.durationSeconds,
+          });
+          await callbacks.updateProgress(8 + Math.round((index + 1) / rawScenes.length * 22), "Generating character dialogue");
+          continue;
+        } catch (error) {
+          console.warn(`Piper character dialogue unavailable for video job ${input.jobId}; continuing with music.`, error);
+        }
       }
       const fileName = `scene-${index + 1}.${tts.name === "piper" ? "wav" : "mp3"}`;
       const outputPath = path.join(audioDir, fileName);
-      await tts.synthesize(scene.narrationText ?? scene.text, { voice: input.voice, language: input.language }, outputPath, callbacks.signal);
-      const narrationDuration = await probeDuration(outputPath, callbacks.signal);
-      const audioSpeed = getNarrationSpeed(narrationDuration, targetSceneDuration);
-      scenes.push({
-        ...scene,
-        audioFile: fileName,
-        durationSeconds: targetSceneDuration,
-        ...(audioSpeed > 1 ? { audioSpeed } : {}),
-      });
-      await callbacks.updateProgress(8 + Math.round((index + 1) / rawScenes.length * 22), "Generating voice");
+      try {
+        await tts.synthesize(scene.narrationText ?? scene.text, { voice: input.voice, language: input.language }, outputPath, callbacks.signal);
+        const narrationDuration = await probeDuration(outputPath, callbacks.signal);
+        const audioSpeed = getNarrationSpeed(narrationDuration, targetSceneDuration);
+        scenes.push({
+          ...scene,
+          audioFile: fileName,
+          durationSeconds: targetSceneDuration,
+          ...(audioSpeed > 1 ? { audioSpeed } : {}),
+        });
+        await callbacks.updateProgress(8 + Math.round((index + 1) / rawScenes.length * 22), "Generating voice");
+      } catch (error) {
+        console.warn(`Piper narration unavailable for video job ${input.jobId}; continuing with music.`, error);
+        scenes.push({ ...scene, durationSeconds: targetSceneDuration });
+      }
     }
   }
 

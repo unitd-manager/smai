@@ -174,7 +174,7 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
       }),
       prisma.analyticsSnapshot.count({ where: { workspaceId: req.workspace!.id, post: { brandId: brand.id } } }),
       prisma.socialAccount.findMany({
-        where: { workspaceId: req.workspace!.id, status: "CONNECTED" },
+        where: { workspaceId: req.workspace!.id, status: "CONNECTED", provider: { in: ["instagram", "facebook"] } },
         select: { provider: true, displayName: true },
       }),
       prisma.contentPlan.findMany({
@@ -325,7 +325,9 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
       publisherCapabilities: {
         instagramConnected: connectedAccounts.some((account) => account.provider === "instagram"),
         instagramLivePublishingIntegrated: true,
-        otherSelectedPlatformsAreDraftOnly: input.platforms.filter((platform) => platform.toLowerCase() !== "instagram"),
+        facebookConnected: connectedAccounts.some((account) => account.provider === "facebook"),
+        facebookLivePublishingIntegrated: true,
+        otherSelectedPlatformsAreDraftOnly: input.platforms.filter((platform) => !["instagram", "facebook"].includes(platform.toLowerCase())),
       },
     });
   } catch (error) {
@@ -377,6 +379,10 @@ router.get("/:id", async (req, res, next) => {
       where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
       select: { id: true },
     });
+    const facebookAccount = await prisma.socialAccount.findFirst({
+      where: { workspaceId: req.workspace!.id, provider: "facebook", status: "CONNECTED" },
+      select: { id: true },
+    });
     const contentById = new Map(contentRows.map((row) => [row.id, row]));
     const designsByContentId = new Map<string, typeof designRows>();
     for (const design of designRows) {
@@ -415,8 +421,10 @@ router.get("/:id", async (req, res, next) => {
       publisherCapabilities: {
         instagramConnected: Boolean(instagramAccount),
         instagramLivePublishingIntegrated: true,
+        facebookConnected: Boolean(facebookAccount),
+        facebookLivePublishingIntegrated: true,
         otherSelectedPlatformsAreDraftOnly: Array.isArray(campaign.platforms)
-          ? campaign.platforms.filter((platform): platform is string => typeof platform === "string" && platform.toLowerCase() !== "instagram")
+          ? campaign.platforms.filter((platform): platform is string => typeof platform === "string" && !["instagram", "facebook"].includes(platform.toLowerCase()))
           : [],
       },
     });

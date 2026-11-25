@@ -23,6 +23,8 @@ type SocialAccountsResponse = {
   accounts: ConnectedAccount[];
   instagramConfigured: boolean;
   facebookConfigured: boolean;
+  instagramRedirectUri: string | null;
+  facebookRedirectUri: string | null;
   mediaPublishingConfigured: boolean;
   mediaPublishingMessage: string;
 };
@@ -33,6 +35,8 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [instagramConfigured, setInstagramConfigured] = useState(false);
   const [facebookConfigured, setFacebookConfigured] = useState(false);
+  const [instagramRedirectUri, setInstagramRedirectUri] = useState("");
+  const [facebookRedirectUri, setFacebookRedirectUri] = useState("");
   const [mediaPublishingConfigured, setMediaPublishingConfigured] = useState(false);
   const [mediaPublishingMessage, setMediaPublishingMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -46,6 +50,8 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
       setAccounts(response.accounts);
       setInstagramConfigured(response.instagramConfigured);
       setFacebookConfigured(response.facebookConfigured);
+      setInstagramRedirectUri(response.instagramRedirectUri ?? "");
+      setFacebookRedirectUri(response.facebookRedirectUri ?? "");
       setMediaPublishingConfigured(response.mediaPublishingConfigured);
       setMediaPublishingMessage(response.mediaPublishingMessage);
       setError("");
@@ -116,6 +122,7 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
                 <p className="social-provider-status is-connected">{isFacebook ? "Connected Page" : "Workspace account"}: {account.displayName}</p>
                 <p>This connection is shared with other members of this workspace.</p>
                 {account.tokenExpiresAt && <p>Access may need renewal after {new Date(account.tokenExpiresAt).toLocaleDateString()}.</p>}
+                <div className="oauth-callback-help"><strong>Meta OAuth callback URL</strong><p>Register this exact URL in Meta before reconnecting:</p><code>{isFacebook ? facebookRedirectUri : instagramRedirectUri}</code></div>
                 {!isFacebook && <button className="social-provider-action" type="button" disabled={busy} onClick={() => void connectAccount("instagram")}>
                   {busy ? "Opening Instagram…" : "Reconnect to enable listening"}
                 </button>}
@@ -136,6 +143,11 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
                 <p>{isFacebook
                   ? "Continue to Facebook to review and authorize every Page available to your account."
                   : <>Select <strong>Continue to Instagram</strong> to open Instagram’s secure authorization page. Log in there with the Professional account you want to connect, then approve the requested permissions.</>}</p>
+                <div className="oauth-callback-help">
+                  <strong>Meta OAuth callback URL</strong>
+                  <p>Add this exact URL to your Meta app’s redirect URI allowlist:</p>
+                  <code>{isFacebook ? facebookRedirectUri : instagramRedirectUri}</code>
+                </div>
                 <button className="button button-gold" type="button" disabled={busy} onClick={() => void connectAccount(isFacebook ? "facebook" : "instagram")}>
                   {busy ? `Opening ${isFacebook ? "Facebook" : "Instagram"}…` : `Continue to ${isFacebook ? "Facebook" : "Instagram"}`}
                 </button>
@@ -196,7 +208,7 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
     <section className="dashboard-content social-accounts-page">
       <p className="eyebrow">YOUR STUDIO · PUBLISH</p>
       <h1>Social Accounts</h1>
-      <p className="dashboard-lead">Connect channels for this workspace. Each customer workspace manages its own social accounts; connections are shared only with members of the selected workspace.</p>
+      <p className="dashboard-lead">Connect and manage the channels for this workspace.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       <div className="social-provider-grid">
@@ -237,7 +249,7 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
       </div>
       {!instagramConfigured && <p className="demo-banner" role="note">To enable Instagram, set the Meta app ID and secret, OAuth callback URL, and token encryption key in the API environment. Use a public HTTPS API URL for live image publishing.</p>}
       {instagramConfigured && !mediaPublishingConfigured && <p className="demo-banner" role="alert">Instagram is connected, but publishing is blocked: {mediaPublishingMessage || "The API media URL is not reachable."}</p>}
-      {instagramConfigured && mediaPublishingConfigured && <p className="demo-banner" role="note">{mediaPublishingMessage} Facebook Page connections only show connection status; publishing and insights are not enabled.</p>}
+      {instagramConfigured && mediaPublishingConfigured && <p className="demo-banner" role="note">{mediaPublishingMessage} Facebook Page text and image publishing is available after connecting a Page with the required Meta permissions. Facebook Page insights are not enabled.</p>}
     </section>
   );
 }

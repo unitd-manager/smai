@@ -12,13 +12,14 @@ type ClientWorkspace = {
 };
 
 type AgencyResponse = {
-  agency: { name: string; workspaceId: string };
+  agency: { name: string; workspaceId: string; clientCount: number; clientLimit: number };
   clients: ClientWorkspace[];
 };
 
 export function AgencyWorkspacesClient() {
   const [clients, setClients] = useState<ClientWorkspace[]>([]);
   const [agencyName, setAgencyName] = useState("");
+  const [clientLimit, setClientLimit] = useState(25);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,6 +31,7 @@ export function AgencyWorkspacesClient() {
       const response = await apiRequest<AgencyResponse>("/api/agency/clients");
       setClients(response.clients);
       setAgencyName(response.agency.name);
+      setClientLimit(response.agency.clientLimit);
       setError("");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not load client workspaces.");
@@ -79,7 +81,6 @@ export function AgencyWorkspacesClient() {
       <p className="dashboard-lead">
         Manage each client in its own workspace. Brands, social connections, content, and team access stay isolated, while you switch between clients with your agency login.
       </p>
-      <div className="agency-rollout-note" role="note"><strong>Agency subscription</strong><span>Client workspace management is available. Subscription tiers, client seat limits, and reseller billing are still being finalized.</span></div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
 
@@ -95,7 +96,7 @@ export function AgencyWorkspacesClient() {
             required
             placeholder="Client or brand name"
           />
-          <button className="button button-gold" type="submit" disabled={saving}>
+          <button className="button button-gold" type="submit" disabled={saving || clients.length >= clientLimit || loading}>
             {saving ? "Creating…" : "Create client workspace"}
           </button>
         </div>
@@ -105,7 +106,7 @@ export function AgencyWorkspacesClient() {
       <div className="agency-client-list" aria-live="polite">
         <div className="agency-client-list-heading">
           <h2>{agencyName ? `${agencyName} clients` : "Your clients"}</h2>
-          {!loading && <span>{clients.length} {clients.length === 1 ? "workspace" : "workspaces"}</span>}
+          {!loading && <span>{clients.length} / {clientLimit} client workspaces</span>}
         </div>
         {loading ? (
           <p className="loading-label">Loading client workspaces…</p>

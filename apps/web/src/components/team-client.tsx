@@ -216,7 +216,7 @@ export function TeamClient() {
     <section className="dashboard-content team-page">
       <p className="eyebrow">YOUR WORKSPACE · SETTINGS</p>
       <h1>Team collaboration</h1>
-      <p className="dashboard-lead">Invite people to work in the same workspace, give each person the access they need, and keep reviews tied to clear roles.</p>
+      <p className="dashboard-lead">Invite teammates and choose their workspace access.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {inviteToken && (

@@ -198,6 +198,8 @@ router.get("/", async (req, res, next) => {
         instagramAccountConnected: Boolean(instagramAccount),
         instagramCompetitorInsightsAvailable: Boolean(facebookUserAccount && connectedFacebookPages),
         instagramCompetitorInsightsMessage: "Instagram Business Discovery requires Facebook Login with instagram_basic, instagram_manage_insights, pages_read_engagement, and an eligible linked professional account. Meta app review may be required.",
+        youtubeApiAvailable: Boolean(env.YOUTUBE_DATA_API_KEY),
+        xApiAvailable: Boolean(env.X_API_BEARER_TOKEN),
         message: `${env.TAVILY_API_KEY
           ? "Brand Profile can automatically discover and analyze up to three relevant providers when industry, products, or business description are saved."
           : "Configure a public web search API to enable automatic provider discovery."} Public post performance is available only where an approved API returns metrics; otherwise, record visible post links and counts as evidence.`,

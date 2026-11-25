@@ -73,7 +73,7 @@ export function ApprovalsClient() {
     <section className="dashboard-content approvals-page">
       <p className="eyebrow">YOUR STUDIO · PUBLISH</p>
       <h1>Post Approvals</h1>
-      <p className="dashboard-lead">Review posts and captions across your selected social channels, then approve them or request changes.</p>
+      <p className="dashboard-lead">Review posts, approve them, or request changes.</p>
       <div className="posts-toolbar approvals-toolbar">
         <label>Review status
           <CompactSelect aria-label="Review status" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>

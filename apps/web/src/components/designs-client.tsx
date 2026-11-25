@@ -289,7 +289,7 @@ export function DesignsClient() {
     <section className="dashboard-content designs-page">
       <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
       <h1>Saved designs</h1>
-      <p className="dashboard-lead">Each visual stays linked to the brief that created it. Open a design to review its source prompt, edit the artwork text, compare styles, or restore a saved version.</p>
+      <p className="dashboard-lead">Review, edit, and restore your saved brand designs.</p>
       <div className="design-toolbar">
         <label className="design-search">Search designs<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, brand, or platform" /></label>
         <label>Format<CompactSelect aria-label="Format filter" value={format} onChange={(event) => setFormat(event.target.value)}><option value="all">All formats</option>{formats.map((item) => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>

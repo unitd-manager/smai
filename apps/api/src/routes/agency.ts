@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireAuth, requireWritableWorkspace, requireWorkspace, requireWorkspaceRole } from "../middleware/auth.js";
+import { plans } from "@united-technologies/shared/plans";
 
 const router = Router();
 const createClientSchema = z.object({
@@ -59,7 +60,8 @@ async function getAgencyContext(req: Request, res: Response) {
     return current;
   });
 
-  return { workspace, reseller };
+  const clientCount = await prisma.workspace.count({ where: { resellerId: reseller.id, billingWorkspaceId: workspace.id, status: "ACTIVE" } });
+  return { workspace, reseller, clientCount, clientLimit: plans.agency.brands };
 }
 
 router.use(requireAuth, requireWorkspace);
@@ -84,7 +86,7 @@ router.get("/clients", async (req, res, next) => {
       },
     });
     res.json({
-      agency: { name: context.reseller.name, workspaceId: context.workspace.id },
+      agency: { name: context.reseller.name, workspaceId: context.workspace.id, clientCount: context.clientCount, clientLimit: context.clientLimit },
       clients: clients.map((client) => ({
         id: client.id,
         name: client.name,
@@ -103,6 +105,10 @@ router.post("/clients", requireWorkspaceRole("OWNER"), requireWritableWorkspace,
     const input = createClientSchema.parse(req.body);
     const context = await getAgencyContext(req, res);
     if (!context) return;
+    if (context.clientCount >= context.clientLimit) {
+      res.status(409).json({ error: `Your Agency plan supports up to ${context.clientLimit} client workspaces.` });
+      return;
+    }
     const client = await prisma.$transaction(async (tx) => {
       const workspace = await tx.workspace.create({
         data: {

@@ -8,7 +8,9 @@ import { Router } from "express";
 import { prisma } from "../db.js";
 import { approvalEmailConfigured, approvalEmailProvider, env, hasPartialSmtpConfiguration } from "../env.js";
 import { requireAuth, requireWorkspace, requireWorkspaceRole } from "../middleware/auth.js";
-import { getInstagramAccessToken } from "../services/instagram.js";
+import { getInstagramAccessToken, isInstagramConfigured } from "../services/instagram.js";
+import { isFacebookConfigured } from "../services/facebook.js";
+import { decryptSocialToken } from "../services/social-token-crypto.js";
 import { listMusicTracks, remotionBrowserStatus, videoToolStatus } from "../services/video-renderer.js";
 import { ttsConfiguration } from "../services/video-tts.js";
 
@@ -30,7 +32,7 @@ async function optionalExecutableAvailable(executable: string) {
 type Check = {
   id: string;
   label: string;
-  status: "ready" | "warning" | "error";
+  status: "ready" | "warning" | "error" | "not_configured";
   message: string;
   action?: string;
 };
@@ -77,6 +79,28 @@ router.use(requireAuth, requireWorkspace, requireWorkspaceRole("OWNER", "ADMIN")
 router.get("/status", async (req, res, next) => {
   try {
     const checks: Check[] = [];
+    checks.push({
+      id: "instagram-oauth",
+      label: "Instagram connection setup",
+      status: isInstagramConfigured() ? "ready" : "not_configured",
+      message: isInstagramConfigured() ? "Instagram OAuth settings are present." : "Instagram OAuth is not configured; live Instagram publishing cannot connect new accounts.",
+      ...(!isInstagramConfigured() ? { action: "Configure INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_REDIRECT_URI, and SOCIAL_TOKEN_ENCRYPTION_KEY in the API environment." } : {}),
+    });
+    checks.push({
+      id: "facebook-oauth",
+      label: "Facebook Page connection setup",
+      status: isFacebookConfigured() ? "ready" : "not_configured",
+      message: isFacebookConfigured() ? "Facebook OAuth is configured; Page text and image publishing is integrated. Page insights are not available." : "Facebook OAuth is not configured; Facebook Page accounts cannot be connected.",
+      ...(!isFacebookConfigured() ? { action: "Configure FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, FACEBOOK_REDIRECT_URI, and SOCIAL_TOKEN_ENCRYPTION_KEY in the API environment." } : {}),
+    });
+    checks.push(
+      { id: "linkedin-api", label: "LinkedIn publishing and analytics", status: "not_configured", message: "No LinkedIn OAuth, publishing, or analytics adapter is implemented in this app.", action: "Integrate LinkedIn's Community Management APIs and obtain product access and the required organization permissions before connecting accounts." },
+      { id: "tiktok-api", label: "TikTok publishing and analytics", status: "not_configured", message: "No TikTok OAuth or Content Posting adapter is implemented in this app.", action: "Integrate TikTok Content Posting API, configure OAuth client credentials, and complete the API audit required for public Direct Posts." },
+      { id: "youtube-api", label: "YouTube publishing and analytics", status: "not_configured", message: "No YouTube OAuth, video upload, or Analytics adapter is implemented in this app.", action: "Enable YouTube Data API and YouTube Analytics API in a Google Cloud project, then add OAuth consent and channel authorization. YOUTUBE_DATA_API_KEY is absent but does not replace OAuth." },
+      { id: "pinterest-api", label: "Pinterest publishing and analytics", status: "not_configured", message: "No Pinterest OAuth, Pins publishing, or analytics adapter is implemented in this app.", action: "Register a Pinterest app, implement OAuth and Pins API, and request Standard access for user-facing publishing." },
+      { id: "x-api", label: "X publishing and analytics", status: "not_configured", message: "No X user authorization or publishing adapter is implemented in this app. X_API_BEARER_TOKEN is absent.", action: "Implement X API user-context OAuth and confirm an acceptable usage-based API budget before enabling publishing." },
+      { id: "google-business-api", label: "Google Business Profile publishing and analytics", status: "not_configured", message: "No Business Profile OAuth, Local Posts, or Performance API adapter is implemented in this app.", action: "Request Google Business Profile API project access, enable the required APIs, and implement OAuth for eligible verified locations." },
+    );
     try {
       await prisma.$queryRaw`SELECT 1`;
       checks.push({ id: "database", label: "Database", status: "ready", message: "The workspace database is responding." });
@@ -212,8 +236,9 @@ router.get("/status", async (req, res, next) => {
       } else {
         for (const account of accounts) {
           const expired = account.tokenExpiresAt !== null && account.tokenExpiresAt.getTime() <= Date.now();
-          let valid = !expired && account.provider === "instagram";
-          if (valid) {
+          let valid = !expired;
+          let accountMessage = "The saved connection was verified with its platform.";
+          if (valid && account.provider === "instagram") {
             try {
               const { accessToken } = await getInstagramAccessToken(account);
               const tokenCheckUrl = new URL(`https://graph.instagram.com/${env.INSTAGRAM_GRAPH_API_VERSION}/me`);
@@ -221,16 +246,34 @@ router.get("/status", async (req, res, next) => {
               tokenCheckUrl.searchParams.set("access_token", accessToken);
               const tokenResponse = await fetch(tokenCheckUrl, { signal: AbortSignal.timeout(10_000) });
               valid = tokenResponse.ok;
+              if (!valid) accountMessage = "Instagram rejected the saved access token.";
             } catch (error) {
               console.error(`System status Instagram token check failed for account ${account.id}.`, error);
               valid = false;
+              accountMessage = "Instagram could not be reached to verify this token.";
             }
+          } else if (valid && (account.provider === "facebook" || account.provider === "facebook-user")) {
+            try {
+              const token = decryptSocialToken(account.encryptedTokens);
+              const target = account.provider === "facebook-user" ? "me" : encodeURIComponent(account.providerAccountId);
+              const tokenCheckUrl = new URL(`https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}/${target}`);
+              tokenCheckUrl.searchParams.set("fields", "id");
+              const tokenResponse = await fetch(tokenCheckUrl, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) });
+              valid = tokenResponse.ok;
+              if (!valid) accountMessage = "Meta rejected the saved access token.";
+            } catch (error) {
+              console.error(`System status Meta token check failed for account ${account.id}.`, error);
+              valid = false;
+              accountMessage = "Meta could not be reached or the saved token could not be decrypted.";
+            }
+          } else if (valid) {
+            accountMessage = "This connection is saved, but this platform has no token-check adapter yet.";
           }
           checks.push({
             id: `social-${account.id}`,
             label: `${account.provider} · ${account.displayName}`,
-            status: valid ? "ready" : "error",
-            message: valid ? "Instagram confirmed this account token." : expired ? "The saved connection has expired." : "The account token could not be verified.",
+            status: valid && !["instagram", "facebook", "facebook-user"].includes(account.provider) ? "warning" : valid ? "ready" : "error",
+            message: expired ? "The saved connection has expired." : accountMessage,
             ...(!valid ? { action: "Reconnect this account from Social Accounts and retry the check." } : {}),
           });
         }
@@ -242,7 +285,7 @@ router.get("/status", async (req, res, next) => {
 
     const status = checks.some((check) => check.status === "error")
       ? "attention"
-      : checks.some((check) => check.status === "warning")
+      : checks.some((check) => check.status === "warning" || check.status === "not_configured")
         ? "degraded"
         : "ready";
     res.json({ status, checkedAt: new Date().toISOString(), checks });

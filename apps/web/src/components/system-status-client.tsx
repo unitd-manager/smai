@@ -7,7 +7,7 @@ import { apiRequest } from "@/lib/api";
 type StatusCheck = {
   id: string;
   label: string;
-  status: "ready" | "warning" | "error";
+  status: "ready" | "warning" | "error" | "not_configured";
   message: string;
   action?: string;
 };
@@ -63,7 +63,7 @@ export function SystemStatusClient() {
             <article className={`system-status-card is-${check.status}`} key={check.id}>
               <span className="system-status-indicator" aria-hidden="true" />
               <div><h2>{check.label}</h2><p>{check.message}</p>{check.action && <small>{check.action}</small>}</div>
-              <strong>{check.status === "ready" ? "Ready" : check.status === "warning" ? "Check" : "Action needed"}</strong>
+              <strong>{check.status === "ready" ? "Ready" : check.status === "warning" ? "Check" : check.status === "not_configured" ? "Not configured" : "Action needed"}</strong>
             </article>
           ))}
         </div>

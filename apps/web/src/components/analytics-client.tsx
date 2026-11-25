@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, CalendarClock, CircleAlert, Send } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarClock, CircleAlert, Eye, Lightbulb, Send, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiRequest, postsUpdatedEvent } from "@/lib/api";
 
@@ -18,6 +18,17 @@ type AnalyticsPost = {
     publishedAt: string | null;
     publishingMode: "live" | "demo";
   }>;
+};
+
+type InstagramInsightPost = {
+  id: string;
+  caption: string;
+  mediaType: string;
+  timestamp: string | null;
+  permalink: string | null;
+  likes: number | null;
+  commentsCount: number | null;
+  insights: Record<string, number | null>;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -141,6 +152,9 @@ export function AnalyticsClient() {
   const [now, setNow] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [instagramPosts, setInstagramPosts] = useState<InstagramInsightPost[] | null>(null);
+  const [instagramError, setInstagramError] = useState("");
+  const [instagramLoading, setInstagramLoading] = useState(true);
 
   const loadAnalytics = useCallback(async () => {
     setLoading(true);
@@ -171,6 +185,17 @@ export function AnalyticsClient() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadAnalytics]);
+
+  useEffect(() => {
+    let active = true;
+    apiRequest<{ posts: InstagramInsightPost[] }>("/api/listening")
+      .then((response) => { if (active) { setInstagramPosts(response.posts); setInstagramError(""); } })
+      .catch((requestError: unknown) => {
+        if (active) setInstagramError(requestError instanceof Error ? requestError.message : "Instagram insights are unavailable.");
+      })
+      .finally(() => { if (active) setInstagramLoading(false); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const refreshAnalytics = () => void loadAnalytics();
@@ -265,7 +290,50 @@ export function AnalyticsClient() {
     };
   }, [now, period, posts]);
 
+  const instagramSummary = useMemo(() => {
+    const postsWithInteractions = (instagramPosts ?? []).map((post) => ({
+      post,
+      interactions: post.insights.total_interactions ?? ((post.likes ?? 0) + (post.commentsCount ?? 0) + (post.insights.shares ?? 0) + (post.insights.saved ?? 0)),
+    }));
+    const availableSum = (key: string) => {
+      const values = (instagramPosts ?? []).map((post) => post.insights[key]).filter((value): value is number => typeof value === "number");
+      return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+    };
+    const bestPost = [...postsWithInteractions].filter(({ interactions }) => interactions > 0).sort((a, b) => b.interactions - a.interactions)[0]?.post ?? null;
+    return {
+      reach: availableSum("reach"),
+      views: availableSum("views"),
+      interactions: postsWithInteractions.some(({ post }) => typeof post.insights.total_interactions === "number" || post.likes !== null || post.commentsCount !== null || typeof post.insights.shares === "number" || typeof post.insights.saved === "number")
+        ? postsWithInteractions.reduce((sum, item) => sum + item.interactions, 0)
+        : null,
+      likes: (instagramPosts ?? []).some((post) => post.likes !== null) ? (instagramPosts ?? []).reduce((sum, post) => sum + (post.likes ?? 0), 0) : null,
+      comments: (instagramPosts ?? []).some((post) => post.commentsCount !== null) ? (instagramPosts ?? []).reduce((sum, post) => sum + (post.commentsCount ?? 0), 0) : null,
+      bestPost,
+    };
+  }, [instagramPosts]);
+
   const maxPlatformCount = Math.max(1, ...summary.byPlatform.map(([, count]) => count));
+  const leadingPlatform = summary.byPlatform[0];
+  const nextAction = summary.failed > 0
+    ? {
+      title: "Review publishing issues",
+      detail: `${summary.failed} live ${summary.failed === 1 ? "target needs" : "targets need"} attention.`,
+      href: "/dashboard/posts",
+      link: "Review posts",
+    }
+    : summary.scheduled === 0
+      ? {
+        title: "Schedule your next post",
+        detail: "No queued or pending live targets were found.",
+        href: "/dashboard/calendar",
+        link: "Open calendar",
+      }
+      : {
+        title: "Review the publishing queue",
+        detail: `${summary.scheduled} live ${summary.scheduled === 1 ? "target is" : "targets are"} queued or pending.`,
+        href: "/dashboard/calendar",
+        link: "View schedule",
+      };
 
   return (
     <section className="dashboard-content analytics-page">
@@ -280,6 +348,67 @@ export function AnalyticsClient() {
       {error && <p className="form-error" role="alert">{error}</p>}
       {loading ? <p className="loading-label" role="status">Loading publishing activity…</p> : (
         <>
+          <section className="analytics-marketing-snapshot" aria-labelledby="analytics-snapshot-title">
+            <header className="analytics-section-heading">
+              <div><p className="card-kicker">MARKETING SNAPSHOT</p><h2 id="analytics-snapshot-title">Your publishing at a glance</h2></div>
+              <span className="analytics-data-source">Live publishing records</span>
+            </header>
+            <div className="analytics-snapshot-grid">
+              <article className="analytics-snapshot-card is-published">
+                <span>Published posts</span><strong>{summary.published}</strong>
+                <small>In the selected period</small><Send size={17} aria-hidden="true" />
+              </article>
+              <article className="analytics-snapshot-card is-channel">
+                <span>Most active platform</span><strong>{leadingPlatform?.[0] ?? "—"}</strong>
+                <small>{leadingPlatform ? `${leadingPlatform[1]} confirmed live ${leadingPlatform[1] === 1 ? "post" : "posts"}` : "No confirmed live posts in this period"}</small>
+                <ArrowUpRight size={17} aria-hidden="true" />
+              </article>
+              <article className="analytics-snapshot-card is-queued">
+                <span>Queued live targets</span><strong>{summary.scheduled}</strong>
+                <small>Waiting or pending publication</small><CalendarClock size={17} aria-hidden="true" />
+              </article>
+              <article className="analytics-snapshot-card is-unavailable">
+                <span>Instagram reach</span><strong>{instagramLoading ? "Loading" : instagramSummary.reach === null ? "Unavailable" : instagramSummary.reach.toLocaleString()}</strong>
+                <small>{instagramSummary.reach === null ? "Instagram account insights only; other platforms unavailable" : "Recent Instagram media · live API insights"}</small><Eye size={17} aria-hidden="true" />
+              </article>
+            </div>
+            <div className="analytics-instagram-detail" aria-live="polite">
+              {instagramError
+                ? <p>Instagram insights unavailable: {instagramError}</p>
+                : instagramLoading
+                  ? <p>Checking connected Instagram insights…</p>
+                  : !instagramPosts?.length
+                    ? <p>No Instagram posts are available for insights. Connect an eligible professional account with Insights permission.</p>
+                    : <>
+                      <div><span>Recent-post views</span><strong>{instagramSummary.views === null ? "Unavailable" : instagramSummary.views.toLocaleString()}</strong></div>
+                      <div><span>Likes</span><strong>{instagramSummary.likes === null ? "Unavailable" : instagramSummary.likes.toLocaleString()}</strong></div>
+                      <div><span>Comments</span><strong>{instagramSummary.comments === null ? "Unavailable" : instagramSummary.comments.toLocaleString()}</strong></div>
+                      <div><span>Interactions</span><strong>{instagramSummary.interactions === null ? "Unavailable" : instagramSummary.interactions.toLocaleString()}</strong></div>
+                      {instagramSummary.bestPost && (instagramSummary.bestPost.permalink
+                        ? <a href={instagramSummary.bestPost.permalink} target="_blank" rel="noreferrer"><span>Highest interaction count · Instagram</span><strong>{instagramSummary.bestPost.caption.trim().slice(0, 90) || instagramSummary.bestPost.mediaType} · {instagramSummary.bestPost.insights.total_interactions ?? ((instagramSummary.bestPost.likes ?? 0) + (instagramSummary.bestPost.commentsCount ?? 0))} interactions</strong></a>
+                        : <div><span>Highest interaction count · Instagram</span><strong>{instagramSummary.bestPost.caption.trim().slice(0, 90) || instagramSummary.bestPost.mediaType} · {instagramSummary.bestPost.insights.total_interactions ?? ((instagramSummary.bestPost.likes ?? 0) + (instagramSummary.bestPost.commentsCount ?? 0))} interactions</strong></div>)}
+                    </>}
+            </div>
+          </section>
+
+          <section className="analytics-insights-panel analytics-panel" aria-labelledby="analytics-insights-title">
+            <div className="analytics-section-heading">
+              <div><p className="card-kicker">ACTIONABLE INSIGHTS</p><h2 id="analytics-insights-title">What to do next</h2></div>
+              <Sparkles size={18} aria-hidden="true" />
+            </div>
+            <div className="analytics-insights-grid">
+              <article>
+                <span className="analytics-insight-icon"><Lightbulb size={17} aria-hidden="true" /></span>
+                <div><strong>Recommended next action</strong><p>{nextAction.title} · {nextAction.detail}</p><Link href={nextAction.href}>{nextAction.link} <ArrowRight size={13} aria-hidden="true" /></Link></div>
+              </article>
+              <article>
+                <span className="analytics-insight-icon is-muted"><Eye size={17} aria-hidden="true" /></span>
+                <div><strong>{instagramSummary.bestPost ? "Strongest recent Instagram post" : "Broader performance rankings unavailable"}</strong><p>{instagramSummary.bestPost ? `${instagramSummary.bestPost.caption.trim().slice(0, 140) || instagramSummary.bestPost.mediaType}. Instagram's reported interactions are shown in the snapshot; category and cross-platform rankings need more connected metrics.` : "Best post, content category, and publishing time require platform engagement metrics. Instagram insights are shown when the connected account provides them."}</p></div>
+              </article>
+            </div>
+            <p className="analytics-data-limit">Instagram metrics come from recent media insights and may be unavailable for some formats or permissions. Cross-platform impressions, audience growth, and campaign attribution are not connected. No sample performance figures are shown as real results.</p>
+          </section>
+
           <div className="analytics-dashboard-overview">
             <div className="analytics-summary-stack">
               <article className="analytics-kpi-published"><span>Published posts</span><strong>{summary.published}</strong><small>In the selected period</small><span className="analytics-kpi-icon" aria-hidden="true"><Send size={18} /></span></article>

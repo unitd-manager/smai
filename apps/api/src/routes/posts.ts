@@ -246,21 +246,24 @@ router.post("/approvals/:id/review", requireWorkspaceRole("OWNER", "ADMIN", "EDI
       res.status(409).json({ error: "This approval request has already been reviewed." });
       return;
     }
-    let instagramAccountId: string | null = null;
+    let accountIdByPlatform = new Map<string, string>();
     if (input.status === "APPROVED" && approval.post.scheduledAt) {
-      if (approval.post.targets.some((target) => target.platform !== "Instagram")) {
-        res.status(409).json({ error: "Live publishing is currently connected for Instagram only. Update the post channels before approving it for publishing." });
+      const platforms = [...new Set(approval.post.targets.map((target) => target.platform))];
+      const unsupported = platforms.filter((platform) => !["Instagram", "Facebook"].includes(platform));
+      if (unsupported.length) {
+        res.status(409).json({ error: `Live publishing is not integrated for ${unsupported.join(", ")}. Remove those channels or save them as drafts before approving this post.` });
         return;
       }
-      const account = await prisma.socialAccount.findFirst({
-        where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
-        select: { id: true },
+      const accounts = await prisma.socialAccount.findMany({
+        where: { workspaceId: req.workspace!.id, provider: { in: platforms.map((platform) => platform.toLowerCase()) }, status: "CONNECTED" },
+        select: { id: true, provider: true },
       });
-      if (!account) {
-        res.status(409).json({ error: "Connect an Instagram Professional account before approving this scheduled post for live publishing." });
+      accountIdByPlatform = new Map(accounts.map((account) => [account.provider === "instagram" ? "Instagram" : "Facebook", account.id]));
+      const missing = platforms.filter((platform) => !accountIdByPlatform.has(platform));
+      if (missing.length) {
+        res.status(409).json({ error: `Connect ${missing.join(" and ")} before approving this scheduled post for live publishing.` });
         return;
       }
-      instagramAccountId = account.id;
     }
     const reviewed = await prisma.$transaction(async (tx) => {
       const result = await tx.approval.update({
@@ -276,7 +279,9 @@ router.post("/approvals/:id/review", requireWorkspaceRole("OWNER", "ADMIN", "EDI
       });
       if (input.status === "APPROVED" && approval.post.scheduledAt) {
         await tx.post.update({ where: { id: approval.postId }, data: { status: "SCHEDULED" } });
-        await tx.postTarget.updateMany({ where: { postId: approval.postId, workspaceId: req.workspace!.id, platform: "Instagram" }, data: { status: "PENDING", socialAccountId: instagramAccountId } });
+        for (const [platform, socialAccountId] of accountIdByPlatform) {
+          await tx.postTarget.updateMany({ where: { postId: approval.postId, workspaceId: req.workspace!.id, platform }, data: { status: "PENDING", socialAccountId } });
+        }
         await tx.publishJob.createMany({
           data: approval.post.targets.map((target) => ({
             workspaceId: target.workspaceId,
@@ -421,7 +426,7 @@ router.get("/", async (req, res, next) => {
           where: {
             id: { in: accountIds },
             workspaceId: req.workspace!.id,
-            provider: "instagram",
+            provider: { in: ["instagram", "facebook"] },
             status: "CONNECTED",
           },
           select: { id: true },
@@ -432,10 +437,10 @@ router.get("/", async (req, res, next) => {
       ...post,
       targets: post.targets.map((target) => ({
         ...target,
-        publishingMode: target.platform === "Instagram" && target.socialAccountId &&
+        publishingMode: ["Instagram", "Facebook"].includes(target.platform) && target.socialAccountId &&
           connectedAccountIds.has(target.socialAccountId) ? "live" : "demo",
       })),
-      demoMode: post.targets.some((target) => target.platform !== "Instagram" || !target.socialAccountId ||
+      demoMode: post.targets.some((target) => !["Instagram", "Facebook"].includes(target.platform) || !target.socialAccountId ||
         !connectedAccountIds.has(target.socialAccountId)),
     }));
     res.json({ posts });
@@ -619,22 +624,38 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
       res.status(415).json({ error: "PDF files are for reference and cannot be scheduled as social posts." });
       return;
     }
-    const instagramAccount = input.platforms.includes("Instagram")
-      ? await prisma.socialAccount.findFirst({
-          where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
-          select: { id: true },
-        })
-      : null;
+    const [instagramAccount, facebookAccount] = await Promise.all([
+      input.platforms.includes("Instagram")
+        ? prisma.socialAccount.findFirst({
+            where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED", OR: [{ brandId: content.brandId }, { brandId: null }] },
+            select: { id: true },
+          })
+        : null,
+      input.platforms.includes("Facebook")
+        ? prisma.socialAccount.findFirst({
+            where: { workspaceId: req.workspace!.id, provider: "facebook", status: "CONNECTED" },
+            select: { id: true },
+          })
+        : null,
+    ]);
+    if (scheduled && input.platforms.includes("Facebook") && !facebookAccount) {
+      res.status(409).json({ error: "Connect a Facebook Page before scheduling this post. Draft-only channels are available from Save as draft." });
+      return;
+    }
     const importedVideo = mediaAsset?.mimeType === "video/mp4";
     if ((videoJob || importedVideo) && (input.platforms.length !== 1 || input.platforms[0] !== "Instagram")) {
       res.status(400).json({ error: "Live video publishing is currently supported only for Instagram Reels. Select Instagram to publish this video." });
+      return;
+    }
+    if ((videoJob || importedVideo) && input.platforms.includes("Facebook")) {
+      res.status(400).json({ error: "Facebook Page video publishing is not supported yet. Select Instagram for live Reel publishing or save the video as a draft." });
       return;
     }
     if ((videoJob || importedVideo) && !instagramAccount) {
       res.status(400).json({ error: "Connect an Instagram Professional account in Social Accounts before publishing this video." });
       return;
     }
-    if (instagramAccount && (videoJob || mediaAsset || design)) {
+    if ((instagramAccount || facebookAccount) && (videoJob || mediaAsset || design)) {
       try {
         await assertInstagramMediaHostingAvailable();
       } catch (error) {
@@ -650,7 +671,7 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
     const carouselMedia = contentData.format === "carousel" && document
       ? document.pages.map((_page, index) => renderDesignPageSvg(document, index))
       : null;
-    if (instagramAccount && contentData.format === "carousel" &&
+    if ((instagramAccount || facebookAccount) && contentData.format === "carousel" &&
       (!carouselMedia || carouselMedia.length < 2 || carouselMedia.length > 10)) {
       res.status(400).json({ error: "The selected Instagram carousel design must contain between 2 and 10 slides." });
       return;
@@ -682,7 +703,7 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
           resellerId: req.workspace!.resellerId,
           postId: created.id,
           platform,
-          socialAccountId: platform === "Instagram" ? instagramAccount?.id ?? null : null,
+          socialAccountId: platform === "Instagram" ? instagramAccount?.id ?? null : platform === "Facebook" ? facebookAccount?.id ?? null : null,
           captionOverride: input.captionOverrides?.[platform] ?? input.caption ?? (platform === "Instagram"
             ? getInstagramCaption(contentData)
             : getPlatformCaption(contentData, platform) ?? contentCaption),
@@ -691,7 +712,7 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
             ? [{ type: importedVideo ? "video" : "image", mediaAssetId: mediaAsset.id }]
             : videoJob?.outputKey
             ? [{ type: "video", storageKey: videoJob.outputKey }]
-            : platform === "Instagram" && carouselMedia
+            : (platform === "Instagram" || platform === "Facebook") && carouselMedia
               ? carouselMedia
               : design?.previewUrl ? [design.previewUrl] : Prisma.JsonNull,
         })),
@@ -762,7 +783,7 @@ router.post("/", requireWritableWorkspace, async (req, res, next) => {
       });
       return;
     }
-    const demoMode = input.platforms.some((platform) => platform !== "Instagram" || !instagramAccount);
+    const demoMode = input.platforms.some((platform) => platform === "Instagram" ? !instagramAccount : platform === "Facebook" ? !facebookAccount : true);
     res.status(201).json({ post: response, demoMode });
   } catch (error) {
     next(error);

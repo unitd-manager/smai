@@ -1,5 +1,6 @@
 import { prisma } from "../db.js";
 import { publishInstagramPost } from "./instagram.js";
+import { publishFacebookPagePost } from "./facebook.js";
 
 type PublishResult = { platformPostId: string; publishedAt: Date; publishedUrl?: string | null };
 
@@ -124,28 +125,37 @@ export async function publishDueJobs(postId?: string) {
       if (!target) throw new Error("Publish target was not found in the job workspace.");
       let result: PublishResult;
       if (target.socialAccountId) {
-        if (target.platform !== "Instagram") {
+        if (target.platform === "Instagram") {
+          const account = await prisma.socialAccount.findFirst({
+            where: { id: target.socialAccountId, workspaceId: job.workspaceId, provider: "instagram", status: "CONNECTED" },
+            select: { id: true, providerAccountId: true, encryptedTokens: true, tokenExpiresAt: true },
+          });
+          if (!account) throw new Error("The connected Instagram account is no longer available. Reconnect it and retry.");
+          result = await publishInstagramPost({
+            targetId: target.id,
+            socialAccountId: account.id,
+            providerAccountId: account.providerAccountId,
+            encryptedTokens: account.encryptedTokens,
+            tokenExpiresAt: account.tokenExpiresAt,
+            caption: target.captionOverride ?? "",
+            media: target.media,
+          });
+        } else if (target.platform === "Facebook") {
+          const account = await prisma.socialAccount.findFirst({
+            where: { id: target.socialAccountId, workspaceId: job.workspaceId, provider: "facebook", status: "CONNECTED" },
+            select: { providerAccountId: true, encryptedTokens: true },
+          });
+          if (!account) throw new Error("The connected Facebook Page is no longer available. Reconnect it and retry.");
+          result = await publishFacebookPagePost({
+            pageId: account.providerAccountId,
+            encryptedPageToken: account.encryptedTokens,
+            targetId: target.id,
+            caption: target.captionOverride ?? "",
+            media: target.media,
+          });
+        } else {
           throw new Error(`Live publishing is not supported for ${target.platform} yet.`);
         }
-        const account = await prisma.socialAccount.findFirst({
-          where: {
-            id: target.socialAccountId,
-            workspaceId: job.workspaceId,
-            provider: "instagram",
-            status: "CONNECTED",
-          },
-          select: { id: true, providerAccountId: true, encryptedTokens: true, tokenExpiresAt: true },
-        });
-        if (!account) throw new Error("The connected Instagram account is no longer available. Reconnect it and retry.");
-        result = await publishInstagramPost({
-          targetId: target.id,
-          socialAccountId: account.id,
-          providerAccountId: account.providerAccountId,
-          encryptedTokens: account.encryptedTokens,
-          tokenExpiresAt: account.tokenExpiresAt,
-          caption: target.captionOverride ?? "",
-          media: target.media,
-        });
       } else {
         result = await demoPublisher.publish({
           jobId: job.id,

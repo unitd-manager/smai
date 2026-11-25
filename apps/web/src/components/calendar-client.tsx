@@ -217,7 +217,7 @@ export function CalendarClient() {
     <section className="dashboard-content calendar-page">
       <p className="eyebrow">YOUR STUDIO · PUBLISH</p>
       <h1>Publishing calendar</h1>
-      <p className="dashboard-lead">See scheduled posts and publishing history by date. Choose a day to start a post with its date prefilled.</p>
+      <p className="dashboard-lead">See what is scheduled and published across your calendar.</p>
       <div className="calendar-toolbar">
         <div className="calendar-month-controls">
           <button type="button" aria-label="Previous calendar period" onClick={() => moveCalendar(-1)}><ChevronLeft size={19} /></button>

@@ -84,12 +84,6 @@ export function InboxClient() {
     (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""),
   ), [conversations]);
 
-  useEffect(() => {
-    if (selectedConversation && selectedConversationId !== selectedConversation.id) {
-      setSelectedConversationId(selectedConversation.id);
-    }
-  }, [selectedConversation, selectedConversationId]);
-
   async function sendReply(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedAccount || !selectedConversation || !messageText.trim()) return;
@@ -117,7 +111,7 @@ export function InboxClient() {
   return (
     <section className="dashboard-content inbox-page">
       <header className="inbox-page-heading">
-        <div className="inbox-heading-copy"><p className="eyebrow">GROW · MESSAGES</p><h1>Inbox</h1><p className="dashboard-lead">Read and reply to Instagram Direct and Facebook Page conversations from this workspace.</p></div>
+        <div className="inbox-heading-copy"><p className="eyebrow">GROW · MESSAGES</p><h1>Inbox</h1><p className="dashboard-lead">Reply to Instagram and Facebook messages.</p></div>
         <button className="button button-gold inbox-refresh-button" type="button" onClick={() => void loadInbox(true)} disabled={loading || refreshing}>{refreshing ? "Refreshing…" : "Refresh inbox"}</button>
       </header>
       {error && accounts.length > 0 && <p className="form-error" role="alert">{error}</p>}

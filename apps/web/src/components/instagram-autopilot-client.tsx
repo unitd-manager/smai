@@ -103,11 +103,9 @@ export function InstagramAutopilotClient() {
         <div>
           <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
           <h1>Autopilot</h1>
-          <p className="dashboard-lead">
-            Every week, Autopilot creates fresh posts and carousels using this brand&apos;s profile, services, audience, voice, and goals. It emails the drafts for your review; it never publishes without your approval.
-          </p>
+          <p className="dashboard-lead">Build a brand-aware batch. Review every post before it goes live.</p>
         </div>
-        <span className="instagram-autopilot-approval-badge">Approval-first scheduling</span>
+        <Link className="instagram-autopilot-approval-badge" href="/dashboard/settings/publishing">{status?.brand.instagramAutopilotEnabled ? "Weekly schedule · On" : "Weekly schedule · Off"}</Link>
       </header>
 
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -117,8 +115,8 @@ export function InstagramAutopilotClient() {
         <div>
           <p className="eyebrow">WEEKLY AUTOMATION</p>
           <h2>{status?.brand.name ?? "Your brand"} · Brand-specific content</h2>
-          <p>When weekly Autopilot is enabled in Brand Profile, it generates a new seven-day batch automatically and emails it to the workspace owner. Drafts stay in review until you approve them.</p>
-          {status && <small>Connected channel{status.brand.connectedPlatforms.length === 1 ? "" : "s"}: {status.brand.connectedPlatforms.join(", ") || "none"} · Brand time zone: {status.brand.timezone}</small>}
+          <p>Approval-first · nothing publishes without your review.</p>
+          {status && <small>{status.brand.connectedPlatforms.join(" · ") || "No connected channels"} · {status.brand.timezone}</small>}
         </div>
         <button
           type="button"
@@ -135,7 +133,7 @@ export function InstagramAutopilotClient() {
           <div>
             <p className="eyebrow">BATCH SETTINGS</p>
             <h2 id="autopilot-mix-heading">Schedule and content mix</h2>
-            <p>Choose the formats and timing for this batch. Posts are spread across your selected dates in the brand time zone.</p>
+            <p>Set the batch window and creative mix.</p>
           </div>
           <label className="instagram-autopilot-days">
             <span>Number of days</span>
@@ -150,7 +148,7 @@ export function InstagramAutopilotClient() {
               />
               <span>days</span>
             </div>
-            <small>Schedule from 1 to 30 days</small>
+            <small>1–30 days</small>
           </label>
         </div>
         <label className="instagram-autopilot-campaign">
@@ -162,11 +160,11 @@ export function InstagramAutopilotClient() {
             onChange={(event) => setCampaignGoal(event.target.value)}
             placeholder="For example: World AIDS Day awareness, a service launch, or this month's confirmed offer"
           />
-          <small>Autopilot uses this only when it fits your saved business profile. It will not invent prices or claims.</small>
+          <small>Grounded in your saved brand profile.</small>
         </label>
         <div className="instagram-autopilot-formats-heading">
           <h3>Content formats</h3>
-          <span>Set the number of items for each format</span>
+          <span>Set each format quantity</span>
         </div>
         <div className="instagram-autopilot-format-grid">
           {formatOptions.map((format) => (
@@ -187,13 +185,13 @@ export function InstagramAutopilotClient() {
         {requestsVideo && <p className="notice notice-gold" role="note">This batch sends {videoCount} video request{videoCount === 1 ? "" : "s"} to Magic Hour and uses its account credits. Check the available balance in Video Studio before generating.</p>}
         {requestsVideo && videoBlockers && videoBlockers.length > 0 ? <div className="notice notice-gold" role="status"><strong>Magic Hour video setup:</strong><ul>{videoBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div> : null}
         {requestsVideo && !videoBlockers && <p className="notice notice-gold" role="status">Video setup status is unavailable. Restart the API and refresh this page before generating videos.</p>}
-        {(counts["linkedin-banner"] > 0 || counts["facebook-cover"] > 0) && <p className="video-music-license">LinkedIn and Facebook formats will be generated and included in review. Live publishing is currently connected to Instagram only, so these channel specific assets remain downloadable drafts.</p>}
+        {(counts["linkedin-banner"] > 0 || counts["facebook-cover"] > 0) && <p className="video-music-license">LinkedIn and Facebook cover assets are delivered as drafts.</p>}
       </section>
 
       {!loading && status && (!status.ready || (requestsVideo && !videoReady)) && (
         <section className="instagram-autopilot-readiness" aria-labelledby="autopilot-readiness-heading">
           <h2 id="autopilot-readiness-heading">Complete setup before generating</h2>
-          <p>These are required to generate scheduled posts and send their approval email:</p>
+          <p>Finish setup to generate this batch:</p>
           <ul>{[...blockers, ...(requestsVideo ? (videoBlockers ?? ["Video setup status is unavailable. Restart the API and refresh this page before generating videos."]) : [])].map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
           <div className="instagram-autopilot-links">
             <Link href="/onboarding">Review brand profile</Link>
@@ -202,13 +200,13 @@ export function InstagramAutopilotClient() {
         </section>
       )}
 
-      {loading && <p className="loading-label" role="status">Checking Autopilot setup…</p>}
+      {loading && <p className="loading-label" role="status">Checking setup…</p>}
       {latestRun && (
         <section className={`instagram-autopilot-run${latestRun.status === "FAILED" ? " is-error" : ""}`} aria-live="polite">
           <h2>Latest batch: {runStatusLabel(latestRun.status)}</h2>
           <p>Started {new Date(latestRun.createdAt).toLocaleString()}</p>
-          {isProcessing && <p>Keep this page open to follow progress. Autopilot checks rendering and generation automatically.</p>}
-          {latestRun.status === "IN_REVIEW" && <p>The drafts are waiting for review. Check the configured approval email inbox; nothing publishes until the posts are approved.</p>}
+          {isProcessing && <p>Generation is in progress.</p>}
+          {latestRun.status === "IN_REVIEW" && <p>Batch ready for approval.</p>}
           {latestRun.error && <p className="form-error" role="alert">{latestRun.error}</p>}
           <div className="instagram-autopilot-links">
             <Link href="/dashboard/approvals">Open approvals</Link>

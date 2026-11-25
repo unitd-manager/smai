@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { ApiError, apiRequest } from "@/lib/api";
@@ -108,7 +109,7 @@ export function CustomAiArtworkClient() {
         {configured === false && <p className="ai-artwork-error" role="status">Image generation needs GROQ_API_KEY or GOOGLE_AI_STUDIO_API_KEY in API configuration.</p>}
         {error && <p className="ai-artwork-error" role="alert">{error}</p>}
       </form>
-      {design && <article className="ai-artwork-result"><div className="ai-artwork-result-preview"><Image src={design.previewUrl} alt={`AI-generated ${design.format} design: ${design.title}`} width={720} height={920} unoptimized /></div><div><p className="eyebrow">YOUR NEW DESIGN</p><h3>{design.title}</h3><p>Saved in Gallery and Designs.</p><div className="ai-artwork-result-actions"><a className="button button-outline" href="/dashboard/designs">Edit design <ArrowRight size={15} /></a><button type="button" className="button button-gold" disabled={saving || saved} onClick={() => void saveDraft()}>{saving ? "Saving…" : saved ? "Draft saved" : "Save as draft"}</button></div></div></article>}
+        {design && <article className="ai-artwork-result"><div className="ai-artwork-result-preview"><Image src={design.previewUrl} alt={`AI-generated ${design.format} design: ${design.title}`} width={720} height={920} unoptimized /></div><div><p className="eyebrow">YOUR NEW DESIGN</p><h3>{design.title}</h3><p>Saved in Gallery and Designs.</p><div className="ai-artwork-result-actions"><Link className="button button-outline" href="/dashboard/designs">Edit design <ArrowRight size={15} /></Link><button type="button" className="button button-gold" disabled={saving || saved} onClick={() => void saveDraft()}>{saving ? "Saving…" : saved ? "Draft saved" : "Save as draft"}</button></div></div></article>}
     </section>
   );
 }

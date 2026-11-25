@@ -203,7 +203,7 @@ export async function getInstagramListeningData(account: {
   }).slice(0, 30);
 
   const posts = await Promise.all(media.map(async (post) => {
-    let insights: Record<string, number | null> = {};
+    const insights: Record<string, number | null> = {};
     try {
       const insightsResponse = await instagramGet(
         `${encodeURIComponent(post.id)}/insights`,

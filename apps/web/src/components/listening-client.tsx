@@ -94,7 +94,7 @@ export function ListeningClient() {
         <div>
           <p className="eyebrow">GROW · INSTAGRAM ACTIVITY</p>
           <h1>Listening</h1>
-          <p className="dashboard-lead">Track your connected Instagram account’s posts, likes, and comments. This page monitors your own account, not public competitor feeds.</p>
+          <p className="dashboard-lead">See recent post reach, engagement, and comments.</p>
         </div>
         <button className="button button-gold" type="button" onClick={() => void load(true)} disabled={loading || refreshing}>
           {refreshing ? "Refreshing…" : "Refresh activity"}
@@ -117,7 +117,7 @@ export function ListeningClient() {
                 {data.accounts.map((account) => <option key={account.id} value={account.id}>{account.displayName}</option>)}
               </select>
             </label>
-            <div className="listening-updated">{updatedAt ? `Updated ${date(updatedAt)}` : "Waiting for first refresh"} · refreshes every 5 minutes while this page is open</div>
+          <div className="listening-updated">{updatedAt ? `Updated ${date(updatedAt)}` : "Waiting for first refresh"} · 5 min refresh</div>
           </div>
           <div className="listening-stats" aria-label="Recent Instagram activity totals">
             <article><span>Posts loaded</span><strong>{data.posts.length}</strong></article>

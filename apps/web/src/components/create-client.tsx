@@ -586,7 +586,7 @@ export function CreateClient() {
     <section className="dashboard-content create-page">
       <p className="eyebrow">YOUR STUDIO · CREATE</p>
       <h1>Create content</h1>
-      <p className="dashboard-lead">Choose one format for each draft—like a flyer, brochure or carousel. For animated character videos, use the dedicated <Link href="/dashboard/videos">Video Studio</Link>.</p>
+      <p className="dashboard-lead">Create branded social posts, carousels, flyers, and brochures.</p>
       <CustomAiArtworkClient />
       {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
       <form className="create-form" onSubmit={(event) => generate(event)}>

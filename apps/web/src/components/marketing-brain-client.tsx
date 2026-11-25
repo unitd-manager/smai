@@ -34,7 +34,6 @@ export function MarketingBrainClient() {
   const [data, setData] = useState<BrainResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [busyId, setBusyId] = useState("");
 
   const load = useCallback(async () => {
@@ -86,30 +85,29 @@ export function MarketingBrainClient() {
       <div className="dashboard-tools-heading brain-page-heading">
         <div>
           <h1>Marketing Brain</h1>
-          <p className="dashboard-lead">Practical next steps grounded in your brand profile and workspace activity.</p>
+          <p className="dashboard-lead">Your next best marketing move, backed by brand and channel signals.</p>
         </div>
-        <button className="button button-outline" type="button" onClick={() => setHelpOpen((open) => !open)} aria-expanded={helpOpen}>
-          What is this?
+        <button className="button button-outline" type="button" onClick={() => { setLoading(true); void load(); }} disabled={loading}>
+          {loading ? "Updating…" : "Refresh insights"}
         </button>
       </div>
-      {helpOpen && <div className="notice"><strong>How recommendations work</strong><p>Suggestions use your saved profile and recent workspace activity. They are guidance, not promises of results. Nothing is published automatically.</p></div>}
       {error && <div className="notice notice-error" role="alert"><p>{error}</p><button className="button button-outline" type="button" onClick={() => { setLoading(true); void load(); }}>Try again</button></div>}
       {loading && <p className="loading-label">Reviewing your brand and recent activity…</p>}
       {!loading && data && <>
         <section className="brain-hero-grid" aria-label="Marketing health overview">
-          <article className="brain-health-card"><span className="card-kicker">MARKETING HEALTH</span><strong>{data.health.score}</strong><span>/100 · {data.health.label}</span><div className="brain-health-meter" aria-label={`${data.health.score} out of 100`}><i style={{ width: `${data.health.score}%` }} /></div><small>{data.health.signals} of {data.health.totalSignals} foundation signals are active</small></article>
-          <article className="brain-next-card"><span className="card-kicker">WHAT SHOULD WE DO NEXT?</span><h2>{data.priorities[0] ?? "Keep publishing and review results"}</h2><p>{data.recommendations[0]?.explanation ?? "Your current profile and workspace activity do not show an urgent gap."}</p>{data.recommendations[0] && <Link className="button button-gold" href={data.recommendations[0].actionHref}>{data.recommendations[0].actionLabel}</Link>}</article>
+          <article className="brain-health-card"><span className="card-kicker">BRAND HEALTH</span><strong>{data.health.score}</strong><span>/100 · {data.health.label}</span><div className="brain-health-meter" aria-label={`${data.health.score} out of 100`}><i style={{ width: `${data.health.score}%` }} /></div><small>{data.health.signals}/{data.health.totalSignals} signals active</small></article>
+          <article className="brain-next-card"><span className="card-kicker">NEXT BEST MOVE</span><h2>{data.recommendations[0]?.title ?? data.priorities[0] ?? "Keep your brand profile current"}</h2><p>{data.recommendations[0]?.explanation ?? "Your workspace is ready for the next content batch."}</p>{data.recommendations[0] && <Link className="button button-gold" href={data.recommendations[0].actionHref}>{data.recommendations[0].actionLabel}</Link>}</article>
         </section>
         <section className="brain-context-panel" aria-label="Business context">
           <div className="brain-context-heading">
-            <div><span className="card-kicker">YOUR BUSINESS CONTEXT</span><h2>Recommendations, grounded in your activity</h2></div>
+            <div><span className="card-kicker">LIVE SIGNALS</span><h2>{data.brand.name}</h2></div>
             <span className="brain-context-status">{data.metrics.analyticsAvailable ? "Analytics connected" : "Workspace activity only"}</span>
           </div>
           <div className="brain-context-metrics">
             <div><span>Industry</span><strong>{data.brand.industry || "Not set"}</strong></div>
             <div><span>Recent posts</span><strong>{data.metrics.recentPosts}</strong></div>
-            <div><span>Drafts created</span><strong>{data.metrics.drafts}</strong></div>
-            <div><span>Connected accounts</span><strong>{data.metrics.connectedAccounts}</strong></div>
+            <div><span>Drafts</span><strong>{data.metrics.drafts}</strong></div>
+            <div><span>Channels</span><strong>{data.metrics.connectedAccounts}</strong></div>
           </div>
           <details className="brain-context-details">
             <summary>How these recommendations are grounded</summary>
@@ -118,19 +116,19 @@ export function MarketingBrainClient() {
           </details>
         </section>
         <section className="brain-intelligence-grid">
-          <article><span className="card-kicker">CURRENT STRATEGY</span><h2>Direction for {data.brand.name}</h2><ul>{data.strategy.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></article>
-          <article><span className="card-kicker">CONTENT OPPORTUNITIES</span><h2>Gaps to close</h2>{data.content.gaps.length ? <ul>{data.content.gaps.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : <p>Your current content foundation is balanced.</p>}<small>Formats used recently: {data.content.formats.join(", ") || "none"}.</small></article>
-          <article><span className="card-kicker">COMPETITOR INSIGHTS</span><h2>Positioning research</h2><p>{data.competitors.status}</p>{data.competitors.entries.length > 0 && <ul>{data.competitors.entries.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>}{data.competitors.insights.filter((item) => item.summary).slice(0, 3).map((item) => <details key={item.name}><summary>{item.name} · sourced analysis</summary><p>{item.summary}</p>{item.opportunities.length > 0 && <small>Opportunity hypotheses: {item.opportunities.join(" · ")}</small>}</details>)}<Link href="/dashboard/competitors">Open Competitor Intelligence</Link></article>
-          <article><span className="card-kicker">CAMPAIGN PRIORITIES</span><h2>Plan before you publish</h2>{data.campaigns.length ? <ul>{data.campaigns.map((campaign, index) => <li key={`${campaign.id ?? campaign.name}-${index}`}><strong>{campaign.name}</strong> · {campaign.status}</li>)}</ul> : <p>No active campaign plan. Turn your highest priority into a reviewable plan.</p>}<Link href="/dashboard/campaigns">Open campaigns</Link></article>
+          <article><span className="card-kicker">STRATEGY</span><h2>Brand direction</h2><ul>{data.strategy.slice(0, 3).map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></article>
+          <article><span className="card-kicker">CONTENT</span><h2>{data.content.gaps.length ? "Gaps to close" : "Formats in rotation"}</h2>{data.content.gaps.length ? <ul>{data.content.gaps.slice(0, 3).map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul> : <p>{data.content.formats.slice(0, 3).join(" · ") || "Create your first post"}</p>}<Link href="/dashboard/create">Create content</Link></article>
+          <article><span className="card-kicker">COMPETITORS</span><h2>{data.competitors.insights.length ? "Market signals" : "Research workspace"}</h2>{data.competitors.insights.filter((item) => item.summary).slice(0, 2).map((item) => <details key={item.name}><summary>{item.name}</summary><p>{item.summary}</p>{item.opportunities.length > 0 && <small>{item.opportunities.slice(0, 2).join(" · ")}</small>}</details>)}{!data.competitors.insights.length && <p>{data.competitors.entries.length} profiles tracked</p>}<Link href="/dashboard/competitors">Open research</Link></article>
+          <article><span className="card-kicker">CAMPAIGNS</span><h2>{data.campaigns.length ? "In motion" : "Plan a moment"}</h2>{data.campaigns.length ? <ul>{data.campaigns.slice(0, 3).map((campaign, index) => <li key={`${campaign.id ?? campaign.name}-${index}`}><strong>{campaign.name}</strong> · {campaign.status}</li>)}</ul> : <p>Turn a seasonal moment into a content plan.</p>}<Link href="/dashboard/campaigns">Open campaigns</Link></article>
         </section>
         <div className="brain-recommendations-heading">
-          <div><span className="card-kicker">NEXT STEPS</span><h2>Ideas for your business</h2></div>
-          <span>{data.recommendations.length} {data.recommendations.length === 1 ? "recommendation" : "recommendations"}</span>
+          <div><span className="card-kicker">ACTION QUEUE</span><h2>Recommended moves</h2></div>
+          <span>{Math.max(0, data.recommendations.length - 1)} actions</span>
         </div>
-        {data.recommendations.length === 0
-          ? <div className="section-empty-state"><h2>You’re up to date</h2><p>No new recommendations are available for this brand right now. Keep your profile and content activity current to improve future suggestions.</p><Link className="button button-gold" href="/dashboard/create">Create content</Link></div>
+        {data.recommendations.length <= 1
+          ? <div className="section-empty-state"><h2>{data.recommendations.length ? "Top move is ready" : "All caught up"}</h2><p>{data.recommendations.length ? "Your next action is featured above." : "Ready for a fresh content batch?"}</p>{!data.recommendations.length && <Link className="button button-gold" href="/dashboard/create">Create content</Link>}</div>
           : <div className="brain-recommendations-grid">
-            {data.recommendations.map((recommendation) => <article className="brain-recommendation-card" key={recommendation.id}>
+            {data.recommendations.slice(1).map((recommendation) => <article className="brain-recommendation-card" key={recommendation.id}>
               <span className="card-kicker">{recommendation.kind.replaceAll("-", " ")}</span>
               <h2>{recommendation.title}</h2>
               <details className="brain-recommendation-details">

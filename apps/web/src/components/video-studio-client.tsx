@@ -122,7 +122,7 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
 
   async function deleteSelectedGalleryImage() {
     const selected = galleryAssets.find((asset) => asset.id === selectedGalleryAssetId);
-    if (!selected || !window.confirm(`Permanently delete â€œ${selected.fileName}â€ from this workspace?`)) return;
+    if (!selected || !window.confirm(`Permanently delete "${selected.fileName}" from this workspace?`)) return;
     try {
       await apiRequest(`/api/media/uploads/${encodeURIComponent(selected.id)}`, { method: "DELETE" });
       setGalleryAssets((assets) => assets.filter((asset) => asset.id !== selected.id));
@@ -261,7 +261,7 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
       {config.accounts.map((account) => `Account ${account.slot}: ${account.status === "available" ? account.credits ?? "balance unavailable" : account.error ?? "unavailable"}`).join(" · ")}
       {config.accounts.length === 1 ? " Only one API key is loaded by the server; verify MAGIC_HOUR_API_KEY_2 in apps/api/.env and restart the API." : " Available account balances are combined; unavailable accounts are excluded from the total."}
     </p>}
-    {!config && !error && <p className="notice notice-gold" role="status">Checking Magic Hour configurationâ€¦</p>}
+    {!config && !error && <p className="notice notice-gold" role="status">Checking Magic Hour configuration...</p>}
     {config?.configured === false && <p className="notice notice-gold" role="status">Add <code>MAGIC_HOUR_API_KEY</code> to <code>apps/api/.env</code> and restart the API to enable real Magic Hour generation.</p>}
     {config?.voicesUnavailable && <p className="notice notice-gold" role="status">Magic Hour balance is available, but the voice list could not be loaded. Product video workflows remain available.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}{galleryError && <p className="notice notice-gold" role="status">Saved media could not be loaded. You can still upload a file directly.</p>}{feedback && <p className="form-success" role="status">{feedback}</p>}
@@ -358,7 +358,7 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
         <CompactSelect aria-label="Length" value={String(durationSeconds)} options={[5, 10, 15].map((seconds) => ({ value: String(seconds), label: `${seconds} seconds` }))} onValueChange={(value) => setDurationSeconds(Number(value))} />
       </label>
       <p className="video-credit-notice">Generation uses Magic Hour credits. Check the displayed balance before generating.</p>
-      <button type="submit" className="button button-gold" disabled={busy || !config?.configured || (workflow !== "product-text" && !sourceFile && !selectedGalleryAssetId) || (workflow.includes("product") && !title.trim() && !productName.trim() && !description.trim())}>{busy ? "Queuing videoâ€¦" : "Generate video"}</button>
+      <button type="submit" className="button button-gold" disabled={busy || !config?.configured || (workflow !== "product-text" && !sourceFile && !selectedGalleryAssetId) || (workflow.includes("product") && !title.trim() && !productName.trim() && !description.trim())}>{busy ? "Queuing video..." : "Generate video"}</button>
       </Fragment>
     </form>
   </section>;
@@ -402,10 +402,6 @@ function getScriptMusicMood(mood: string | undefined) {
   return "calm";
 }
 
-function removeSceneTimecode(scene: string) {
-  return scene.replace(/^\s*\d{1,3}(?::\d{2})?(?:\s*(?:-|â€“|â€”|to)\s*\d{1,3}(?::\d{2})?)?\s*(?:s|sec|seconds)?\s*[Â·:|-]\s*/i, "");
-}
-
 export function VideoStudioClient() {
   const [scripts, setScripts] = useState<VideoScript[]>([]);
   const [selectedScriptId, setSelectedScriptId] = useState("");
@@ -426,7 +422,6 @@ export function VideoStudioClient() {
   const [narration, setNarration] = useState("voiceover");
   const [voiceId, setVoiceId] = useState("man-professional");
   const [contentPlatform, setContentPlatform] = useState("Instagram");
-  const [platform, setPlatform] = useState("Instagram");
   const [publishingReadiness, setPublishingReadiness] = useState<PublishingReadiness | null>(null);
   const [checkingReadiness, setCheckingReadiness] = useState(false);
   const [scheduleAt, setScheduleAt] = useState<Record<string, string>>({});
@@ -538,7 +533,7 @@ export function VideoStudioClient() {
             config?.geminiConfigured ? "Google Gemini" : null,
             config?.groqConfigured ? "Groq fallback" : null,
             config?.openaiConfigured ? "OpenAI fallback" : null,
-          ].filter(Boolean).join(" â†’ ") || "No AI provider configured";
+          ].filter(Boolean).join(" -> ") || "No AI provider configured";
   const platformLimit = videoPlatformLimits.platforms[contentPlatform as keyof typeof videoPlatformLimits.platforms];
   const platformLimitWarning = platformLimit && durationSeconds > platformLimit.maxSeconds
     ? `${formatDuration(durationSeconds)} is longer than the configured ${contentPlatform} limit of ${formatDuration(platformLimit.maxSeconds)}. Choose a shorter length or check the platform's current upload rules.`
@@ -778,10 +773,6 @@ export function VideoStudioClient() {
   }
 
   async function sendToSchedule(job: VideoJob, publishNow = false) {
-    if (platform !== "Instagram") {
-      setError("Live video publishing is currently available only for Instagram Reels.");
-      return;
-    }
     if (!publishingReadiness?.ready) {
       setError(publishingReadiness?.message ?? "Check the Instagram connection before scheduling or publishing.");
       return;
@@ -812,7 +803,7 @@ export function VideoStudioClient() {
         body: JSON.stringify({
           contentId: job.contentId,
           videoJobId: job.id,
-          platforms: [platform],
+          platforms: ["Instagram"],
           ...(scheduledInstant ? { scheduledAt: scheduledInstant } : {}),
           timezone,
         }),
@@ -821,7 +812,7 @@ export function VideoStudioClient() {
         ? demoMode
           ? "Post request processed in demo mode. It was not published to a live social account."
           : post.status === "PUBLISHED"
-            ? `Video published on ${platform}.`
+          ? "Video published on Instagram."
             : `Instagram accepted the publish request (status: ${post.status.toLowerCase()}). Check Posts and Queue for updates.`
         : demoMode
           ? "Video added to the schedule in demo mode. It will not publish to a live social account."
@@ -838,10 +829,10 @@ export function VideoStudioClient() {
 
   return (
     <section className="dashboard-content video-studio-page">
-      <p className="eyebrow">YOUR STUDIO Â· VIDEO</p>
+      <p className="eyebrow">YOUR STUDIO · VIDEO</p>
       <h1>Video Studio</h1>
-      <p className="dashboard-lead">Create product demonstration or presenter avatar videos with Magic Hour, using an image from the Media Library or a new upload. Then preview, save, and prepare them for Instagram.</p>
-      {error && <div className="video-generation-error" role="alert"><strong>We couldnâ€™t complete that step</strong><p>{error}</p></div>}
+      <p className="dashboard-lead">Create, preview, and prepare branded product or presenter videos.</p>
+      {error && <div className="video-generation-error" role="alert"><strong>We couldn&apos;t complete that step</strong><p>{error}</p></div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       <MagicHourCreator onCreated={() => { void loadJobs(); }} />
       <details className="video-advanced-workflows" hidden>
@@ -852,13 +843,13 @@ export function VideoStudioClient() {
           <span className="video-provider-badge">Writing provider: {activeProviderLabel}</span>
         </div>
         <form className="video-script-form video-idea-form" onSubmit={(event) => void generateIdeaPlan(event)}>
-          <label>Describe your business and the scenario in 2â€“3 lines
+          <label>Describe your business and the scenario in 2-3 lines
             <textarea required minLength={10} maxLength={2400} value={topic} onChange={(event) => setTopic(event.target.value)} rows={3} placeholder="Example: Create a polished ad for our beverage. Show a man and woman chatting at a cafÃ© table, then demonstrate the bottle clearly. Use only facts from my brand profile." />
           </label>
           <div className="video-duration-controls">
             <label>Duration<CompactSelect aria-label="Duration" value={ideaDuration} onChange={(event) => setIdeaDuration(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((minutes) => <option key={minutes} value={minutes * 60}>{minutes} minute{minutes > 1 ? "s" : ""}</option>)}</CompactSelect></label>
             <label>Language<CompactSelect aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</CompactSelect></label>
-            <label>Format<CompactSelect aria-label="Format" value={ideaAspectRatio} onChange={(event) => setIdeaAspectRatio(event.target.value as "vertical" | "landscape")}><option value="vertical">Vertical Â· 1080 Ã— 1920</option><option value="landscape">Horizontal Â· 1920 Ã— 1080</option></CompactSelect></label>
+            <label>Format<CompactSelect aria-label="Format" value={ideaAspectRatio} onChange={(event) => setIdeaAspectRatio(event.target.value as "vertical" | "landscape")}><option value="vertical">Vertical · 1080 x 1920</option><option value="landscape">Horizontal · 1920 x 1080</option></CompactSelect></label>
             <label>Voice<CompactSelect aria-label="Voice" value={ideaVoice} onChange={(event) => setIdeaVoice(event.target.value)}>{(config?.tts.voices.length ? config.tts.voices : [{ id: "default", label: "Configured Piper voice", description: "Free local voice" }]).map((voice) => <option value={voice.id} key={voice.id}>{voice.label}</option>)}</CompactSelect></label>
           <label>Conversation tone<CompactSelect aria-label="Conversation tone" value={ideaConversationStyle} onChange={(event) => setIdeaConversationStyle(event.target.value as VideoConversationStyle)}><option value="story-driven">Story-driven</option><option value="warm">Warm and friendly</option><option value="playful">Playful</option><option value="dramatic">Dramatic</option><option value="product-demo">Professional product demonstration</option></CompactSelect></label>
             <label>Characters<CompactSelect aria-label="Characters" value={ideaCastSize} onChange={(event) => setIdeaCastSize(Number(event.target.value) as 2 | 3)}><option value={2}>Two people</option><option value={3}>Three people</option></CompactSelect></label>
@@ -874,7 +865,7 @@ export function VideoStudioClient() {
           </label>
           <p className="video-music-license">Review the generated characters, scene captions, dialogue, and product actions before rendering. Choose two people for a focused conversation or three for a group scene.</p>
           {language !== "en-US" && <p className="notice notice-gold" role="status">The included Piper voice models speak US English. Other selected languages are used for the plan and subtitles, but spoken pronunciation may be limited.</p>}
-          <button type="submit" className="button button-gold" disabled={busy || !topic.trim() || !aiConfigured}>{busy ? "Creating your planâ€¦" : "Generate video plan"}</button>
+          <button type="submit" className="button button-gold" disabled={busy || !topic.trim() || !aiConfigured}>{busy ? "Creating your plan..." : "Generate video plan"}</button>
         </form>
         {ideaPlan && ideaScript && <div className="video-editable-storyboard">
           <h3>Review the conversation before rendering</h3>
@@ -889,11 +880,11 @@ export function VideoStudioClient() {
           <label>Hook<input value={ideaPlan.hook} onChange={(event) => updateIdeaPlan((plan) => ({ ...plan, hook: event.target.value }))} /></label>
           <label>Story<textarea rows={3} value={ideaPlan.story} onChange={(event) => updateIdeaPlan((plan) => ({ ...plan, story: event.target.value }))} /></label>
           {ideaPlan.scenes.map((scene, index) => <article className="video-editable-scene" key={`idea-scene-${index}`}>
-            <h4>Scene {index + 1} Â· {scene.durationSeconds}s Â· {scene.setting.replaceAll("-", " ")}{scene.ahaMoment ? " Â· Aha moment" : ""}</h4>
-            <p><strong>Action:</strong> {scene.characters.map((character) => `${character.role}: ${character.action}`).join(" Â· ")}</p>
+            <h4>Scene {index + 1} · {scene.durationSeconds}s · {scene.setting.replaceAll("-", " ")}{scene.ahaMoment ? " · Aha moment" : ""}</h4>
+            <p><strong>Action:</strong> {scene.characters.map((character) => `${character.role}: ${character.action}`).join(" · ")}</p>
             <p><strong>Props:</strong> {scene.props.join(", ")}</p>
             <label>On-screen text<input value={scene.onScreenText} onChange={(event) => updateIdeaPlan((plan) => ({ ...plan, scenes: plan.scenes.map((item, itemIndex) => itemIndex === index ? { ...item, onScreenText: event.target.value } : item) }))} /></label>
-            {scene.dialogue?.map((line, lineIndex) => <label key={`line-${lineIndex}`}>Character {line.speaker} Â· {ideaPlan.cast?.find((character) => character.id === line.speaker)?.name ?? line.speaker}
+            {scene.dialogue?.map((line, lineIndex) => <label key={`line-${lineIndex}`}>Character {line.speaker} · {ideaPlan.cast?.find((character) => character.id === line.speaker)?.name ?? line.speaker}
               <textarea rows={2} value={line.text} onChange={(event) => updateIdeaPlan((plan) => ({
                 ...plan,
                 scenes: plan.scenes.map((item, itemIndex) => {
@@ -958,7 +949,7 @@ export function VideoStudioClient() {
           {platformLimitWarning && <p className="notice notice-gold" role="alert">{platformLimitWarning} Platform targets last reviewed {videoPlatformLimits.lastReviewed}; confirm current rules in the linked documentation.</p>}
           <label>Visual style<CompactSelect aria-label="Visual style" value={visualStyle} onChange={(event) => setVisualStyle(event.target.value)}><option value="product-demo">Product demonstration</option><option value="b-roll">B-roll</option><option value="talking-head">Talking head</option><option value="kinetic-type">Kinetic type</option></CompactSelect></label>
           <label>Language<CompactSelect aria-label="Language" value={language} onChange={(event) => setLanguage(event.target.value)}>{languages.map(([code, name]) => <option value={code} key={code}>{name}</option>)}</CompactSelect></label>
-          <button type="submit" className="button button-gold" disabled={busy || !topic.trim() || durationSeconds < 15 || !aiConfigured}>{busy ? "Workingâ€¦" : "Generate video script"}</button>
+          <button type="submit" className="button button-gold" disabled={busy || !topic.trim() || durationSeconds < 15 || !aiConfigured}>{busy ? "Working..." : "Generate video script"}</button>
           {scriptRetryAvailable && <button type="button" className="button button-outline" disabled={busy || !topic.trim() || !aiConfigured} onClick={() => void generateScript()}>Retry video script</button>}
         </form>
 
@@ -1005,22 +996,22 @@ export function VideoStudioClient() {
             </div>
           </label>
           <p className="video-music-license">Target length: {formatDuration(durationSeconds)}. {platformLimitWarning || `Platform targets last reviewed ${videoPlatformLimits.lastReviewed}; confirm current rules in the linked documentation.`}</p>
-          <label>Video format<CompactSelect aria-label="Video format" value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}><option value="vertical">Vertical Â· 9:16</option><option value="square">Square Â· 1:1</option><option value="landscape">Landscape Â· 16:9</option></CompactSelect></label>
+          <label>Video format<CompactSelect aria-label="Video format" value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)}><option value="vertical">Vertical · 9:16</option><option value="square">Square · 1:1</option><option value="landscape">Landscape · 16:9</option></CompactSelect></label>
           <label>Narration<CompactSelect aria-label="Narration" value={narration} onChange={(event) => setNarration(event.target.value)}><option value="voiceover">Voiceover</option><option value="on-camera">Presenter voiceover</option><option value="text-only">Text only (no TTS)</option></CompactSelect></label>
           {narration !== "text-only" && <>
             <label>Narration voice
               <CompactSelect aria-label="Narration voice" value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
-                {(config?.tts.voices ?? []).map((voice) => <option value={voice.id} key={voice.id}>{voice.label} Â· {voice.description}</option>)}
+                {(config?.tts.voices ?? []).map((voice) => <option value={voice.id} key={voice.id}>{voice.label} · {voice.description}</option>)}
               </CompactSelect>
             </label>
             <p className="video-music-license">Each option uses a different speaker from the free local Piper multi-speaker model. The available voices are US English.</p>
           </>}
           <label>Music track
-            <CompactSelect aria-label="Music track" value={musicId} onChange={(event) => setMusicId(event.target.value)}><option value="">Automatic soft bed</option>{config?.music.map((track) => <option value={track.id} key={track.id}>{track.title} Â· {track.mood}</option>)}</CompactSelect>
+            <CompactSelect aria-label="Music track" value={musicId} onChange={(event) => setMusicId(event.target.value)}><option value="">Automatic soft bed</option>{config?.music.map((track) => <option value={track.id} key={track.id}>{track.title} · {track.mood}</option>)}</CompactSelect>
           </label>
           {musicId && <label>Music treatment
             <CompactSelect aria-label="Music treatment" value={musicStyle} onChange={(event) => setMusicStyle(event.target.value)}>
-              {(config?.musicStyles ?? []).map((style) => <option value={style.id} key={style.id}>{style.label} Â· {style.description}</option>)}
+              {(config?.musicStyles ?? []).map((style) => <option value={style.id} key={style.id}>{style.label} · {style.description}</option>)}
             </CompactSelect>
           </label>}
           {musicTrack && <>
@@ -1028,10 +1019,10 @@ export function VideoStudioClient() {
             <small>{musicTrack.licenseNote}</small>
           </>}
           <p className="video-music-license">A low-volume local track plays under narrated videos to cover brief action beats and the end card; narration ducks the music automatically.</p>
-          <label>Music volume Â· {Math.round(musicVolume * 100)}%
+          <label>Music volume · {Math.round(musicVolume * 100)}%
             <input type="range" min="0" max="0.5" step="0.01" value={musicVolume} onChange={(event) => setMusicVolume(Number(event.target.value))} />
           </label>
-          <label>Music under voice Â· {Math.round(musicDucking * 100)}%
+          <label>Music under voice · {Math.round(musicDucking * 100)}%
             <input type="range" min="0" max="1" step="0.05" value={musicDucking} onChange={(event) => setMusicDucking(Number(event.target.value))} />
           </label>
           {config?.pexelsConfigured && <p className="form-success">Pexels stock visuals are enabled; generated brand gradients remain the fallback.</p>}
@@ -1052,7 +1043,7 @@ export function VideoStudioClient() {
       </div>
       </details>
       <section className="video-job-list">
-        <div className="video-job-heading"><div><p className="card-kicker">RENDER QUEUE</p><h2>Your videos</h2></div><Link href="/dashboard/media-library">Open Media Library â†’</Link></div>
+        <div className="video-job-heading"><div><p className="card-kicker">RENDER QUEUE</p><h2>Your videos</h2></div><Link href="/dashboard/media-library">Open Media Library →</Link></div>
         {jobs.length === 0 ? <article className="section-empty-state"><h2>No rendered videos yet</h2><p>Your completed MP4 files will appear here and in the Media Library.</p></article> : jobs.map((job) => (
           <article className="video-job-card video-library-card" key={job.id}>
             <button type="button" className="video-card-open" onClick={() => { setPublishingReadiness(null); setSelectedVideoId(job.id); }} aria-label={`Open ${job.inputJson.title ?? "video"} details`}>
@@ -1061,7 +1052,7 @@ export function VideoStudioClient() {
                 : <span className="video-card-placeholder"><Play size={28} aria-hidden="true" /></span>}
               <span className="video-card-open-icon"><Play size={18} fill="currentColor" aria-hidden="true" /></span>
             </button>
-            <div className="video-job-title"><div><h3>{job.inputJson.title ?? "Branded video"}</h3><span>{job.inputJson.provider === "magic-hour" ? `Magic Hour Â· ${job.inputJson.generationType ?? "video"}` : job.inputJson.scenePlan ? "AI-cast characters" : "Classic scene video"} Â· {job.inputJson.aspectRatio ?? "vertical"} Â· {job.stage ?? (job.status === "QUEUED" ? "Waiting in render queue" : job.status.toLowerCase())}</span></div><strong>{job.status === "SUCCEEDED" ? "Ready" : job.status === "FAILED" || job.status === "TIMED_OUT" ? "Failed" : job.status === "QUEUED" ? "Queued" : job.status === "CANCELLED" ? "Cancelled" : `${job.progress}%`}</strong></div>
+            <div className="video-job-title"><div><h3>{job.inputJson.title ?? "Branded video"}</h3><span>{job.inputJson.provider === "magic-hour" ? `Magic Hour · ${job.inputJson.generationType ?? "video"}` : job.inputJson.scenePlan ? "AI-cast characters" : "Classic scene video"} · {job.inputJson.aspectRatio ?? "vertical"} · {job.stage ?? (job.status === "QUEUED" ? "Waiting in render queue" : job.status.toLowerCase())}</span></div><strong>{job.status === "SUCCEEDED" ? "Ready" : job.status === "FAILED" || job.status === "TIMED_OUT" ? "Failed" : job.status === "QUEUED" ? "Queued" : job.status === "CANCELLED" ? "Cancelled" : `${job.progress}%`}</strong></div>
             {job.inputJson.provider === "magic-hour" && job.status === "SUCCEEDED" && (job.magicHourCreditsCharged ?? job.inputJson.magicHourCreditsCharged) !== null && (job.magicHourCreditsCharged ?? job.inputJson.magicHourCreditsCharged) !== undefined && <small>Magic Hour charged {job.magicHourCreditsCharged ?? job.inputJson.magicHourCreditsCharged} credits.</small>}
             {(job.status === "PROCESSING" || job.status === "QUEUED") && <progress max={100} value={job.progress} aria-label={`Render progress ${job.progress}%`} />}
             {(job.status === "FAILED" || job.status === "TIMED_OUT") && <p className="form-error" role="alert">{job.error}</p>}
@@ -1098,45 +1089,29 @@ export function VideoStudioClient() {
               </header>
               <div className="design-post-heading-copy">
                 <h2>{selectedVideo.inputJson.title ?? "Branded video"}</h2>
-                <p>{selectedVideo.inputJson.aspectRatio ?? "vertical"} format Â· {selectedVideo.status.toLowerCase()} Â· {new Date(selectedVideo.createdAt).toLocaleString()}</p>
+                <p>{selectedVideo.inputJson.aspectRatio ?? "vertical"} format · {selectedVideo.status.toLowerCase()} · {new Date(selectedVideo.createdAt).toLocaleString()}</p>
               </div>
               <div className="design-post-copy">
-                <p className="design-post-date">{selectedVideo.inputJson.brandName ?? "Branded video"}{selectedVideo.inputJson.language ? ` Â· ${selectedVideo.inputJson.language}` : ""} Â· {selectedVideo.inputJson.scenePlan ? "AI-cast animated characters" : "Classic scene render"}</p>
-                {!selectedVideo.inputJson.scenePlan && <div className="notice notice-gold" role="note">
-                  This saved video uses the older scene renderer. Its visuals wonâ€™t change when you retry it. To use the animated character cast, create a new plan in Idea to MP4.
-                  {" "}<Link href="#idea-to-mp4" onClick={() => setSelectedVideoId("")}>Go to Idea to MP4 â†’</Link>
-                </div>}
                 {selectedVideo.videoUrl && <section className="video-publish-settings" aria-label="Video publishing settings">
                   <h3>Publish this video</h3>
-                  <label>Platform
-                    <CompactSelect aria-label="Publish platform" value={platform} onChange={(event) => setPlatform(event.target.value)}>
-                      <option value="Instagram">Instagram Reels</option>
-                      <option value="YouTube" disabled>YouTube Â· not available yet</option>
-                      <option value="Facebook" disabled>Facebook Â· not available yet</option>
-                      <option value="LinkedIn" disabled>LinkedIn Â· not available yet</option>
-                      <option value="TikTok" disabled>TikTok Â· not available yet</option>
-                    </CompactSelect>
-                  </label>
+                  <p className="video-publish-platform">Instagram Reels</p>
                   <label className="video-detail-schedule">Schedule date and time
                     <input type="datetime-local" min={getDateTimeInputValue(new Date(), timezone)} value={scheduleAt[selectedVideo.id] ?? ""} onChange={(event) => setScheduleAt((current) => ({ ...current, [selectedVideo.id]: event.target.value }))} />
-                    <small>Time shown in {getTimezoneLabel(timezone)} Â· <Link href="/dashboard/settings/publishing">Change time zone</Link></small>
+                    <small>Time shown in {getTimezoneLabel(timezone)} · <Link href="/dashboard/settings/publishing">Change time zone</Link></small>
                   </label>
                   <p className={publishingReadiness?.ready ? "video-publishing-ready" : "video-publishing-unready"} role="status">
-                    {checkingReadiness ? "Checking Instagram connection and video hostingâ€¦" : publishingReadiness?.message ?? "Checking Instagram connectionâ€¦"}
-                    {publishingReadiness?.accountName ? ` Â· ${publishingReadiness.accountName}` : ""}
+                    {checkingReadiness
+                      ? "Checking publishing readiness..."
+                      : publishingReadiness?.ready
+                        ? "Instagram is ready to publish."
+                        : "Connect an Instagram account to publish."}
                   </p>
-                  {!checkingReadiness && publishingReadiness?.connectionAction && <Link href="/dashboard/social-accounts/instagram">{publishingReadiness.connectionAction === "reconnect" ? "Reconnect Instagram account" : "Connect Instagram account"} â†’</Link>}
-                  <button type="button" className="video-check-connection" onClick={() => void checkPublishingReadiness()} disabled={checkingReadiness || busy}>
-                    {checkingReadiness ? "Checkingâ€¦" : "Recheck publishing readiness"}
-                  </button>
-                </section>}
-                {selectedVideo.inputJson.sourceScenes?.length
-                  ? <ol className="video-detail-scenes">{selectedVideo.inputJson.sourceScenes.map((scene, index) => <li key={`${selectedVideo.id}-${index}`}>{removeSceneTimecode(scene)}</li>)}</ol>
-                  : <p>Generated branded MP4 video.</p>}
-                {selectedVideo.inputJson.caption && <section className="video-result-caption">
-                  <h3>Suggested caption</h3>
-                  <p>{selectedVideo.inputJson.caption}</p>
-                  {selectedVideo.inputJson.hashtags?.length ? <p>{selectedVideo.inputJson.hashtags.join(" ")}</p> : null}
+                  <div className="video-publishing-actions">
+                    {!checkingReadiness && !publishingReadiness?.ready && <Link href="/dashboard/social-accounts/instagram">{publishingReadiness?.connectionAction === "reconnect" ? "Reconnect Instagram" : "Connect Instagram"}</Link>}
+                    <button type="button" className="video-check-connection" onClick={() => void checkPublishingReadiness()} disabled={checkingReadiness || busy}>
+                      {checkingReadiness ? "Checking..." : "Check readiness"}
+                    </button>
+                  </div>
                 </section>}
                 {selectedVideo.error && <p className="form-error" role="alert">{selectedVideo.error}</p>}
                 {error && <p className="form-error" role="alert">{error}</p>}
