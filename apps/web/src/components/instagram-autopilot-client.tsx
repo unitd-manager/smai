@@ -111,24 +111,41 @@ export function InstagramAutopilotClient() {
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
 
-      <article className="instagram-autopilot-card">
-        <div>
-          <p className="eyebrow">WEEKLY AUTOMATION</p>
-          <h2>{status?.brand.name ?? "Your brand"} · Brand-specific content</h2>
-          <p>Approval-first · nothing publishes without your review.</p>
-          {status && <small>{status.brand.connectedPlatforms.join(" · ") || "No connected channels"} · {status.brand.timezone}</small>}
-        </div>
-        <button
-          type="button"
-          className="button button-primary"
-          disabled={loading || starting || isProcessing || !status?.ready || !videoReady || postCount < 1 || postCount > 30 || days > postCount}
-          onClick={() => void generateBatch()}
-        >
-          {starting ? "Starting Autopilot…" : isProcessing ? runStatusLabel(latestRun!.status) : `Generate ${postCount} posts`}
-        </button>
-      </article>
+      <div className="instagram-autopilot-workspace">
+        <article className="instagram-autopilot-card">
+          <div className="instagram-autopilot-brand-summary">
+            <p className="eyebrow">WEEKLY AUTOMATION</p>
+            <h2>{status?.brand.name ?? "Your brand"}</h2>
+            <p>Build a brand-specific batch. Every post goes to review before publishing.</p>
+            {status && <small>{status.brand.connectedPlatforms.join(" · ") || "No connected channels"} · {status.brand.timezone}</small>}
+          </div>
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={loading || starting || isProcessing || !status?.ready || !videoReady || postCount < 1 || postCount > 30 || days > postCount}
+            onClick={() => void generateBatch()}
+          >
+            {starting ? "Starting Autopilot…" : isProcessing ? runStatusLabel(latestRun!.status) : `Generate ${postCount} posts`}
+          </button>
+          {latestRun && (
+            <div className={`instagram-autopilot-run${latestRun.status === "FAILED" ? " is-error" : ""}`} aria-live="polite">
+              <div className="instagram-autopilot-run-copy">
+                <p className="eyebrow">Latest batch</p>
+                <h3>{runStatusLabel(latestRun.status)}</h3>
+                <p>Started {new Date(latestRun.createdAt).toLocaleString()}</p>
+                {isProcessing && <p>Generation is in progress.</p>}
+                {latestRun.status === "IN_REVIEW" && <p>Batch ready for email approval.</p>}
+                {latestRun.error && <p className="form-error" role="alert">{latestRun.error}</p>}
+              </div>
+              <div className="instagram-autopilot-links">
+                <Link href="/dashboard/approvals">Open approvals</Link>
+                <Link href="/dashboard/content">View generated content</Link>
+              </div>
+            </div>
+          )}
+        </article>
 
-      <section className="instagram-autopilot-config" aria-labelledby="autopilot-mix-heading">
+        <section className="instagram-autopilot-config" aria-labelledby="autopilot-mix-heading">
         <div className="instagram-autopilot-config-heading">
           <div>
             <p className="eyebrow">BATCH SETTINGS</p>
@@ -186,7 +203,8 @@ export function InstagramAutopilotClient() {
         {requestsVideo && videoBlockers && videoBlockers.length > 0 ? <div className="notice notice-gold" role="status"><strong>Magic Hour video setup:</strong><ul>{videoBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div> : null}
         {requestsVideo && !videoBlockers && <p className="notice notice-gold" role="status">Video setup status is unavailable. Restart the API and refresh this page before generating videos.</p>}
         {(counts["linkedin-banner"] > 0 || counts["facebook-cover"] > 0) && <p className="video-music-license">LinkedIn and Facebook cover assets are delivered as drafts.</p>}
-      </section>
+        </section>
+      </div>
 
       {!loading && status && (!status.ready || (requestsVideo && !videoReady)) && (
         <section className="instagram-autopilot-readiness" aria-labelledby="autopilot-readiness-heading">
@@ -201,19 +219,6 @@ export function InstagramAutopilotClient() {
       )}
 
       {loading && <p className="loading-label" role="status">Checking setup…</p>}
-      {latestRun && (
-        <section className={`instagram-autopilot-run${latestRun.status === "FAILED" ? " is-error" : ""}`} aria-live="polite">
-          <h2>Latest batch: {runStatusLabel(latestRun.status)}</h2>
-          <p>Started {new Date(latestRun.createdAt).toLocaleString()}</p>
-          {isProcessing && <p>Generation is in progress.</p>}
-          {latestRun.status === "IN_REVIEW" && <p>Batch ready for approval.</p>}
-          {latestRun.error && <p className="form-error" role="alert">{latestRun.error}</p>}
-          <div className="instagram-autopilot-links">
-            <Link href="/dashboard/approvals">Open approvals</Link>
-            <Link href="/dashboard/content">View generated content</Link>
-          </div>
-        </section>
-      )}
     </section>
   );
 }

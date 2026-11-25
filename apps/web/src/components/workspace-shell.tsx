@@ -487,7 +487,7 @@ export function WorkspaceShell({
           <nav ref={navigationRef} id="workspace-navigation" className="app-navigation" aria-label="Workspace navigation">
             {visibleNavigation.map((group) => (
               <div className="nav-group" key={group.label}>
-                <p className="sidebar-label">{group.label}</p>
+                <p className="sidebar-label">{group.label.toLocaleLowerCase().replace(/\b\w/g, (letter) => letter.toLocaleUpperCase())}</p>
                 {group.items.map((item) => {
                   const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
                   return (

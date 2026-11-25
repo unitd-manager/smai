@@ -59,7 +59,7 @@ function postTimeLabel(post: CalendarPost) {
   const publishedAt = post.targets.find((target) => target.publishedAt)?.publishedAt;
   return publishedAt
     ? `Published ${new Date(publishedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`
-    : "Draft";
+    : post.status === "DRAFT" ? "Draft" : post.status.toLowerCase().replaceAll("_", " ");
 }
 
 export function CalendarClient() {
@@ -215,9 +215,14 @@ export function CalendarClient() {
 
   return (
     <section className="dashboard-content calendar-page">
-      <p className="eyebrow">YOUR STUDIO · PUBLISH</p>
-      <h1>Publishing calendar</h1>
-      <p className="dashboard-lead">See what is scheduled and published across your calendar.</p>
+      <header className="calendar-page-heading">
+        <div>
+          <p className="eyebrow">Publishing · Calendar</p>
+          <h1>Publishing calendar</h1>
+          <p className="dashboard-lead">See what is scheduled and published across your channels.</p>
+        </div>
+        <Link className="button button-gold calendar-create-button" href={`/dashboard/create?date=${todayKey}`}><Plus size={17} aria-hidden="true" />Create a post</Link>
+      </header>
       <div className="calendar-toolbar">
         <div className="calendar-month-controls">
           <button type="button" aria-label="Previous calendar period" onClick={() => moveCalendar(-1)}><ChevronLeft size={19} /></button>
@@ -228,7 +233,6 @@ export function CalendarClient() {
         <div className="calendar-view-switch" role="group" aria-label="Calendar view">
           {(["month", "week", "day"] as const).map((view) => <button key={view} type="button" aria-pressed={calendarView === view} className={calendarView === view ? "is-active" : ""} onClick={() => setCalendarView(view)}>{view[0]!.toUpperCase() + view.slice(1)}</button>)}
         </div>
-        <Link className="button button-gold" href={`/dashboard/create?date=${todayKey}`}><Plus size={17} />Create a post</Link>
       </div>
       <div className="calendar-filters">
         <label>Platform
@@ -246,7 +250,7 @@ export function CalendarClient() {
         {(platformFilter !== "all" || statusFilter !== "all") && <button type="button" onClick={() => { setPlatformFilter("all"); setStatusFilter("all"); }}>Clear filters</button>}
         <span className="calendar-filter-count">{filteredPosts.length} {filteredPosts.length === 1 ? "post" : "posts"}</span>
       </div>
-      <p className="calendar-drag-hint">Drag a scheduled post to another day to update its queued publishing time. Its current local time and business time zone are kept.</p>
+      <p className="calendar-drag-hint">Drag a scheduled post to another day to change its date. Its local time and time zone stay the same.</p>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="calendar-board-scroll">
         <div className={`calendar-board calendar-board-${calendarView}`} aria-label={monthLabel}>
@@ -258,13 +262,13 @@ export function CalendarClient() {
           return (
             <article className={`calendar-day${inMonth ? "" : " calendar-day-outside"}${key === todayKey ? " calendar-day-today" : ""}${draggedPostId ? " calendar-day-drop-target" : ""}`} key={key} onDragOver={(event) => { if (draggedPostId) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); if (draggedPostId) void reschedulePost(draggedPostId, key); }}>
               <div className="calendar-day-heading">
-                <button type="button" className="calendar-day-date" aria-label={`Focus ${formatCalendarDate(date)}`} onClick={() => setFocusDate(key)}>{date.getDate()}</button>
+                <button type="button" className="calendar-day-date" aria-label={`Focus ${formatCalendarDate(date)}`} aria-pressed={focusDate === key} onClick={() => setFocusDate(key)}>{date.getDate()}</button>
                 <Link className="calendar-add-day" href={`/dashboard/create?date=${key}`} aria-label={`Create a post for ${formatCalendarDate(date)}`}><Plus size={14} aria-hidden="true" /><span>Add</span></Link>
               </div>
               <div className="calendar-day-events">
                 {dayPosts.slice(0, 3).map((post) => (
                   <Link draggable={post.status === "SCHEDULED"} onDragStart={() => setDraggedPostId(post.id)} onDragEnd={() => setDraggedPostId("")} className={`calendar-event calendar-event-${post.status.toLowerCase().replaceAll("_", "-")}`} href="/dashboard/posts" key={post.id}>
-                    <span className="calendar-event-time">{post.scheduledAt ? new Date(post.scheduledAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: post.timezone }) : "Published"}</span>
+                    <span className="calendar-event-meta"><span className="calendar-event-time">{postTimeLabel(post)}</span><span className="calendar-event-status">{post.status.toLowerCase().replaceAll("_", " ")}</span></span>
                     <strong>{post.title ?? "Untitled post"}</strong>
                     <small>{post.targets.map((target) => target.platform).join(", ")}</small>
                   </Link>

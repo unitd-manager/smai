@@ -132,6 +132,7 @@ export function OnboardingClient() {
     const query = countrySearch.trim().toLocaleLowerCase();
     return query ? countryOptions.filter((country) => country.toLocaleLowerCase().includes(query)) : countryOptions;
   }, [countrySearch]);
+  const brandColorPreview = useMemo(() => form.brandColors.split(",").map((color) => color.trim()).filter((color) => /^#[0-9a-f]{6}$/i.test(color)), [form.brandColors]);
 
   useEffect(() => {
     if (!countryOpen) return;
@@ -299,12 +300,26 @@ export function OnboardingClient() {
 
   return (
       <section className="dashboard-content onboarding-content">
-        <p className="eyebrow">YOUR BRAND FOUNDATION</p>
-        <h1>Brand Kit &amp; Profile</h1>
-        <p className="dashboard-lead">This profile guides every idea and design. You can refine it whenever your business evolves.</p>
+        <header className="brand-kit-page-heading">
+          <div><p className="eyebrow">Brand identity</p><h1>Brand Kit</h1><p className="dashboard-lead">The saved brand details and visual assets used across your content.</p></div>
+        </header>
+        {!loading && <section className="brand-kit-overview" aria-label="Current brand identity">
+          <div className="brand-kit-monogram">
+            {selectedLogoId && !logoPreviewFailed
+              ? <Image className="brand-kit-overview-logo" src={`/api/media/uploads/${encodeURIComponent(selectedLogoId)}/file`} alt={`${brandName || "Brand"} logo`} width={40} height={40} unoptimized onError={() => setLogoPreviewFailed(true)} />
+              : <span aria-hidden="true">{brandName.trim().slice(0, 1).toUpperCase() || "B"}</span>}
+          </div>
+          <div className="brand-kit-overview-copy"><span>Current brand</span><h2>{brandName || "Brand name not set"}</h2><p>{[form.industry, [form.city, form.country].filter(Boolean).join(", ")].filter(Boolean).join(" · ") || "Add business details below"}</p></div>
+          <div className="brand-kit-palette" aria-label="Saved brand colors">
+            <span>Brand colors</span>
+            {brandColorPreview.length ? <div role="group" aria-label="Current color swatches">{brandColorPreview.map((color, index) => <span key={`${color}-${index}`} role="img" style={{ backgroundColor: color }} title={color} aria-label={color} />)}</div> : <small>Add valid hex colors below</small>}
+          </div>
+          <div className="brand-kit-overview-fonts"><span>Typography</span><strong>{form.fonts.split(",").map((font) => font.trim()).filter(Boolean).join(" · ") || "Not set"}</strong></div>
+        </section>}
         {loading ? <p className="loading-label">Loading your brand profile…</p> : (
           <form className="profile-form" onSubmit={handleSubmit}>
             <div className="brand-profile-primary-card">
+            <section className="brand-kit-section">
             <div className="form-section-heading">
               <span>01</span><div><h2>Business & audience</h2><p>Help us understand your offer and who it serves.</p></div>
             </div>
@@ -363,6 +378,8 @@ export function OnboardingClient() {
               <label>Brand voice rules<textarea value={form.brandVoiceRules} onChange={(event) => updateField("brandVoiceRules", event.target.value)} rows={2} placeholder="Guidance for the AI, e.g. plain language, avoid jargon" /></label>
               <label className="brand-banned-words-field">Banned words<textarea value={form.bannedWords} onChange={(event) => updateField("bannedWords", event.target.value)} rows={2} placeholder="Words or phrases to avoid, comma-separated" /></label>
             </div>
+            </section>
+            <section className="brand-kit-section">
             <div className="form-section-heading">
               <span>02</span><div><h2>Content direction</h2><p>Set the context for thoughtful, relevant content.</p></div>
             </div>
@@ -385,6 +402,8 @@ export function OnboardingClient() {
             {lastAutopilotRun?.status === "FAILED" && (
               <p className="autopilot-status-error" role="status">The latest Autopilot attempt needs attention: {lastAutopilotRun.error ?? "The batch could not be completed."}</p>
             )}
+            </section>
+            <section className="brand-kit-section">
             <div className="form-section-heading">
               <span>03</span><div><h2>Visual identity</h2><p>Start with your palette and preferred typefaces.</p></div>
             </div>
@@ -428,8 +447,9 @@ export function OnboardingClient() {
                 <input required value={form.fonts} onChange={(event) => updateField("fonts", event.target.value)} />
               </label>
             </div>
+            </section>
             </div>
-            <div className="brand-template-preferences">
+            <section className="brand-template-preferences brand-kit-section">
               <div className="brand-template-heading">
                 <strong>Preferred design templates</strong>
               </div>
@@ -451,7 +471,7 @@ export function OnboardingClient() {
                   </label>
                 ))}
               </div>
-            </div>
+            </section>
             <p className="brand-kit-help">Your brand profile guides generated copy; these colors are used as accents and palette choices in design previews. You can update them at any time.</p>
             {workspaceCanWrite === false && (
               <p className="profile-readonly-notice" role="status">

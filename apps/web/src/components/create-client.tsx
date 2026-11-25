@@ -584,21 +584,28 @@ export function CreateClient() {
 
   return (
     <section className="dashboard-content create-page">
-      <p className="eyebrow">YOUR STUDIO · CREATE</p>
-      <h1>Create content</h1>
-      <p className="dashboard-lead">Create branded social posts, carousels, flyers, and brochures.</p>
-      <CustomAiArtworkClient />
+      <header className="create-page-heading">
+        <div><p className="eyebrow">Create studio</p><h1>Create content</h1><p className="dashboard-lead">Turn a brief into platform-ready posts, designs, and campaign artwork.</p></div>
+        <span className="create-page-step"><span>01</span> Brief <i /> <span>02</span> Review <i /> <span>03</span> Publish</span>
+      </header>
+      <details className="create-artwork-disclosure">
+        <summary><span><strong>Custom AI artwork</strong><small>Generate an original visual from a prompt or reference image</small></span><span className="create-artwork-disclosure-action">Open artwork studio</span></summary>
+        <CustomAiArtworkClient />
+      </details>
       {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
       <form className="create-form" onSubmit={(event) => generate(event)}>
-        <div className="create-idea-field">
+        <div className="create-idea-field create-brief-section">
           <div className="create-idea-heading">
-            <label htmlFor="create-content-idea">Describe your content</label>
+            <label htmlFor="create-content-idea"><span className="create-step-number">01</span><span><strong>Your brief</strong><small>Describe the idea, audience, and key message</small></span></label>
             <button type="button" className="text-button surprise-button" onClick={surpriseMe}><Sparkles size={16} aria-hidden="true" /> <span>Surprise me</span></button>
           </div>
-          <textarea id="create-content-idea" value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="Share your topic, key points, or full copy. The selected template styles it; carousel content is organized into slides." rows={2} />
+          <textarea id="create-content-idea" value={idea} onChange={(event) => setIdea(event.target.value)} placeholder="Share your topic, audience, key points, or existing copy. The chosen format and template shape the result." rows={4} />
         </div>
+        <div className="create-configuration-grid">
+        <section className="create-config-card" aria-labelledby="create-design-options-title">
+          <h2 id="create-design-options-title"><span className="create-step-number">02</span><span><strong>Format and design</strong><small>Choose how your content should look</small></span></h2>
         <fieldset className="create-fieldset">
-          <legend>Choose one format</legend>
+          <legend>Content format</legend>
           <div className="create-option-grid">
             {formats.map(([value, label]) => <label className="create-check" key={value}><input type="radio" name="content-format" checked={selectedFormats[0] === value} onChange={() => setSelectedFormats([value])} />{label}</label>)}
           </div>
@@ -632,8 +639,11 @@ export function CreateClient() {
           <small>{templateLoadError || (templateId ? `Using “${templateName}” from your in-app template library.` : "Choose a built-in design for this format, or leave it empty to generate three layout options. Designs stay crisp and editable in the app.")}</small>
         </label>
         {!templateId && <label className="create-check"><input type="checkbox" checked={useBrandTemplate} onChange={(event) => setUseBrandTemplate(event.target.checked)} /> Use my preferred Brand Kit template</label>}
+        </section>
+        <section className="create-config-card" aria-labelledby="create-channel-options-title">
+          <h2 id="create-channel-options-title"><span className="create-step-number">03</span><span><strong>Channels and voice</strong><small>Tailor copy for each selected platform</small></span></h2>
         <fieldset className="create-fieldset">
-          <legend>Choose platforms</legend>
+          <legend>Publish to</legend>
           <div className="create-option-grid create-platform-grid">
             {platforms.map((platform) => <label className="create-check" key={platform}><input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => toggleValue(platform, selectedPlatforms, setSelectedPlatforms)} />{platform}</label>)}
           </div>
@@ -650,6 +660,8 @@ export function CreateClient() {
             </CompactSelect>
           </label>
         </div>
+        </section>
+        </div>
         {error && <p className="form-error" role="alert">{error}</p>}
         {error && <button className="button button-outline" type="button" disabled={generating} onClick={() => void generate()}>Retry generation</button>}
         {notice && <p className="form-success" role="status">{notice}{notice.includes("Posts and Queue") && <> <Link href="/dashboard/posts">Open queue</Link></>}</p>}
@@ -658,6 +670,7 @@ export function CreateClient() {
           <button type="submit" className="button button-gold" disabled={generating || selectedFormats.length === 0 || selectedPlatforms.length === 0}>
             {generating ? "Creating your content…" : "Generate drafts to review"}
           </button>
+          <span className="create-submit-context">Your draft is saved for review. Nothing publishes automatically.</span>
           {usage && <span className="create-usage">{usage.limit === null ? `${usage.used} generations used this month · Unlimited during trial` : `${usage.used} of ${usage.limit} generations used this month`}</span>}
         </div>
       </form>
@@ -665,7 +678,7 @@ export function CreateClient() {
       {generating && <div className="generation-progress" role="status"><span />Shaping your brief into content and design options…</div>}
       {results.length > 0 && (
         <section className="created-results" aria-label="Generated content">
-          <div className="created-results-heading"><div><p className="card-kicker">YOUR NEW CONTENT</p><h2>Review your drafts</h2><p>Read and edit each caption before you choose to schedule or publish. Nothing is sent automatically.</p></div><div><button type="button" disabled={Boolean(savingContentSet) || Boolean(postingId)} onClick={() => void saveContentSet()}>{savingContentSet ? "Saving set…" : "Save as Content Set"}</button> <Link href="/dashboard/content">View content library →</Link></div></div>
+          <div className="created-results-heading"><div><p className="create-results-kicker">Generated content</p><h2>Review your drafts</h2><p>Refine each platform version, check quality, then choose when to publish.</p></div><div><button type="button" disabled={Boolean(savingContentSet) || Boolean(postingId)} onClick={() => void saveContentSet()}>{savingContentSet ? "Saving set…" : "Save as Content Set"}</button> <Link href="/dashboard/content">View content library →</Link></div></div>
           <div className="created-grid">
             {results.map((item) => {
               const content = item.contentJson;
@@ -681,7 +694,7 @@ export function CreateClient() {
                 : design?.previewUrl ?? null;
               const designPageCount = designDocument?.pages.length ?? 1;
               return (
-                <article className="created-card" key={item.id}>
+                <article className="created-card create-review-card" key={item.id}>
                   <div className="created-preview-wrap">
                     {designDocument ? (
                       <button type="button" className="created-preview-trigger" onClick={() => setPreviewTarget({ itemId: item.id, pageIndex: 0 })} aria-label={`Open ${content.title} preview`}>

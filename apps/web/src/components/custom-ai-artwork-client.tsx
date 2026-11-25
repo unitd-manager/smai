@@ -104,7 +104,7 @@ export function CustomAiArtworkClient() {
           <label className="ai-artwork-reference"><span>Style reference <small>Optional</small></span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setReference(event.target.files?.[0] ?? null)} />{reference && <small>{reference.name}</small>}</label>
           <button type="submit" className="button button-gold ai-artwork-submit" disabled={generating || prompt.trim().length < 8 || configured === false}>{generating ? "Creating artwork…" : <><Sparkles size={17} /> Create with AI</>}</button>
         </div>
-        <label className="ai-artwork-photo-mode"><input type="checkbox" checked={photoMode} disabled={!photoAvailable} onChange={(event) => setPhotoMode(event.target.checked)} /> Create photo-rich artwork with Google AI Studio</label>
+        <label className="ai-artwork-photo-mode"><input type="checkbox" checked={photoMode} disabled={!photoAvailable} onChange={(event) => setPhotoMode(event.target.checked)} /><span>Create photo-rich artwork with Google AI Studio</span></label>
         <p className="ai-artwork-note">Saved artwork appears in Gallery and Designs. Save it as a draft to review in Publishing; nothing publishes automatically.</p>
         {configured === false && <p className="ai-artwork-error" role="status">Image generation needs GROQ_API_KEY or GOOGLE_AI_STUDIO_API_KEY in API configuration.</p>}
         {error && <p className="ai-artwork-error" role="alert">{error}</p>}

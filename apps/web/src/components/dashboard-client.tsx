@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import {
   ArrowRight,
   CalendarDays,
+  CalendarClock,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
@@ -12,6 +14,8 @@ import {
   FileVideo2,
   FolderOpen,
   Image as ImageIcon,
+  Lightbulb,
+  Radio,
   Sparkles,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
@@ -37,12 +41,15 @@ type Post = {
   }>;
 };
 
+type ConfirmedTarget = Post["targets"][number] & { publishedAt: string };
+
 type Campaign = { id: string; name: string; startsAt: string; endsAt: string; status: string; campaign?: { lifecycle?: string } };
 
 type DashboardActivity = {
   draftCount: number;
   failedCount: number;
   dailyPublished: number[];
+  posts: Post[];
   scheduledPosts: Post[];
   campaigns: Campaign[];
 };
@@ -69,6 +76,19 @@ type AutopilotPreview = {
     instagramAutopilotNextRunAt: string | null;
   };
   blockers: string[];
+};
+
+type BrainPreview = {
+  recommendations: Array<{ title: string; explanation: string; actionLabel: string; actionHref: string }>;
+  priorities: string[];
+};
+
+type ConnectedAccountsPreview = {
+  accounts: Array<{ id: string; provider: string; displayName: string; status: string }>;
+};
+
+type InstagramPreview = {
+  posts: Array<{ likes: number | null; commentsCount: number | null; insights: Record<string, number | null> }>;
 };
 
 type DashboardState = {
@@ -104,18 +124,29 @@ function scheduledPostDateKey(post: Post) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function confirmedLiveTargets(post: Post) {
+  return post.targets.filter((target): target is ConfirmedTarget =>
+    target.publishingMode === "live" &&
+    (target.status === "PUBLISHED" || target.status === "DELETED_ON_PLATFORM") &&
+    Boolean(target.publishedAt),
+  );
+}
+
 function DashboardPerformanceChart({ values }: { values: number[] }) {
   const width = 760;
   const height = 160;
   const top = 16;
-  const bottom = 122;
+  const bottom = 126;
+  const left = 34;
+  const right = 8;
   const peak = Math.max(1, ...values);
   const points = values.map((value, index) => {
-    const x = 8 + (index / Math.max(1, values.length - 1)) * (width - 16);
+    const x = left + (index / Math.max(1, values.length - 1)) * (width - left - right);
     const y = bottom - (value / peak) * (bottom - top);
     return { x, y, value };
   });
   const line = points.map(({ x, y }) => `${x},${y}`).join(" ");
+  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
     <div className="dashboard-performance-chart">
@@ -124,18 +155,22 @@ function DashboardPerformanceChart({ values }: { values: number[] }) {
         <desc id="dashboard-performance-description">Daily counts of live posts confirmed as published. Demo activity is excluded.</desc>
         {[0, 1, 2].map((step) => {
           const y = top + (step / 2) * (bottom - top);
-          return <line key={step} x1="8" x2={width - 8} y1={y} y2={y} className="dashboard-performance-gridline" />;
+          const label = Math.round(peak * (1 - step / 2));
+          return <g key={step}>
+            <line x1={left} x2={width - right} y1={y} y2={y} className="dashboard-performance-gridline" />
+            <text x="2" y={y + 3} className="dashboard-performance-axis-label">{label}</text>
+          </g>;
         })}
-        <polygon points={`8,${bottom} ${line} ${width - 8},${bottom}`} className="dashboard-performance-area" />
+        <polygon points={`${left},${bottom} ${line} ${width - right},${bottom}`} className="dashboard-performance-area" />
         <polyline points={line} className="dashboard-performance-line" />
         {points.map(({ x, y, value }, index) => (
           <circle key={index} cx={x} cy={y} r="3" className="dashboard-performance-point">
-            <title>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}: {value} published</title>
+            <title>{weekdays[index]}: {value} published</title>
           </circle>
         ))}
         {points.map(({ x }, index) => (
           <text key={index} x={x} y={height - 4} className="dashboard-performance-label" textAnchor="middle">
-            {["M", "T", "W", "T", "F", "S", "S"][index]}
+            {weekdays[index]}
           </text>
         ))}
       </svg>
@@ -198,7 +233,7 @@ function DashboardMiniCalendar({ posts, campaigns, error }: { posts: Post[] | nu
     <section className="dashboard-mini-calendar" aria-labelledby="dashboard-mini-calendar-title">
       <header className="dashboard-mini-calendar-header">
         <div>
-          <p className="eyebrow">YOUR SCHEDULE</p>
+          <p className="eyebrow">Your schedule</p>
           <h2 id="dashboard-mini-calendar-title">Publishing calendar</h2>
         </div>
         <Link href="/dashboard/calendar">Open calendar <ArrowRight size={14} aria-hidden="true" /></Link>
@@ -293,18 +328,17 @@ const studioFeatures = [
   { label: "Connect social channels", detail: "Manage the accounts used for publishing", href: "/dashboard/social-accounts", icon: FolderOpen },
 ];
 
-const featuredTools = [
-  studioFeatures[0],
-  studioFeatures[2],
-  studioFeatures[3],
-];
-
 export function DashboardClient() {
   const [dashboard, setDashboard] = useState<DashboardState | null>(null);
   const [competitors, setCompetitors] = useState<DashboardCompetitor[] | null>(null);
   const [competitorError, setCompetitorError] = useState("");
   const [autopilot, setAutopilot] = useState<AutopilotPreview | null>(null);
   const [autopilotError, setAutopilotError] = useState("");
+  const [brain, setBrain] = useState<BrainPreview | null>(null);
+  const [brainError, setBrainError] = useState("");
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccountsPreview["accounts"] | null>(null);
+  const [accountsError, setAccountsError] = useState("");
+  const [instagram, setInstagram] = useState<InstagramPreview | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -319,9 +353,27 @@ export function DashboardClient() {
       .catch((requestError: unknown) => {
         if (active) setAutopilotError(requestError instanceof Error ? requestError.message : "Could not load Autopilot status.");
       });
+    apiRequest<BrainPreview>("/api/marketing-brain")
+      .then((response) => { if (active) setBrain(response); })
+      .catch((requestError: unknown) => {
+        if (active) setBrainError(requestError instanceof Error ? requestError.message : "Could not load the next marketing recommendation.");
+      });
+    apiRequest<ConnectedAccountsPreview>("/api/social-accounts")
+      .then((response) => {
+        if (!active) return;
+        setConnectedAccounts(response.accounts);
+        if (response.accounts.some((account) => account.provider === "instagram" && account.status === "CONNECTED")) {
+          apiRequest<InstagramPreview>("/api/listening")
+            .then((insights) => { if (active) setInstagram(insights); })
+            .catch(() => { if (active) setInstagram(null); });
+        }
+      })
+      .catch((requestError: unknown) => {
+        if (active) setAccountsError(requestError instanceof Error ? requestError.message : "Could not load connected channels.");
+      });
     Promise.all([
       apiRequest<DashboardData>("/api/dashboard"),
-      apiRequest<{ posts: Post[] }>("/api/posts?brandId=all&limit=100"),
+      apiRequest<{ posts: Post[] }>("/api/posts?brandId=all&limit=500"),
       apiRequest<{ items: Array<{ status: string }> }>("/api/content?brandId=all"),
       apiRequest<{ campaigns: Campaign[] }>("/api/campaigns").catch(() => ({ campaigns: [] })),
     ])
@@ -354,6 +406,7 @@ export function DashboardClient() {
             draftCount: contentResponse.items.filter((item) => item.status === "DRAFT").length,
             failedCount: failedPosts.length,
             dailyPublished,
+            posts,
             scheduledPosts,
             campaigns: campaignResponse.campaigns,
           },
@@ -369,26 +422,73 @@ export function DashboardClient() {
   const workspace = dashboard?.workspace;
   const activity = dashboard?.activity;
   const verifiedCompetitors = competitors?.filter((competitor) => competitor.websiteUrl) ?? [];
+  const recentPosts = [...(activity?.posts ?? [])]
+    .map((post) => {
+      const failed = post.status === "FAILED" || post.targets.some((target) => target.status === "FAILED");
+      const publishedTargets = confirmedLiveTargets(post);
+      const publishedAt = publishedTargets
+        .map((target) => target.publishedAt)
+        .filter((value): value is string => Boolean(value))
+        .sort((first, second) => new Date(second).getTime() - new Date(first).getTime())[0] ?? null;
+      return { post, failed, publishedAt };
+    })
+    .filter(({ failed, publishedAt }) => failed || publishedAt)
+    .sort((first, second) => {
+      if (first.failed !== second.failed) return first.failed ? -1 : 1;
+      return new Date(second.publishedAt ?? 0).getTime() - new Date(first.publishedAt ?? 0).getTime();
+    })
+    .slice(0, 5);
+  const upcomingPosts = [...(activity?.scheduledPosts ?? [])]
+    .sort((first, second) => new Date(first.scheduledAt ?? 0).getTime() - new Date(second.scheduledAt ?? 0).getTime())
+    .slice(0, 4);
+  const campaignCutoff = new Date();
+  campaignCutoff.setHours(0, 0, 0, 0);
+  const upcomingCampaigns = [...(activity?.campaigns ?? [])]
+    .filter((campaign) => new Date(campaign.endsAt).getTime() >= campaignCutoff.getTime() && (campaign.campaign?.lifecycle ?? campaign.status).toUpperCase() !== "COMPLETED")
+    .sort((first, second) => new Date(first.startsAt).getTime() - new Date(second.startsAt).getTime())
+    .slice(0, 3);
+  const weekStart = getWeekStart(new Date());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const publishedThisWeek = activity?.posts.filter((post) =>
+    confirmedLiveTargets(post).some((target) => {
+      const publishedAt = new Date(target.publishedAt);
+      return publishedAt >= weekStart && publishedAt < weekEnd;
+    }),
+  ).length ?? 0;
+  const instagramTotals = instagram?.posts.reduce((totals, post) => ({
+    likes: totals.likes + (post.likes ?? 0),
+    comments: totals.comments + (post.commentsCount ?? 0),
+  }), { likes: 0, comments: 0 });
+  const activeAccounts = connectedAccounts?.filter((account) => account.status === "CONNECTED") ?? [];
+  const nextRecommendation = brain?.recommendations[0];
 
   return (
     <section className="dashboard-content workspace-dashboard dashboard-redesign">
       <header className="dashboard-hero">
         <div className="dashboard-hero-copy">
-          <p className="eyebrow"><span className="dashboard-hero-dot" /> YOUR CREATIVE WORKSPACE</p>
-          <h1>Make every scroll <span>stop.</span></h1>
+          <p className="eyebrow"><span className="dashboard-hero-dot" /> {workspace?.brand?.name ?? "Your creative workspace"}</p>
+          <h1>Your publishing <span>week</span></h1>
           <p>{workspace?.brand?.name
-            ? `Create and plan on-brand content for ${workspace.brand.name}.`
-            : "Plan your next idea, then bring it to life with AI images, video, and ready-to-edit designs."}</p>
+            ? `Plan, publish, and review content for ${workspace.brand.name}.`
+            : "Keep upcoming posts, publishing activity, and creative work moving in one place."}</p>
           <div className="dashboard-hero-actions">
             <Link className="button button-gold" href="/dashboard/create"><Sparkles size={16} aria-hidden="true" /> Start creating <ArrowRight size={15} aria-hidden="true" /></Link>
             <Link className="dashboard-hero-secondary" href="/dashboard/analytics">See publishing activity <ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
         </div>
+        <Link className="dashboard-hero-next" href={upcomingPosts.length ? "/dashboard/posts" : "/dashboard/calendar"}>
+          <span className="dashboard-hero-next-icon"><CalendarClock size={18} aria-hidden="true" /></span>
+          <span><small>{upcomingPosts.length ? "Next scheduled" : "Schedule"}</small><strong>{upcomingPosts.length ? upcomingPosts[0]?.title || "Untitled post" : "Plan your next post"}</strong><em>{upcomingPosts.length && upcomingPosts[0]?.scheduledAt
+            ? new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: upcomingPosts[0].timezone || undefined }).format(new Date(upcomingPosts[0].scheduledAt))
+            : "Open publishing calendar"}</em></span>
+          <ArrowRight size={16} aria-hidden="true" />
+        </Link>
         <div className="dashboard-hero-art" aria-hidden="true">
           <div className="dashboard-art-orbit" />
-          <div className="dashboard-art-card dashboard-art-card-back"><ImageIcon size={20} aria-hidden="true" /><span>IMAGE</span></div>
-          <div className="dashboard-art-card dashboard-art-card-front"><FileVideo2 size={22} /><span>VIDEO</span><i /></div>
-          <div className="dashboard-art-card dashboard-art-card-side"><Sparkles size={18} /><span>DESIGN</span></div>
+          <div className="dashboard-art-card dashboard-art-card-back"><ImageIcon size={20} aria-hidden="true" /><span>Image</span></div>
+          <div className="dashboard-art-card dashboard-art-card-front"><FileVideo2 size={22} /><span>Video</span><i /></div>
+          <div className="dashboard-art-card dashboard-art-card-side"><Sparkles size={18} /><span>Design</span></div>
           <span className="dashboard-art-spark dashboard-art-spark-one">✦</span>
           <span className="dashboard-art-spark dashboard-art-spark-two">✧</span>
         </div>
@@ -397,61 +497,40 @@ export function DashboardClient() {
       {error && <div className="notice notice-error" role="alert">{error}</div>}
       {workspace?.trialExpired && <div className="notice notice-gold">Your trial has ended. You can still view your workspace; upgrade to create or schedule content.</div>}
 
-      <section className="dashboard-stat-grid dashboard-redesign-stats" aria-label="Publishing statistics">
+      <section className="dashboard-stat-grid dashboard-redesign-stats" aria-label="Publishing overview">
         <article className="dashboard-stat-card">
-          <span>Content drafts</span><strong>{activity ? activity.draftCount : "—"}</strong>
-          <small>Saved and ready to review</small>
+          <span>Drafts</span><strong>{activity ? activity.draftCount : "—"}</strong>
+          <small>Saved content</small>
           <span className="dashboard-stat-icon"><FileText size={21} aria-hidden="true" /></span>
         </article>
         <article className="dashboard-stat-card">
+          <span>Scheduled</span><strong>{activity ? activity.scheduledPosts.length : "—"}</strong>
+          <small>Posts in your queue</small>
+          <span className="dashboard-stat-icon"><CalendarClock size={21} aria-hidden="true" /></span>
+        </article>
+        <article className="dashboard-stat-card">
+          <span>Published this week</span><strong>{activity ? publishedThisWeek : "—"}</strong>
+          <small>Confirmed on connected channels</small>
+          <span className="dashboard-stat-icon"><CheckCircle2 size={21} aria-hidden="true" /></span>
+        </article>
+        <article className="dashboard-stat-card dashboard-stat-card-attention">
           <span>Needs attention</span><strong>{activity ? activity.failedCount : "—"}</strong>
-          <small>{activity?.failedCount ? "Review publishing issues" : "No failed posts"}</small>
+          <small>{activity?.failedCount ? "Publishing issues to review" : "No failed posts"}</small>
           <span className="dashboard-stat-icon"><CircleAlert size={21} aria-hidden="true" /></span>
         </article>
       </section>
 
-      <section className="dashboard-creative-section" aria-labelledby="dashboard-tools-title">
-        <div className="dashboard-redesign-heading">
-          <div><p className="eyebrow">THE AI STUDIO</p><h2 id="dashboard-tools-title">Start with a spark</h2><p>Choose a format and make it your own.</p></div>
-          <Link href="/dashboard/create">Explore all tools <ArrowRight size={15} aria-hidden="true" /></Link>
-        </div>
-        <div className="dashboard-creative-grid">
-          {featuredTools.map(({ label, detail, href, icon: Icon }, index) => (
-            <Link className={`dashboard-creative-card dashboard-creative-card-${index + 1}`} href={href} key={href}>
-              <span className="dashboard-creative-art"><Icon size={30} aria-hidden="true" /><span>{index === 0 ? "CREATE" : index === 1 ? "MOTION" : "DESIGN"}</span></span>
-              <span className="dashboard-creative-copy"><strong>{label}</strong><small>{detail}</small></span>
-              <span className="dashboard-creative-arrow" aria-hidden="true"><ArrowRight size={17} /></span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="dashboard-more-tools" aria-labelledby="dashboard-more-tools-title">
-        <div className="dashboard-redesign-heading dashboard-more-tools-heading">
-          <div><p className="eyebrow">YOUR WORKSPACE</p><h2 id="dashboard-more-tools-title">More ways to move forward</h2></div>
-        </div>
-        <div className="dashboard-feature-grid">
-          {studioFeatures.slice(1, 2).concat(studioFeatures.slice(4)).map(({ label, detail, href, icon: Icon }) => (
-            <Link className="dashboard-feature-card" href={href} key={href}>
-              <span className="dashboard-feature-icon"><Icon size={19} aria-hidden="true" /></span>
-              <span><strong>{label}</strong><small>{detail}</small></span>
-              <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <div className="dashboard-redesign-main-grid">
+      <div className="dashboard-priority-grid">
         <section className="dashboard-panel dashboard-analytics-panel" aria-label="Publishing analytics">
           <div className="dashboard-panel-heading">
-            <div><p className="eyebrow">CHANNEL PULSE</p><h2>Publishing activity</h2><p>Confirmed live posts this week</p></div>
+            <div><p className="eyebrow">Performance</p><h2>Publishing activity</h2><p>Confirmed live posts · this week</p></div>
             <Link href="/dashboard/analytics">Open analytics <ArrowRight size={13} aria-hidden="true" /></Link>
           </div>
           {activity ? (
             <>
               <div className="dashboard-performance-summary">
-                <strong>{activity.dailyPublished.reduce((sum, count) => sum + count, 0)}</strong>
-                <span>live posts confirmed this week</span>
+                <strong>{publishedThisWeek}</strong>
+                <span>posts confirmed on connected channels</span>
               </div>
               <DashboardPerformanceChart values={activity.dailyPublished} />
               {!activity.dailyPublished.some((count) => count > 0) && <p className="dashboard-chart-empty">Activity will appear after a connected platform confirms published posts.</p>}
@@ -459,13 +538,127 @@ export function DashboardClient() {
           ) : <p className="dashboard-panel-empty" role={error ? "alert" : "status"}>{error ? "Publishing activity could not be loaded." : "Loading publishing activity…"}</p>}
         </section>
 
-        <DashboardMiniCalendar posts={activity?.scheduledPosts ?? null} campaigns={activity?.campaigns ?? []} error={error} />
+        <div className="dashboard-side-stack">
+          <section className="dashboard-panel dashboard-upcoming-panel" aria-labelledby="dashboard-upcoming-title">
+            <header className="dashboard-panel-heading">
+              <div><p className="eyebrow">Next in queue</p><h2 id="dashboard-upcoming-title">Upcoming posts</h2></div>
+              <Link href="/dashboard/posts">View posts <ArrowRight size={13} aria-hidden="true" /></Link>
+            </header>
+            {!activity
+              ? <p className="dashboard-panel-empty" role="status">Loading scheduled posts…</p>
+              : upcomingPosts.length
+                ? <div className="dashboard-upcoming-list">
+                  {upcomingPosts.map((post) => {
+                    const scheduled = new Date(post.scheduledAt as string);
+                    const platforms = [...new Set(post.targets.map((target) => target.platform))];
+                    const scheduleDate = new Intl.DateTimeFormat(undefined, { day: "numeric", timeZone: post.timezone || undefined }).format(scheduled);
+                    const scheduleMonth = new Intl.DateTimeFormat(undefined, { month: "short", timeZone: post.timezone || undefined }).format(scheduled);
+                    return <Link className="dashboard-upcoming-item" href="/dashboard/posts" key={post.id}>
+                      <span className="dashboard-upcoming-date"><strong>{scheduleDate}</strong><small>{scheduleMonth}</small></span>
+                      <span className="dashboard-upcoming-copy"><strong>{post.title || "Untitled post"}</strong><small>{platforms.length ? platforms.join(" · ") : "Scheduled post"}</small></span>
+                      <time dateTime={post.scheduledAt ?? undefined}>{post.scheduledAt ? new Date(post.scheduledAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: post.timezone || undefined }) : ""}</time>
+                    </Link>;
+                  })}
+                </div>
+                : <div className="dashboard-empty-state"><p>No posts are scheduled yet</p><Link href="/dashboard/calendar">Plan a post <ArrowRight size={13} aria-hidden="true" /></Link></div>}
+          </section>
+
+        </div>
       </div>
 
+      <section className="dashboard-panel dashboard-campaign-panel dashboard-campaign-wide-panel" aria-labelledby="dashboard-campaigns-title">
+        <header className="dashboard-panel-heading">
+          <div><p className="eyebrow">Campaign planner</p><h2 id="dashboard-campaigns-title">Campaigns</h2><p>Upcoming activity across your saved campaigns.</p></div>
+          <Link href="/dashboard/campaigns" aria-label="View campaigns">View all <ArrowRight size={13} aria-hidden="true" /></Link>
+        </header>
+        {!activity
+          ? <p className="dashboard-panel-empty" role="status">Loading campaigns…</p>
+          : upcomingCampaigns.length
+            ? <div className="dashboard-campaign-list">
+              {upcomingCampaigns.map((campaign) => <Link className="dashboard-campaign-item" href="/dashboard/campaigns" key={campaign.id}>
+                <span><strong>{campaign.name}</strong><small>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(campaign.startsAt))} – {new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(campaign.endsAt))}</small></span>
+                <em>{(campaign.campaign?.lifecycle ?? campaign.status).toLowerCase().replaceAll("_", " ")}</em>
+              </Link>)}
+            </div>
+            : <div className="dashboard-empty-state"><p>No campaigns to preview</p><Link href="/dashboard/campaigns">Create a campaign <ArrowRight size={13} aria-hidden="true" /></Link></div>}
+      </section>
+
+      <div className="dashboard-schedule-grid">
+        <DashboardMiniCalendar posts={activity?.scheduledPosts ?? null} campaigns={activity?.campaigns ?? []} error={error} />
+        <section className="dashboard-panel dashboard-recent-panel" aria-labelledby="dashboard-recent-title">
+          <header className="dashboard-panel-heading">
+            <div><p className="eyebrow">Workspace activity</p><h2 id="dashboard-recent-title">Recent publishing</h2></div>
+            <Link href="/dashboard/posts">Open publishing <ArrowRight size={13} aria-hidden="true" /></Link>
+          </header>
+          {!activity
+            ? <p className="dashboard-panel-empty" role={error ? "alert" : "status"}>{error ? "Recent posts could not be loaded." : "Loading recent posts…"}</p>
+            : recentPosts.length
+              ? <div className="dashboard-recent-list">
+                {recentPosts.map(({ post, failed, publishedAt }) => <Link className="dashboard-recent-item" href="/dashboard/posts" key={post.id}>
+                  <span className={`dashboard-recent-mark${failed ? " is-failed" : ""}`}>{failed ? <CircleAlert size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}</span>
+                  <span className="dashboard-recent-copy"><strong>{post.title || "Untitled post"}</strong><small>{failed ? "Needs attention" : [...new Set(confirmedLiveTargets(post).map((target) => target.platform))].join(" · ") || "Published"}</small></span>
+                  {publishedAt && <time dateTime={publishedAt}>{new Date(publishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time>}
+                </Link>)}
+              </div>
+              : <div className="dashboard-empty-state"><p>Published posts and issues will appear here</p><Link href="/dashboard/posts">Open publishing <ArrowRight size={13} aria-hidden="true" /></Link></div>}
+        </section>
+      </div>
+
+      <section className="dashboard-creative-section dashboard-shortcuts-section" aria-labelledby="dashboard-tools-title">
+        <div className="dashboard-redesign-heading">
+          <div><p className="eyebrow">Workspace</p><h2 id="dashboard-tools-title">Quick actions</h2><p>Go straight to a tool or workflow.</p></div>
+          <Link href="/dashboard/create">Open Create <ArrowRight size={15} aria-hidden="true" /></Link>
+        </div>
+        <div className="dashboard-shortcut-grid">
+          {studioFeatures.map(({ label, detail, href, icon: Icon }) => (
+            <Link className="dashboard-shortcut-card" href={href} key={href} title={detail}>
+              <span className="dashboard-shortcut-icon"><Icon size={17} aria-hidden="true" /></span>
+              <strong>{label}</strong><ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <div className="dashboard-insight-grid dashboard-redesign-insights">
-        <section className="dashboard-insight-card" aria-label="Competitor snapshot">
+        <section className="dashboard-insight-card dashboard-recommendation-card" aria-label="Marketing recommendation">
           <header>
-            <div><p className="eyebrow">MARKET SNAPSHOT</p><h2>Competitor intelligence</h2></div>
+            <div><p className="eyebrow">Marketing Brain</p><h2>Your next move</h2></div>
+            <Lightbulb size={18} aria-hidden="true" />
+          </header>
+          {brainError
+            ? <p className="dashboard-insight-empty">Recommendations are unavailable right now.</p>
+            : brain
+              ? <>
+                <strong className="dashboard-recommendation-title">{nextRecommendation?.title ?? brain.priorities[0] ?? "No new recommendation"}</strong>
+                <p>{nextRecommendation?.explanation ?? (brain.priorities.length ? "Review this current workspace priority." : "Your workspace has no open recommendations right now.")}</p>
+                {nextRecommendation && <Link className="dashboard-insight-link" href={nextRecommendation.actionHref}>{nextRecommendation.actionLabel} <ArrowRight size={14} aria-hidden="true" /></Link>}
+              </>
+              : <p className="dashboard-panel-empty" role="status">Loading recommendations…</p>}
+          <Link className="dashboard-insight-link" href="/dashboard/marketing-brain">Open Marketing Brain <ArrowRight size={14} aria-hidden="true" /></Link>
+        </section>
+
+        <section className="dashboard-insight-card dashboard-channel-card" aria-label="Connected channel status">
+          <header>
+            <div><p className="eyebrow">Channel status</p><h2>Connected accounts</h2></div>
+            <Radio size={18} aria-hidden="true" />
+          </header>
+          {accountsError
+            ? <p className="dashboard-insight-empty">Channel status could not be loaded.</p>
+            : connectedAccounts
+              ? <>
+                <div className="dashboard-channel-total"><strong>{activeAccounts.length}</strong><span>{activeAccounts.length === 1 ? "connected account" : "connected accounts"}</span></div>
+                {activeAccounts.length
+                  ? <ul className="dashboard-channel-list">{activeAccounts.slice(0, 3).map((account) => <li key={account.id}><span className="dashboard-channel-indicator" /><span>{account.displayName}</span><small>{account.provider}</small></li>)}</ul>
+                  : <p className="dashboard-insight-empty">Connect a social account to publish and access channel insights.</p>}
+              </>
+              : <p className="dashboard-panel-empty" role="status">Loading account status…</p>}
+          {instagram && <div className="dashboard-instagram-summary"><span>Recent Instagram posts</span><strong>{instagram.posts.length}</strong><small>{instagramTotals?.likes ?? 0} likes · {instagramTotals?.comments ?? 0} comments</small></div>}
+          <Link className="dashboard-insight-link" href="/dashboard/social-accounts">Manage accounts <ArrowRight size={14} aria-hidden="true" /></Link>
+        </section>
+
+        <section className="dashboard-insight-card dashboard-competitor-card" aria-label="Competitor snapshot">
+          <header>
+            <div><p className="eyebrow">Market snapshot</p><h2>Competitor intelligence</h2></div>
             <Link href="/dashboard/competitors" aria-label="Open competitor intelligence"><ArrowRight size={17} aria-hidden="true" /></Link>
           </header>
           {verifiedCompetitors.slice(0, 3).map((competitor) => {
@@ -501,7 +694,7 @@ export function DashboardClient() {
 
         <section className="dashboard-insight-card" aria-label="Weekly Autopilot">
           <header>
-            <div><p className="eyebrow">WEEKLY CONTENT</p><h2>Autopilot</h2></div>
+            <div><p className="eyebrow">Weekly content</p><h2>Autopilot</h2></div>
             <Sparkles size={18} aria-hidden="true" />
           </header>
           {autopilotError

@@ -52,12 +52,24 @@ export function ContentLibraryClient() {
   const [search, setSearch] = useState("");
   const [historyItemId, setHistoryItemId] = useState("");
   const [historyVersions, setHistoryVersions] = useState<ContentVersion[]>([]);
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
-  const visibleItems = items.filter((item) => {
+  const filteredItems = items.filter((item) => {
     const query = search.trim().toLocaleLowerCase();
-    return !query || [item.request, item.contentJson.title, item.contentJson.caption, item.brand.name]
+    return !query || [item.request, item.contentJson.title, item.contentJson.caption, item.brand.name,
+      ...(item.contentJson.hashtags ?? []), ...(item.contentJson.platforms ?? [])]
       .some((value) => value?.toLocaleLowerCase().includes(query));
   });
+  const visibleItems = [...filteredItems].sort((a, b) => sortOrder === "oldest"
+    ? a.createdAt.localeCompare(b.createdAt)
+    : sortOrder === "title"
+      ? (a.contentJson.title ?? "Untitled content").localeCompare(b.contentJson.title ?? "Untitled content")
+      : b.createdAt.localeCompare(a.createdAt));
+  const selectedItems = items.filter((item) => selectedIds.includes(item.id));
+  const selectedVisibleItems = visibleItems.filter((item) => selectedIds.includes(item.id));
+  const allVisibleSelected = visibleItems.length > 0 && selectedVisibleItems.length === visibleItems.length;
   const formatCount = new Set(items.map((item) => item.contentJson.format ?? "content")).size;
 
   useEffect(() => {
@@ -169,6 +181,51 @@ export function ContentLibraryClient() {
     }
   }
 
+  async function duplicateSelected() {
+    const selected = selectedItems;
+    if (!selected.length) return;
+    setBulkBusy(true);
+    setError("");
+    setNotice("");
+    const results = await Promise.allSettled(selected.map((item) => apiRequest(`/api/content/${encodeURIComponent(item.id)}/duplicate`, { method: "POST" })));
+    const succeeded = results.filter((result) => result.status === "fulfilled").length;
+    const failed = results.length - succeeded;
+    setSelectedIds([]);
+    if (succeeded) {
+      setNotice(`${succeeded} ${succeeded === 1 ? "copy was" : "copies were"} added to your library${failed ? `; ${failed} could not be duplicated` : ""}.`);
+      setRefreshKey((key) => key + 1);
+    }
+    if (failed) setError(`${failed} selected ${failed === 1 ? "item could" : "items could"} not be duplicated.`);
+    setBulkBusy(false);
+  }
+
+  async function deleteSelected() {
+    const selected = selectedItems;
+    if (!selected.length || !window.confirm(`Delete ${selected.length} selected ${selected.length === 1 ? "item" : "items"} and their saved design options?`)) return;
+    setBulkBusy(true);
+    setError("");
+    setNotice("");
+    const results = await Promise.allSettled(selected.map((item) => apiRequest<void>(`/api/content/${encodeURIComponent(item.id)}`, { method: "DELETE" })));
+    const succeededIds = selected.filter((_, index) => results[index]?.status === "fulfilled").map((item) => item.id);
+    const failedCount = results.length - succeededIds.length;
+    setSelectedIds((current) => current.filter((id) => !succeededIds.includes(id)));
+    if (succeededIds.length) {
+      setNotice(`${succeededIds.length} ${succeededIds.length === 1 ? "item was" : "items were"} deleted${failedCount ? `; ${failedCount} could not be deleted` : ""}.`);
+      setRefreshKey((key) => key + 1);
+    }
+    if (failedCount) setError(`${failedCount} selected ${failedCount === 1 ? "item could" : "items could"} not be deleted.`);
+    setBulkBusy(false);
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setFormatFilter("all");
+    setPlatformFilter("all");
+    setStatusFilter("all");
+    setBrandFilter("all");
+    setSortOrder("newest");
+  }
+
   async function regenerate(item: LibraryItem, refine = "") {
     setError("");
     setNotice("");
@@ -192,11 +249,14 @@ export function ContentLibraryClient() {
 
   return (
     <section className="dashboard-content library-page">
-      <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
-      <div className="library-heading">
-        <div><h1>Content library</h1><p className="dashboard-lead">Ideas, captions, scripts and creative briefs created for your brands.</p></div>
+      <header className="library-heading">
+        <div>
+          <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
+          <h1>Content library</h1>
+          <p className="dashboard-lead">Ideas, captions, scripts and creative briefs created for your brands.</p>
+        </div>
         <Link className="button button-gold library-create-button" href="/dashboard/create">Create content</Link>
-      </div>
+      </header>
       {!loading && <div className="library-summary" aria-label="Content library totals">
         <div><span>Saved items</span><strong>{items.length}</strong></div>
         <div><span>Formats</span><strong>{formatCount}</strong></div>
@@ -206,22 +266,34 @@ export function ContentLibraryClient() {
       {error && <div className="notice notice-error" role="alert">{error}</div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       <div className="library-toolbar">
-        <label className="library-search">Search content<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, brief or brand" /></label>
+        <label className="library-search">Search content<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, brief, caption, hashtag or brand" /></label>
         <label>Format<CompactSelect aria-label="Format filter" value={formatFilter} onChange={(event) => setFormatFilter(event.target.value)}><option value="all">All formats</option>{["post", "carousel", "story", "poster", "brochure", "flyer", "thumbnail", "video"].map((format) => <option key={format}>{format}</option>)}</CompactSelect></label>
         <label>Platform<CompactSelect aria-label="Platform filter" value={platformFilter} onChange={(event) => setPlatformFilter(event.target.value)}><option value="all">All platforms</option>{["Instagram", "Facebook", "LinkedIn", "TikTok", "YouTube", "Pinterest", "X"].map((platform) => <option key={platform}>{platform}</option>)}</CompactSelect></label>
         <label>Status<CompactSelect aria-label="Status filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="completed">Completed</option></CompactSelect></label>
         <label>Brand<CompactSelect aria-label="Brand filter" value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</CompactSelect></label>
+        <label>Sort by<CompactSelect aria-label="Sort content" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option></CompactSelect></label>
       </div>
+      {!loading && items.length > 0 && <div className="library-results-bar">
+        <label className="library-select-all"><input type="checkbox" checked={allVisibleSelected} onChange={(event) => setSelectedIds((current) => event.target.checked
+          ? [...new Set([...current, ...visibleItems.map((item) => item.id)])]
+          : current.filter((id) => !visibleItems.some((item) => item.id === id)))} /> Select visible</label>
+        <p>{visibleItems.length} {visibleItems.length === 1 ? "item" : "items"}{visibleItems.length !== items.length ? ` shown · ${items.length} loaded` : " loaded"}</p>
+        {(search || formatFilter !== "all" || platformFilter !== "all" || statusFilter !== "all" || brandFilter !== "all" || sortOrder !== "newest") && <button type="button" className="library-clear-filters" onClick={clearFilters}>Clear filters</button>}
+      </div>}
+      {selectedItems.length > 0 && <div className="library-selection-bar" role="region" aria-label="Selected content actions">
+        <strong>{selectedItems.length} selected</strong>
+        <div><button type="button" className="button button-primary" disabled={bulkBusy} onClick={() => void duplicateSelected()}>{bulkBusy ? "Working…" : "Duplicate selected"}</button><button type="button" className="button button-outline library-bulk-delete" disabled={bulkBusy} onClick={() => void deleteSelected()}>Delete selected</button><button type="button" className="button button-outline library-selection-clear" disabled={bulkBusy} onClick={() => setSelectedIds([])}>Clear selection</button></div>
+      </div>}
       {loading ? <p className="loading-label">Loading your content library…</p> : items.length === 0 ? (
         <article className="section-empty-state"><span className="section-empty-icon"><Files size={22} aria-hidden="true" /></span><h2>No content saved yet</h2><p>Create a caption, carousel, story or video script to add it to this library.</p><Link className="button button-gold" href="/dashboard/create">Create content</Link></article>
       ) : visibleItems.length === 0 ? (
-        <article className="section-empty-state"><h2>No matching content</h2><p>Try a different search or update your filters.</p><button className="button button-outline" type="button" onClick={() => setSearch("")}>Clear search</button></article>
+        <article className="section-empty-state"><h2>No matching content</h2><p>Try a different search or update your filters.</p><button className="button button-outline" type="button" onClick={clearFilters}>Clear filters</button></article>
       ) : (
         <div className="library-card-grid">{visibleItems.map((item) => (
-          <article className="library-item" key={item.id}>
+          <article className={`library-item${selectedIds.includes(item.id) ? " is-selected" : ""}`} key={item.id}>
             <div className="library-item-type">{(item.contentJson.format ?? "content").slice(0, 1).toUpperCase()}</div>
             <div className="library-item-copy">
-              <div><span className="library-badge">{item.contentJson.format ?? "content"}</span><span className="library-badge">{item.provider === "google-ai-studio" ? "Gemini" : item.provider === "groq" ? "Groq" : item.provider === "openai" ? "OpenAI" : item.provider === "media-upload" ? "Imported" : "Legacy"}</span></div>
+              <div className="library-item-badges"><span className="library-badge">{item.contentJson.format ?? "content"}</span><span className="library-badge">{item.provider === "google-ai-studio" ? "Gemini" : item.provider === "groq" ? "Groq" : item.provider === "openai" ? "OpenAI" : item.provider === "media-upload" ? "Imported" : "Legacy"}</span><span className="library-status" data-status={item.status.toLowerCase()}>{item.status.replaceAll("_", " ").toLocaleLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</span></div>
               {editingId === item.id ? (
                 <div className="content-editor">
                   <label>Title<input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
@@ -232,16 +304,19 @@ export function ContentLibraryClient() {
               ) : (
                 <>
                   <h2>{item.contentJson.title ?? "Untitled content"}</h2>
-                  <p>{item.contentJson.caption ?? ""}</p>
-                  <small>{item.brand.name} · {new Date(item.createdAt).toLocaleDateString()}</small>
+                  {(item.contentJson.caption || item.request) && <p>{item.contentJson.caption || `Brief: ${item.request}`}</p>}
+                  <div className="library-item-meta"><strong>{item.brand.name}</strong><span>{new Date(item.createdAt).toLocaleDateString()}</span></div>
+                  {item.contentJson.platforms?.length ? <div className="library-platforms" aria-label="Target platforms">{item.contentJson.platforms.map((platform) => <span key={platform}>{platform}</span>)}</div> : null}
                   <details className="content-detail"><summary>View full content</summary><p>Brief: {item.request || "No brief provided"}</p><p>Hashtags: {item.contentJson.hashtags?.join(" ") || "None"}</p><p>Platforms: {item.contentJson.platforms?.join(", ") || "Not set"}</p></details>
-                  <div className="library-actions">
+                  <div className="library-actions library-primary-actions">
                     <button type="button" onClick={() => beginEdit(item)}>Edit</button>
-                    <button type="button" onClick={() => void loadHistory(item.id)}>Version history</button>
                     <button type="button" onClick={() => void duplicateItem(item.id)}>Duplicate</button>
-                    <button type="button" disabled={Boolean(refinements[item.id]?.trim()) === false} onClick={() => void regenerate(item, refinements[item.id])}>Refine</button>
-                    <button type="button" onClick={() => void regenerate(item)}>Regenerate</button>
-                    <button type="button" onClick={() => void deleteItem(item.id)}>Delete</button>
+                    <details className="library-more-actions"><summary>More</summary><div>
+                      <button type="button" onClick={() => void loadHistory(item.id)}>Version history</button>
+                      <button type="button" disabled={Boolean(refinements[item.id]?.trim()) === false} onClick={() => void regenerate(item, refinements[item.id])}>Refine</button>
+                      <button type="button" onClick={() => void regenerate(item)}>Regenerate</button>
+                      <button type="button" onClick={() => void deleteItem(item.id)}>Delete</button>
+                    </div></details>
                   </div>
                   {historyItemId === item.id && <div className="content-version-list">
                     <h3>Saved versions</h3>
@@ -260,6 +335,7 @@ export function ContentLibraryClient() {
                 </>
               )}
             </div>
+            <label className="library-item-select"><input type="checkbox" checked={selectedIds.includes(item.id)} aria-label={`Select ${item.contentJson.title ?? "content item"}`} onChange={(event) => setSelectedIds((current) => event.target.checked ? [...new Set([...current, item.id])] : current.filter((id) => id !== item.id))} /></label>
             {item.contentJson.hashtags && <div className="library-tags">{item.contentJson.hashtags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
           </article>
         ))}</div>

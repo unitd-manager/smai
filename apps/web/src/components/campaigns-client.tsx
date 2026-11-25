@@ -271,6 +271,16 @@ function dateInputValue(value: string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function campaignErrorSummary(message: string) {
+  if (/\b(429|503)\b|high demand|rate limit|temporarily unavailable/i.test(message)) {
+    return "The configured AI providers are busy or temporarily unavailable. Try again shortly.";
+  }
+  if (/invalid_type|invalid input|expected (array|number|string)|schema/i.test(message)) {
+    return "The generated response could not be used. Try again; if it keeps happening, review the technical details.";
+  }
+  return message.length > 240 ? `${message.slice(0, 240).trimEnd()}…` : message;
+}
+
 function downloadCampaign(campaign: PersistedCampaign) {
   const blob = new Blob([JSON.stringify(campaign, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -659,13 +669,17 @@ export function CampaignsClient() {
 
   return (
     <section className="dashboard-content campaign-page">
-      <p className="eyebrow">YOUR STUDIO · CAMPAIGNS</p>
-      <h1>Campaign intelligence</h1>
-      <p className="dashboard-lead">Turn a marketing goal into a sequenced, reviewable content plan.</p>
+      <header className="campaign-page-heading">
+        <p className="eyebrow">YOUR STUDIO · CAMPAIGNS</p>
+        <h1>Campaign intelligence</h1>
+        <p className="dashboard-lead">Turn a marketing goal into a sequenced, reviewable content plan.</p>
+      </header>
       {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
-      <div className="campaign-capability-note" role="note">
-        Strategy and copy are AI recommendations based on your brief and saved brand profile. External market/trend research is not connected. Instagram and Facebook Page text/image publishing are integrated; other selected channels are content drafts. Metrics are shown only when actual campaign-attributed data is available.
-      </div>
+      <details className="campaign-capability-note">
+        <summary>How campaign recommendations and publishing work</summary>
+        <p>Strategy and copy are AI recommendations based on your brief and saved brand profile. External market and trend research is not connected.</p>
+        <p>Instagram and Facebook Page text and image publishing are integrated. Other selected channels create content drafts. Metrics appear only when actual campaign-attributed data is available.</p>
+      </details>
       <section className="campaign-moments" aria-label="Upcoming campaign ideas">
         <div className="campaign-moments-heading"><div><p className="eyebrow">BRAND CALENDAR</p><h2>Campaign ideas coming up</h2><p>Ideas use your saved industry and country. Outcomes are goals, not guaranteed results.</p></div><span>{brandMarket.country || "Global dates"}</span></div>
         <div className="campaign-moments-grid">{upcomingCampaignMoments(brandMarket.country, brandMarket.industry).map((moment) => <article className="campaign-moment-card" key={`${moment.title}-${moment.date.toISOString()}`}><time dateTime={moment.date.toISOString()}>{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(moment.date)}</time><h3>{moment.title}</h3><p>{moment.angle}</p><small>Goal: {moment.outcome}</small><button type="button" className="button button-outline" onClick={() => applyCampaignMoment(moment)}>Use this idea</button></article>)}</div>
@@ -688,7 +702,7 @@ export function CampaignsClient() {
           <label className="create-idea-field">Campaign goal and brief
             <textarea required minLength={8} maxLength={1000} rows={3} value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="What are you promoting, what outcome do you want, and what should people do next?" />
           </label>
-          <details className="campaign-optional-fields" open>
+          <details className="campaign-optional-fields">
             <summary>Campaign name, audience, success target, and budget</summary>
             <div className="campaign-optional-grid">
               <label className="create-idea-field">Campaign name
@@ -758,7 +772,11 @@ export function CampaignsClient() {
             </label>
           </div>
         </fieldset>
-        {error && <p className="form-error" role="alert">{error}</p>}
+        {error && <div className="campaign-error-panel" role="alert">
+          <strong>{/AI provider|google-ai-studio|groq|openai|gemini|high demand|rate limit/i.test(error) ? "Strategy could not be generated" : "Campaign action could not be completed"}</strong>
+          <p>{campaignErrorSummary(error)}</p>
+          {error.length > 240 && <details><summary>Technical details</summary><pre>{error}</pre></details>}
+        </div>}
         {notice && <p className="form-success" role="status">{notice}{savedPlan && <> <Link href="/dashboard/content-plans">Open Content Plans</Link></>}</p>}
         <button type="submit" className="button button-gold" disabled={creating || formats.length === 0 || selectedPlatforms.length === 0 || !primaryTarget.trim()}>
           {creating ? "Building your campaign strategy…" : strategy ? "Generate a new campaign strategy" : "Build campaign strategy"}

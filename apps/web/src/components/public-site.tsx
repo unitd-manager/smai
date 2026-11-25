@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Menu } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { brand } from "@/config/brand";
 
@@ -25,7 +26,7 @@ export function MarketingHeader() {
         ))}
       </nav>
       <details className="marketing-mobile-nav">
-        <summary aria-label="Toggle navigation">☰</summary>
+        <summary aria-label="Toggle navigation"><Menu size={19} strokeWidth={1.8} aria-hidden="true" /></summary>
         <nav aria-label="Mobile navigation">
           {publicLinks.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
         </nav>

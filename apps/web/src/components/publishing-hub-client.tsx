@@ -17,7 +17,7 @@ export function PublishingHubClient() {
   return (
     <section className="dashboard-content publishing-hub">
       <header className="publishing-hub-heading">
-        <p className="eyebrow">YOUR STUDIO · PUBLISH</p>
+        <p className="eyebrow">Publishing workspace</p>
         <h1>Publishing</h1>
         <p className="dashboard-lead">Manage drafts, scheduled posts, publishing results, and team reviews in one place.</p>
       </header>

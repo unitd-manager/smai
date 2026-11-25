@@ -66,7 +66,7 @@ export function SettingsPageClient({ section = "general", logo }: { section?: st
         </header>
         <div className="settings-layout">
           <nav className="settings-navigation" aria-label="Settings sections">
-            <p>SETTINGS</p>
+            <p>Settings</p>
             {settingsSections.map((item) => {
               const active = activeSection.id === item.id;
               return (

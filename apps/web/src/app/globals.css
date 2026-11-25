@@ -10160,6 +10160,146 @@ body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot
 .create-page .custom-ai-artwork { margin: 18px 0; border: 0; border-radius: 14px; padding: 18px; background: var(--studio-panel, #111d31); }
 .create-page .custom-ai-artwork .ai-artwork-intro { margin-bottom: 16px; }
 
+/* Create studio layout: brief first, production settings second, generated work as a proofing desk. */
+html[data-theme-preset] body .app-shell .dashboard-content.create-page { display: grid; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.create-page > h1::after { content: none; }
+html[data-theme-preset] body .app-shell .create-page-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+html[data-theme-preset] body .app-shell .create-page-heading .eyebrow { margin: 0 0 6px; letter-spacing: 0; text-transform: none; }
+html[data-theme-preset] body .app-shell .create-page-heading h1 { margin: 0; }
+html[data-theme-preset] body .app-shell .create-page-heading .dashboard-lead { margin: 8px 0 0; }
+html[data-theme-preset] body .app-shell .create-page-step { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; color: var(--studio-muted); font-size: 12px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .create-page-step > span { color: var(--studio-accent-soft, var(--accent-400)); font-size: 11px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .create-page-step > i { width: 20px; height: 1px; background: var(--studio-line); }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure { overflow: hidden; border: 1px solid var(--studio-line); border-radius: 12px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure > summary { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; color: var(--studio-text); list-style: none; cursor: pointer; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure > summary::-webkit-details-marker { display: none; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure > summary > span:first-child { display: grid; gap: 4px; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure > summary strong { font-size: 14px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure > summary small { color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure-action { border: 1px solid var(--studio-line); border-radius: 8px; padding: 8px 10px; color: var(--studio-accent-soft, var(--accent-400)); font-size: 12px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure[open] > summary { border-bottom: 1px solid var(--studio-line); }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure[open] .custom-ai-artwork { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .custom-ai-artwork { display: grid; gap: 16px; padding: 18px; background: transparent; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .custom-ai-artwork .ai-artwork-intro .eyebrow,
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .custom-ai-artwork .ai-artwork-result .eyebrow { letter-spacing: 0; text-transform: none; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-controls .compact-select { width: 100%; min-width: 0; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-controls .compact-select-trigger { min-height: 44px; border-color: var(--studio-line); border-radius: 9px; background: var(--studio-panel-raised); color: var(--studio-text); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-page .create-form { gap: 16px; margin: 0; border: 1px solid var(--studio-line); border-radius: 14px; padding: clamp(16px, 2vw, 24px); background: var(--studio-panel); box-shadow: none; }
+html[data-theme-preset] body .app-shell .create-page .create-brief-section { display: grid; gap: 12px; padding: 0; }
+html[data-theme-preset] body .app-shell .create-page .create-idea-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+html[data-theme-preset] body .app-shell .create-page .create-idea-heading > label,
+html[data-theme-preset] body .app-shell .create-config-card > h2 { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--studio-text); cursor: default; }
+html[data-theme-preset] body .app-shell .create-idea-heading > label > span:last-child,
+html[data-theme-preset] body .app-shell .create-config-card > h2 > span:last-child { display: grid; gap: 3px; }
+html[data-theme-preset] body .app-shell .create-idea-heading > label strong,
+html[data-theme-preset] body .app-shell .create-config-card > h2 strong { font-size: 15px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .create-idea-heading > label small,
+html[data-theme-preset] body .app-shell .create-config-card > h2 small { color: var(--studio-muted); font-size: 12px; font-weight: 400; }
+html[data-theme-preset] body .app-shell .create-step-number { display: grid; width: 30px; height: 30px; flex: 0 0 30px; place-items: center; border: 1px solid var(--studio-line); border-radius: 9px; background: var(--studio-panel-raised); color: var(--studio-accent-soft, var(--accent-400)); font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 600; }
+html[data-theme-preset] body .app-shell .create-page .create-form .surprise-button { position: static; min-height: 34px; margin: 0; border: 1px solid var(--studio-line); border-radius: 8px; padding: 0 10px; background: var(--studio-panel-raised); color: var(--studio-accent-soft, var(--accent-400)); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-page .create-form .surprise-button:hover { background: color-mix(in srgb, var(--action-primary) 12%, var(--studio-panel-raised)); }
+html[data-theme-preset] body .app-shell .create-page .create-brief-section textarea { min-height: 126px; border: 1px solid var(--studio-line); border-radius: 10px; padding: 14px; background: var(--studio-panel-raised); color: var(--studio-text); font: 14px/1.6 var(--font-inter), Inter, sans-serif; }
+html[data-theme-preset] body .app-shell .create-page .create-brief-section textarea::placeholder { color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .create-configuration-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 12px; }
+html[data-theme-preset] body .app-shell .create-config-card { display: grid; min-width: 0; gap: 16px; border: 1px solid var(--studio-line); border-radius: 11px; padding: 16px; background: color-mix(in srgb, var(--studio-panel-raised) 46%, var(--studio-panel)); }
+html[data-theme-preset] body .app-shell .create-config-card > h2 { padding-bottom: 12px; border-bottom: 1px solid var(--studio-line); }
+html[data-theme-preset] body .app-shell .create-config-card .create-fieldset legend { margin-bottom: 8px; color: var(--studio-muted); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-config-card .create-option-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+html[data-theme-preset] body .app-shell .create-config-card .create-platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-theme-preset] body .app-shell .create-config-card .create-check { min-width: 0; min-height: 40px; gap: 8px; border-color: var(--studio-line); border-radius: 8px; padding: 6px 9px; background: var(--studio-panel); color: var(--studio-text); font-size: 12px; line-height: 1.3; }
+html[data-theme-preset] body .app-shell .create-config-card .create-check:has(input:checked) { border-color: color-mix(in srgb, var(--action-primary) 45%, var(--studio-line)); background: color-mix(in srgb, var(--action-primary) 12%, var(--studio-panel)); }
+html[data-theme-preset] body .app-shell .create-config-card .create-check input { flex: 0 0 auto; }
+html[data-theme-preset] body .app-shell .create-config-card .create-template-select { display: grid; gap: 7px; color: var(--studio-muted); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-config-card .create-template-select .compact-select-trigger,
+html[data-theme-preset] body .app-shell .create-config-card .create-select-grid .compact-select-trigger { min-height: 42px; border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-text); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-config-card .create-template-select small { color: var(--studio-muted); font-size: 11px; font-weight: 400; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .create-config-card .create-select-grid { gap: 10px; }
+html[data-theme-preset] body .app-shell .create-config-card .create-select-grid label { gap: 6px; color: var(--studio-muted); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-submit-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 16px; margin-top: 0; border-color: var(--studio-line); padding-top: 16px; }
+html[data-theme-preset] body .app-shell .create-submit-row .button { min-height: 44px; border-radius: 8px; font-size: 13px; }
+html[data-theme-preset] body .app-shell .create-submit-context { color: var(--studio-muted); font-size: 12px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .create-usage { grid-column: 1 / -1; color: var(--studio-muted); font-size: 11px; }
+html[data-theme-preset] body .app-shell .create-page .form-error,
+html[data-theme-preset] body .app-shell .create-page .form-success { margin: 0; }
+html[data-theme-preset] body .app-shell .create-page .template-selected { border-radius: 7px; padding: 10px 12px; font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-page .generation-progress { min-height: 40px; gap: 10px; margin: 0; color: var(--studio-muted); font-size: 13px; }
+html[data-theme-preset] body .app-shell .create-page .generation-progress span { flex: 0 0 auto; }
+html[data-theme-preset] body .app-shell .create-page .created-results { display: grid; gap: 16px; margin-top: 8px; }
+html[data-theme-preset] body .app-shell .create-page .created-results-heading { align-items: end; gap: 16px; margin: 0; }
+html[data-theme-preset] body .app-shell .create-page .create-results-kicker { margin: 0 0 5px; color: var(--studio-accent-soft, var(--accent-400)); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-page .created-results-heading h2 { margin: 0; color: var(--studio-text); font-size: 24px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-page .created-results-heading > div:first-child > p:last-child { max-width: 680px; margin: 6px 0 0; color: var(--studio-muted); font-size: 13px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .create-page .created-results-heading > div:last-child { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+html[data-theme-preset] body .app-shell .create-page .created-results-heading > div:last-child > button { min-height: 38px; border: 1px solid var(--studio-line); border-radius: 8px; padding: 0 11px; background: var(--studio-panel); color: var(--studio-text); cursor: pointer; font: inherit; font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-page .created-results-heading > div:last-child > a { color: var(--studio-accent-soft, var(--accent-400)); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-page .created-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+html[data-theme-preset] body .app-shell .create-page .created-card.create-review-card { display: grid; grid-template-columns: minmax(250px, .72fr) minmax(0, 1.28fr); align-items: start; overflow: hidden; gap: 0; border: 1px solid var(--studio-line); border-radius: 14px; background: var(--studio-panel); box-shadow: none; }
+html[data-theme-preset] body .app-shell .create-review-card > .created-preview-wrap { grid-column: 1; grid-row: 1; min-height: 230px; display: grid; place-items: center; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .create-review-card .created-preview { width: 100%; height: 100%; max-height: 420px; object-fit: contain; }
+html[data-theme-preset] body .app-shell .create-review-card .created-preview-trigger { display: grid; width: 100%; height: 100%; min-height: 230px; place-items: center; border: 0; padding: 0; background: transparent; cursor: zoom-in; }
+html[data-theme-preset] body .app-shell .create-review-card .created-preview-empty { display: grid; min-height: 230px; place-items: center; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-review-card .created-format-badge { top: 12px; left: 12px; border-color: var(--studio-line); border-radius: 6px; padding: 5px 8px; background: var(--studio-panel); color: var(--studio-text); font-size: 11px; font-weight: 500; }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-preview { grid-column: 1; grid-row: 2; margin: 0; border: 0; border-top: 1px solid var(--studio-line); border-radius: 0; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-preview > summary { align-items: center; padding: 12px 14px; color: var(--studio-text); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-preview > summary small { color: var(--studio-muted); font-size: 11px; }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-grid { grid-template-columns: minmax(0, 1fr); padding: 0 12px 12px; }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-card { border-color: var(--studio-line); border-radius: 9px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-card :is(header strong, .social-feed-copy strong) { color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .create-review-card .social-feed-card :is(header small, .social-feed-copy p, .social-feed-copy small) { color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .create-review-card .created-card-body { display: grid; min-width: 0; gap: 14px; grid-column: 2; grid-row: 1 / span 2; padding: 18px; }
+html[data-theme-preset] body .app-shell .create-review-card .created-card-title h3 { color: var(--studio-text); font-size: 19px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-review-card .created-platforms { gap: 6px; margin: 0; }
+html[data-theme-preset] body .app-shell .create-review-card .created-platforms span { border-color: var(--studio-line); border-radius: 6px; padding: 5px 8px; color: var(--studio-muted); font-size: 11px; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-content-set { gap: 10px; border-color: var(--studio-line); padding-top: 14px; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-content-set h4 { color: var(--studio-text); font-size: 14px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-content-set > p { margin: -5px 0 0; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-caption-field { gap: 8px; border-color: var(--studio-line); border-radius: 9px; padding: 12px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .create-review-card .platform-caption-field .refine-input { gap: 6px; color: var(--studio-muted); font-size: 12px; font-weight: 500; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-caption-field .refine-input > span { line-height: 1.45; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-caption-field .refine-input textarea,
+html[data-theme-preset] body .app-shell .create-review-card .platform-caption-field .refine-input input { min-height: 76px; border-color: var(--studio-line); border-radius: 8px; padding: 10px; background: var(--studio-panel); color: var(--studio-text); font: 13px/1.5 var(--font-inter), Inter, sans-serif; }
+html[data-theme-preset] body .app-shell .create-review-card .platform-caption-field > button { min-height: 36px; border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-accent-soft, var(--accent-400)); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .create-review-card .post-quality-report { gap: 8px; border-left-width: 3px; border-radius: 8px; padding: 12px 14px; background: color-mix(in srgb, var(--action-primary) 9%, var(--studio-panel)); color: var(--studio-text); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .create-review-card .post-quality-report > strong { color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .create-review-card .design-options { gap: 8px; margin: 0; }
+html[data-theme-preset] body .app-shell .create-review-card .design-option { min-height: 40px; border-color: var(--studio-line); border-radius: 8px; padding: 4px 9px 4px 4px; background: var(--studio-panel-raised); color: var(--studio-text); font-size: 11px; }
+html[data-theme-preset] body .app-shell .create-review-card .design-option.is-active { border-color: color-mix(in srgb, var(--action-primary) 50%, var(--studio-line)); background: color-mix(in srgb, var(--action-primary) 12%, var(--studio-panel)); }
+html[data-theme-preset] body .app-shell .create-review-card .design-option img { width: 32px; height: 32px; border-radius: 5px; }
+html[data-theme-preset] body .app-shell .create-review-card .refine-input { gap: 6px; color: var(--studio-muted); font-size: 12px; font-weight: 500; }
+html[data-theme-preset] body .app-shell .create-review-card .refine-input input { min-height: 42px; border-color: var(--studio-line); border-radius: 8px; padding: 8px 10px; background: var(--studio-panel-raised); color: var(--studio-text); font: 13px var(--font-inter), Inter, sans-serif; }
+html[data-theme-preset] body .app-shell .create-review-card .refine-input small { color: var(--studio-muted); font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .create-review-card .created-primary-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+html[data-theme-preset] body .app-shell .create-review-card .created-primary-actions > button,
+html[data-theme-preset] body .app-shell .create-review-card .created-download-trigger { min-height: 42px; border-radius: 8px; font-size: 12px; }
+html[data-theme-preset] body .app-shell .create-review-card .created-download { min-width: 0; }
+html[data-theme-preset] body .app-shell .create-review-card .created-download-menu { z-index: 5; }
+@media (max-width: 1000px) {
+  html[data-theme-preset] body .app-shell .create-page .create-configuration-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .create-page .created-card.create-review-card { grid-template-columns: minmax(200px, .7fr) minmax(0, 1.3fr); }
+}
+@media (max-width: 720px) {
+  html[data-theme-preset] body .app-shell .create-page-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  html[data-theme-preset] body .app-shell .create-page-step { white-space: normal; }
+  html[data-theme-preset] body .app-shell .create-page .create-config-card .create-option-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .create-page .created-results-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .create-page .created-card.create-review-card { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .create-page .create-review-card > .created-preview-wrap { grid-column: 1; grid-row: 1; min-height: 240px; }
+  html[data-theme-preset] body .app-shell .create-page .create-review-card .social-feed-preview { grid-column: 1; grid-row: 2; }
+  html[data-theme-preset] body .app-shell .create-page .create-review-card .created-card-body { grid-column: 1; grid-row: 3; padding: 14px; }
+}
+@media (max-width: 480px) {
+  html[data-theme-preset] body .app-shell .create-artwork-disclosure > summary { align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px; }
+  html[data-theme-preset] body .app-shell .create-artwork-disclosure-action { align-self: flex-start; }
+  html[data-theme-preset] body .app-shell .create-page .create-idea-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .create-page .create-config-card { padding: 12px; }
+  html[data-theme-preset] body .app-shell .create-page .create-config-card .create-select-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .create-page .create-submit-row { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .create-page .create-submit-row .button { width: 100%; }
+  html[data-theme-preset] body .app-shell .create-page .create-submit-context,
+  html[data-theme-preset] body .app-shell .create-page .create-usage { grid-column: 1; }
+  html[data-theme-preset] body .app-shell .create-page .create-review-card .created-primary-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
 .publishing-hub-heading h1 { margin: 0 0 8px; }
 .publishing-hub-tabs { display: flex; gap: 8px; margin: 22px 0 16px; }
 .publishing-hub-tabs button { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; border: 0; border-radius: 10px; padding: 0 14px; color: var(--foreground); background: var(--studio-panel, #111d31); cursor: pointer; }
@@ -10167,6 +10307,110 @@ body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot
 .publishing-hub-content > .dashboard-content { margin: 0; padding: 0; background: transparent; }
 .publishing-hub-content .posts-page > :is(.eyebrow, h1, .dashboard-lead),
 .publishing-hub-content .approvals-page > :is(.eyebrow, h1, .dashboard-lead) { display: none; }
+
+/* Publishing workspace: keep the existing brand controls, give post status and delivery details a clearer reading order. */
+html[data-theme-preset] body .app-shell .publishing-hub { display: grid; gap: 20px; }
+html[data-theme-preset] body .app-shell .publishing-hub-heading { display: grid; gap: 8px; }
+html[data-theme-preset] body .app-shell .publishing-hub-heading .eyebrow { margin: 0; letter-spacing: 0; text-transform: none; }
+html[data-theme-preset] body .app-shell .publishing-hub-heading h1 { margin: 0; }
+html[data-theme-preset] body .app-shell .publishing-hub-heading .dashboard-lead { max-width: 720px; margin: 0; }
+html[data-theme-preset] body .app-shell .publishing-hub-tabs { gap: 8px; margin: 0; border-bottom: 1px solid var(--studio-line); padding-bottom: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub-content > .dashboard-content { display: grid; gap: 16px; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .posts-page > :is(.eyebrow, h1, .dashboard-lead),
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-page > :is(.eyebrow, h1, .dashboard-lead) { display: none; }
+html[data-theme-preset] body .app-shell .publishing-status-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+html[data-theme-preset] body .app-shell .publishing-status-overview > div { display: flex; min-width: 0; min-height: 76px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--studio-line); border-radius: 12px; padding: 16px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .publishing-status-overview span { color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-status-overview strong { color: var(--studio-text); font-size: 22px; font-variant-numeric: tabular-nums; font-weight: 600; }
+html[data-theme-preset] body .app-shell .publishing-status-overview .has-attention strong { color: var(--danger, #dc2626); }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(100px, 1fr)); align-items: end; gap: 12px; margin: 0; border-color: var(--studio-line); border-radius: 12px; padding: 16px; background: var(--studio-panel); box-shadow: none; }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar label { min-width: 0; gap: 6px; color: var(--studio-muted); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar :is(input, select) { box-sizing: border-box; width: 100%; min-width: 0; min-height: 40px; border: 1px solid var(--studio-line); border-radius: 8px; padding: 0 10px; background: var(--studio-panel-raised); color: var(--studio-text); font: inherit; font-size: 12px; }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar .compact-select { width: 100%; min-width: 0; }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar .compact-select-trigger { min-height: 42px; border-color: var(--studio-line); border-radius: 8px; padding-inline: 10px; background: var(--studio-panel-raised); color: var(--studio-text); font-size: 12px; }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar > .button { grid-column: 1 / 2; justify-self: start; min-height: 42px; }
+html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar > span { grid-column: 2 / -1; justify-self: end; align-self: center; margin: 0; padding: 0; color: var(--studio-muted); font-size: 12px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar { display: flex; min-height: 48px; align-items: center; flex-wrap: wrap; gap: 8px 12px; border: 1px solid var(--studio-line); border-radius: 10px; padding: 8px 12px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar > label { display: inline-flex; min-height: 32px; align-items: center; gap: 8px; color: var(--studio-text); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar > span { flex: 1 1 180px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar button { min-height: 34px; border: 1px solid var(--studio-line); border-radius: 8px; padding: 0 10px; background: var(--studio-panel-raised); color: var(--studio-text); cursor: pointer; font: inherit; font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar button:hover:not(:disabled) { border-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar :is(button, input):focus-visible { outline: 2px solid var(--accent-500); outline-offset: 2px; }
+html[data-theme-preset] body .app-shell .publishing-bulk-bar input,
+html[data-theme-preset] body .app-shell .publishing-post-select input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-600); }
+html[data-theme-preset] body .app-shell .publishing-hub .posts-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-queue-card.publishing-post-card { position: relative; grid-template-columns: minmax(0, 1fr); gap: 14px; border: 1px solid var(--studio-line); border-left: 3px solid var(--studio-line); border-radius: 12px; padding: 18px; background: var(--studio-panel); box-shadow: none; }
+html[data-theme-preset] body .app-shell .publishing-post-card.publishing-post-scheduled { border-left-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .publishing-post-card.publishing-post-published { border-left-color: var(--success, #16a34a); }
+html[data-theme-preset] body .app-shell .publishing-post-card:is(.publishing-post-failed, .publishing-post-needs_attention, .publishing-post-blocked) { border-left-color: var(--danger, #dc2626); }
+html[data-theme-preset] body .app-shell .publishing-hub .post-queue-heading { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+html[data-theme-preset] body .app-shell .publishing-post-select { display: grid; width: 20px; height: 24px; place-items: center; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-queue-title { gap: 6px; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-queue-title h2 { margin: 0; color: var(--studio-text); font-size: 16px; font-weight: 600; line-height: 1.35; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-queue-title small { color: var(--studio-muted); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-status,
+html[data-theme-preset] body .app-shell .publishing-hub .demo-post-badge { width: fit-content; border-color: var(--studio-line); border-radius: 6px; padding: 4px 8px; background: var(--studio-panel-raised); color: var(--studio-muted); font-size: 11px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-status-published { border-color: color-mix(in srgb, var(--success, #16a34a) 35%, var(--studio-line)); color: var(--success, #16a34a); }
+html[data-theme-preset] body .app-shell .publishing-hub .post-status-failed,
+html[data-theme-preset] body .app-shell .publishing-hub .post-status-needs_attention,
+html[data-theme-preset] body .app-shell .publishing-hub .post-status-blocked { border-color: color-mix(in srgb, var(--danger, #dc2626) 35%, var(--studio-line)); color: var(--danger, #dc2626); }
+html[data-theme-preset] body .app-shell .publishing-hub .post-status-scheduled { border-color: color-mix(in srgb, var(--accent-500) 35%, var(--studio-line)); color: var(--accent-700); }
+html[data-theme-preset] body .app-shell .publishing-hub .post-live-badge { color: var(--success, #16a34a); }
+html[data-theme-preset] body .app-shell .publishing-post-preview { display: grid; gap: 6px; border: 1px solid var(--studio-line); border-radius: 9px; padding: 12px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .publishing-post-preview > span { color: var(--studio-muted); font-size: 11px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .publishing-post-preview > p { display: -webkit-box; margin: 0; overflow: hidden; color: var(--studio-text); font-size: 13px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+html[data-theme-preset] body .app-shell .publishing-post-preview .post-caption-details { border-color: var(--studio-line); border-radius: 7px; padding: 8px 10px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .publishing-post-preview .post-caption-details summary { color: var(--studio-accent-soft, var(--accent-400)); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-post-preview .post-caption-details > p { color: var(--studio-text); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-target-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-target-list > .publishing-target-card { min-width: 0; gap: 6px; border: 1px solid var(--studio-line); border-radius: 9px; padding: 10px 12px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .publishing-target-card .post-target-platform { color: var(--studio-text); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-target-card :is(span, small, a) { color: var(--studio-muted); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .publishing-target-card :is(.post-target-failed, .post-target-deleted) { color: var(--danger, #dc2626); }
+html[data-theme-preset] body .app-shell .publishing-target-card .post-target-deleted-note { color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .publishing-no-targets { margin: 0; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub .post-queue-actions { gap: 8px; border-top: 1px solid var(--studio-line); padding-top: 12px; }
+html[data-theme-preset] body .app-shell .publishing-filter-empty { margin: 0; }
+html[data-theme-preset] body .app-shell .publishing-hub .demo-banner { margin: 0; border-radius: 10px; padding: 12px 14px; font-size: 12px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar { display: grid; grid-template-columns: minmax(180px, 220px) auto minmax(120px, 1fr); align-items: end; gap: 12px; margin: 0; border-color: var(--studio-line); border-radius: 12px; padding: 16px; background: var(--studio-panel); box-shadow: none; }
+html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar > label { display: grid; min-width: 0; gap: 6px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar .compact-select { width: 100%; min-width: 0; }
+html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar .compact-select-trigger { min-height: 42px; border-color: var(--studio-line); border-radius: 8px; padding-inline: 10px; background: var(--studio-panel-raised); color: var(--studio-text); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar > .button { min-height: 42px; justify-self: start; }
+html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar > span { justify-self: end; align-self: center; margin: 0; padding: 0; color: var(--studio-muted); font-size: 12px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .publishing-hub .approval-card { align-content: start; }
+html[data-theme-preset] body .app-shell .publishing-hub .approval-card > p { margin: 0; color: var(--studio-text); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .publishing-hub .approval-comment { display: grid; gap: 6px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .publishing-hub .approval-comment textarea { min-height: 76px; border-color: var(--studio-line); border-radius: 8px; padding: 10px; background: var(--studio-panel-raised); color: var(--studio-text); font: inherit; font-size: 13px; }
+html[data-theme-preset] body .app-shell .publishing-hub .approval-schedule,
+html[data-theme-preset] body .app-shell .publishing-hub .approval-existing-comment { border-left: 2px solid var(--accent-500); padding: 8px 10px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .publishing-hub .created-platforms { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-theme-preset] body .app-shell .publishing-hub .created-platforms > span { border: 1px solid var(--studio-line); border-radius: 6px; padding: 4px 8px; color: var(--studio-muted); font-size: 11px; }
+@media (max-width: 1100px) {
+  html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar .publishing-search { grid-column: span 2; }
+}
+@media (max-width: 700px) {
+  html[data-theme-preset] body .app-shell .publishing-hub { gap: 16px; }
+  html[data-theme-preset] body .app-shell .publishing-status-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  html[data-theme-preset] body .app-shell .publishing-status-overview > div { min-height: 64px; padding: 12px; }
+  html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+  html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar .publishing-search { grid-column: 1 / -1; }
+  html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar > .button { grid-column: 1 / 2; width: fit-content; }
+  html[data-theme-preset] body .app-shell .posts-toolbar.publishing-toolbar > span { grid-column: 2 / -1; justify-self: end; padding: 0; }
+  html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
+  html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar > label { grid-column: 1 / -1; }
+  html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar > .button { grid-column: 1 / 2; width: fit-content; }
+  html[data-theme-preset] body .app-shell .publishing-hub .approvals-toolbar > span { grid-column: 2 / -1; }
+  html[data-theme-preset] body .app-shell .publishing-bulk-bar > span { flex-basis: 100%; }
+  html[data-theme-preset] body .app-shell .publishing-hub .post-queue-heading { grid-template-columns: 20px minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .publishing-hub .post-queue-heading > .demo-post-badge { grid-column: 2; }
+  html[data-theme-preset] body .app-shell .publishing-hub .post-queue-card.publishing-post-card { padding: 14px; }
+}
+@media (max-width: 420px) {
+  html[data-theme-preset] body .app-shell .publishing-status-overview > div { align-items: flex-start; flex-direction: column; gap: 4px; }
+  html[data-theme-preset] body .app-shell .publishing-hub-tabs button { justify-content: center; padding-inline: 8px; font-size: 12px; }
+}
 
 .campaign-moments { margin: 20px 0; padding: 20px; border: 0; border-radius: 16px; background: var(--studio-panel, #111d31); }
 .campaign-moments-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
@@ -10522,5 +10766,1298 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-de
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-snapshot-metrics { grid-column: 1 / -1; grid-row: 2; }
 }
 
+/* Workspace and public-site refinement: layout and type only. Existing theme
+   surfaces, gradients, colors, and button treatments stay owned by the rules above. */
+html[data-theme-preset] body .app-shell .sidebar {
+  padding: 16px 12px 12px;
+}
+html[data-theme-preset] body .app-shell .sidebar-brand {
+  min-height: 64px;
+  margin-bottom: 12px;
+  padding: 6px;
+}
+html[data-theme-preset] body .app-shell .sidebar-brand .brand-lockup-mark-only {
+  min-height: 52px;
+}
+html[data-theme-preset] body .app-shell .sidebar-brand .brand-lockup-mark-only .brand-logo {
+  height: 48px;
+}
+html[data-theme-preset] body .app-shell .sidebar-label {
+  margin: 0 0 4px;
+  padding: 8px 10px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+html[data-theme-preset] body .app-shell .nav-group { margin-bottom: 8px; }
+html[data-theme-preset] body .app-shell .nav-item {
+  min-height: 36px;
+  gap: 10px;
+  padding-inline: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+html[data-theme-preset] body .app-shell .nav-item .nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+html[data-theme-preset] body .app-shell .nav-item.active { font-weight: 600; }
+html[data-theme-preset] body .app-shell .workspace-tool-search-wrap { margin: 0 0 10px; }
+html[data-theme-preset] body .app-shell .workspace-tool-search { min-height: 40px; }
+html[data-theme-preset] body .app-shell .sidebar-theme-toggle { min-height: 42px; }
+html[data-theme-preset] body .app-shell .dashboard-topbar {
+  min-height: 64px;
+  height: auto;
+  padding-inline: clamp(20px, 3vw, 40px);
+}
+html[data-theme-preset] body .app-shell .topbar-actions { gap: 12px; }
+html[data-theme-preset] body .app-shell .topbar-page-title { font-size: 14px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content {
+  max-width: 1480px;
+  padding: 36px clamp(24px, 3.2vw, 48px) 64px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content > h1,
+html[data-theme-preset] body .app-shell .dashboard-content > header h1,
+html[data-theme-preset] body .app-shell .dashboard-content .section-page-title h1 {
+  margin-bottom: 8px;
+  font-size: clamp(28px, 2.3vw, 34px);
+  font-weight: 600;
+  letter-spacing: -.03em;
+  line-height: 1.2;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.eyebrow, .card-kicker) {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .07em;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.dashboard-lead, > header .dashboard-lead, .section-page-title + .dashboard-lead) {
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.section-page-header, .settings-page-heading, .inbox-page-heading, .listening-heading) {
+  margin-bottom: 24px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(
+  .dashboard-stat-grid, .analytics-summary-grid, .competitor-overview-grid,
+  .team-summary, .settings-overview-grid, .dashboard-feature-grid
+) { gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content :is(
+  .dashboard-main-grid, .dashboard-bottom-grid, .analytics-main-grid,
+  .competitor-view-grid, .inbox-workspace, .settings-layout
+) { gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content :is(
+  .create-form, .campaign-form, .profile-form, .theme-settings-section,
+  .analytics-panel, .posts-toolbar, .calendar-toolbar, .media-toolbar,
+  .library-toolbar, .template-toolbar, .design-toolbar, .content-plan-toolbar
+) { padding: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content :is(
+  .create-form, .campaign-form, .profile-form, .team-invite-form,
+  .settings-overview-grid, .theme-settings-grid, .content-plan-form-grid
+) { row-gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select
+) { min-height: 42px; font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content textarea {
+  font-size: 13px;
+  line-height: 1.55;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(
+  .dashboard-stat-card, .analytics-summary-grid > article, .team-summary > article
+) > strong { font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content :is(.analytics-panel, .dashboard-panel, .settings-main-content) { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content :is(.calendar-board-scroll, .posts-table-wrap, .table-scroll, .data-table-wrap) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.calendar-toolbar, .posts-toolbar, .analytics-toolbar, .library-toolbar, .template-toolbar) {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar { grid-template-columns: minmax(0, 1fr) minmax(112px, .55fr) minmax(120px, .55fr) minmax(120px, .55fr); align-items: end; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar > .button { grid-column: 1 / 2; grid-row: 2; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar > span { grid-column: 2 / -1; grid-row: 2; justify-self: end; align-self: center; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-toolbar { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-toolbar > label,
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-toolbar > .button,
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-toolbar > span { grid-column: 1; justify-self: stretch; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-toolbar > .button { grid-row: 2; width: fit-content; }
+html[data-theme-preset] body .app-shell .publishing-hub-content .approvals-toolbar > span { grid-row: 3; justify-self: start; }
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar .publishing-search { grid-column: 1 / -1; }
+  html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar > .button { grid-column: 1; grid-row: 4; }
+  html[data-theme-preset] body .app-shell .publishing-hub-content .posts-toolbar.publishing-toolbar > span { grid-column: 2; grid-row: 4; }
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.section-page-card, .settings-overview-card, .dashboard-feature-card, .dashboard-tool-card) {
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.section-page-card, .dashboard-feature-card, .dashboard-tool-card) h2,
+html[data-theme-preset] body .app-shell .dashboard-content :is(.section-page-card, .dashboard-feature-card, .dashboard-tool-card) strong {
+  line-height: 1.4;
+}
+html[data-theme-preset] body .app-shell .dashboard-content :is(.campaign-page, .campaigns-page, .content-plans-page, .content-sets-page,
+  .competitor-page, .marketing-brain-page, .instagram-autopilot-page, .system-status-page, .team-page, .agency-page) {
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content:is(.campaign-page, .campaigns-page, .content-plans-page,
+  .content-sets-page, .competitor-page, .marketing-brain-page, .instagram-autopilot-page, .system-status-page,
+  .team-page, .agency-page, .inbox-page, .listening-page) h1::after,
+html[data-theme-preset] body .app-shell .template-gallery-hero h1::after { content: none !important; }
+html[data-theme-preset] body .app-shell .dashboard-content h1::after { content: none !important; }
+
+/* Public pages keep their existing scenes and gradient surfaces while sharing
+   the workspace's measured spacing and a calmer responsive type scale. */
+html[data-theme-preset] body .marketing-header {
+  min-height: 72px;
+  padding-inline: clamp(20px, 4.5vw, 72px);
+}
+html[data-theme-preset] body .marketing-brand { min-width: 0; }
+html[data-theme-preset] body .marketing-nav { gap: clamp(16px, 2vw, 28px); font-size: 13px; font-weight: 500; }
+html[data-theme-preset] body .header-actions { gap: 18px; }
+html[data-theme-preset] body .marketing-hero {
+  min-height: min(760px, calc(100svh - 72px));
+  padding: clamp(72px, 9vw, 118px) clamp(24px, 7.2vw, 104px) 72px;
+}
+html[data-theme-preset] body .hero-copy { max-width: 560px; padding-top: 0; }
+html[data-theme-preset] body .hero-copy h1 {
+  margin: 20px 0 16px;
+  font-size: clamp(44px, 5.2vw, 72px);
+  letter-spacing: -.045em;
+  line-height: 1.06;
+}
+html[data-theme-preset] body .hero-description { font-size: 15px; line-height: 1.75; }
+html[data-theme-preset] body .workflow-section { padding: clamp(72px, 8vw, 112px) clamp(24px, 7vw, 100px); }
+html[data-theme-preset] body .workflow-grid { gap: clamp(20px, 3vw, 40px); margin-top: 52px; }
+html[data-theme-preset] body .studio-section { gap: clamp(32px, 6vw, 80px); padding: clamp(64px, 8vw, 100px) clamp(24px, 8vw, 112px); }
+html[data-theme-preset] body .public-page-content {
+  padding: clamp(56px, 7vw, 88px) clamp(24px, 7vw, 104px) clamp(64px, 8vw, 100px);
+}
+html[data-theme-preset] body .public-page-heading { max-width: 900px; }
+html[data-theme-preset] body .public-page-heading h1 {
+  margin: 16px 0 14px;
+  font-size: clamp(38px, 5vw, 60px);
+  letter-spacing: -.04em;
+  line-height: 1.08;
+}
+html[data-theme-preset] body .public-page-heading > p:last-child { max-width: 700px; line-height: 1.7; }
+html[data-theme-preset] body .public-page-body { max-width: 1240px; margin-inline: auto; }
+html[data-theme-preset] body .marketing-footer { gap: 20px; padding: 32px clamp(24px, 7vw, 104px); }
+html[data-theme-preset] body .auth-panel { padding: clamp(28px, 5vw, 42px); }
+html[data-theme-preset] body .auth-panel h1 { font-size: clamp(30px, 4vw, 38px); }
+html[data-theme-preset] body .auth-form { gap: 16px; }
+html[data-theme-preset] body .marketing-mobile-nav summary { display: grid; width: 40px; height: 40px; place-items: center; font-size: 0; }
+html[data-theme-preset] body .marketing-mobile-nav summary svg { width: 19px; height: 19px; }
+html[data-app-theme="dark"] body .public-page :is(.public-card h2, .public-about-copy h2) { color: var(--foreground); }
+
+@media (max-width: 960px) {
+  html[data-theme-preset] body .marketing-header { gap: 16px; }
+  html[data-theme-preset] body .marketing-nav { gap: 14px; }
+  html[data-theme-preset] body .marketing-brand .brand-lockup-copy small { display: none; }
+  html[data-theme-preset] body .marketing-hero { min-height: 650px; }
+  html[data-theme-preset] body .hero-scene { transform: scale(.9); transform-origin: center right; }
+  html[data-theme-preset] body .studio-section { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-topbar { min-height: 58px; padding-inline: 16px; }
+  html[data-theme-preset] body .app-shell .topbar-actions { gap: 8px; }
+  html[data-theme-preset] body .app-shell .dashboard-content { padding: 24px 18px 48px; }
+  html[data-theme-preset] body .app-shell .dashboard-content :is(.section-page-header, .settings-page-heading) { margin-bottom: 20px; }
+  html[data-theme-preset] body .app-shell .dashboard-content :is(.create-form, .campaign-form, .profile-form, .theme-settings-section, .analytics-panel, .posts-toolbar, .calendar-toolbar, .media-toolbar, .library-toolbar, .template-toolbar, .design-toolbar, .content-plan-toolbar) { padding: 16px; }
+  html[data-theme-preset] body .marketing-header { min-height: 64px; flex-wrap: wrap; padding-inline: 18px; }
+  html[data-theme-preset] body .marketing-nav { display: none; }
+  html[data-theme-preset] body .marketing-mobile-nav { display: block; order: 3; }
+  html[data-theme-preset] body .marketing-mobile-nav nav { right: auto; left: 0; }
+  html[data-theme-preset] body .header-actions { gap: 12px; }
+  html[data-theme-preset] body .marketing-hero { min-height: 0; grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 64px 22px 52px; }
+  html[data-theme-preset] body .hero-copy h1 { font-size: clamp(42px, 11vw, 58px); }
+  html[data-theme-preset] body .hero-scene { width: 100%; height: 420px; justify-self: center; transform: scale(.82); transform-origin: center top; }
+  html[data-theme-preset] body .hero-footnote { right: 22px; left: 22px; font-size: 9px; letter-spacing: .08em; }
+  html[data-theme-preset] body .platform-strip { align-items: flex-start; flex-direction: column; padding-inline: 22px; }
+  html[data-theme-preset] body .platform-strip > div { justify-content: flex-start; gap: 14px 22px; }
+  html[data-theme-preset] body .workflow-section { padding: 64px 22px; }
+  html[data-theme-preset] body .workflow-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 32px; }
+  html[data-theme-preset] body .workflow-grid article { min-height: 0; padding: 20px 18px; }
+  html[data-theme-preset] body .workflow-grid h3 { margin: 18px 0 8px; }
+  html[data-theme-preset] body .studio-section { grid-template-columns: minmax(0, 1fr); gap: 28px; padding: 60px 22px; }
+  html[data-theme-preset] body .studio-art { height: 340px; }
+  html[data-theme-preset] body .studio-poster { top: 38px; left: max(22px, calc(50% - 145px)); width: 205px; height: 270px; }
+  html[data-theme-preset] body .studio-token { right: max(8px, calc(50% - 195px)); bottom: 22px; }
+  html[data-theme-preset] body .public-page-content { padding: 48px 22px 60px; }
+  html[data-theme-preset] body .public-page-heading h1 { font-size: clamp(36px, 9vw, 48px); }
+  html[data-theme-preset] body .marketing-footer { align-items: flex-start; flex-direction: column; padding: 28px 22px; }
+  html[data-theme-preset] body .marketing-footer nav { flex-wrap: wrap; gap: 12px 18px; }
+}
+@media (max-width: 480px) {
+  html[data-theme-preset] body .app-shell .dashboard-content { padding-inline: 14px; }
+  html[data-theme-preset] body .app-shell .topbar-page-title { max-width: 36vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-theme-preset] body .marketing-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand action" "menu login";
+    gap: 8px 12px;
+  }
+  html[data-theme-preset] body .marketing-brand { grid-area: brand; min-width: 0; }
+  html[data-theme-preset] body .marketing-header .brand-logo { width: 34px; height: 34px; }
+  html[data-theme-preset] body .marketing-header .brand-lockup-copy strong { font-size: 12px; }
+  html[data-theme-preset] body .marketing-header .brand-lockup-copy { min-width: 0; }
+  html[data-theme-preset] body .header-actions { display: contents; }
+  html[data-theme-preset] body .header-actions .button { grid-area: action; justify-self: end; }
+  html[data-theme-preset] body .header-actions .login-link { grid-area: login; justify-self: end; font-size: 12px; }
+  html[data-theme-preset] body .marketing-mobile-nav { grid-area: menu; order: 0; }
+  html[data-theme-preset] body .marketing-hero { padding-inline: 18px; }
+  html[data-theme-preset] body .hero-copy { width: 100%; min-width: 0; }
+  html[data-theme-preset] body .hero-copy h1 { overflow-wrap: anywhere; }
+  html[data-theme-preset] body .hero-scene { height: 330px; transform: scale(.68); }
+  html[data-theme-preset] body .hero-footnote { display: none; }
+  html[data-theme-preset] body .public-page-heading h1 br { display: none; }
+}
+
+/* Dashboard-only layout: keep the shared shell, palette, gradients, and buttons intact. */
+html[data-theme-preset] body .app-shell .workspace-dashboard.dashboard-redesign {
+  gap: 22px;
+  padding-top: 28px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-hero-copy > .eyebrow,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-redesign-heading .eyebrow,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading .eyebrow,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-header .eyebrow,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-insight-card > header .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-hero-copy h1 {
+  font-weight: 600;
+  letter-spacing: -.035em;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-art-card > span { font-size: 11px; letter-spacing: .04em; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-redesign-stats {
+  width: 100%;
+  max-width: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card {
+  min-width: 0;
+  min-height: 112px;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  align-content: center;
+  gap: 6px 12px;
+  border-radius: 16px;
+  padding: 18px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card > span:first-child { font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card > strong { font-size: 30px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card > small { color: var(--studio-muted); font-size: 11px; line-height: 1.4; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-icon { width: 40px; height: 40px; }
+
+.dashboard-priority-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, .8fr);
+  align-items: stretch;
+  gap: 16px;
+}
+.dashboard-side-stack { display: grid; min-width: 0; align-content: start; gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-analytics-panel,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-upcoming-panel,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-panel,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-recent-panel {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 16px;
+  padding: 20px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-analytics-panel { min-height: 100%; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading { align-items: flex-start; gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading h2 { font-size: 19px !important; line-height: 1.25; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading p { font-size: 12px !important; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading .eyebrow { margin-bottom: 6px; font-size: 11px !important; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading > a { gap: 6px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-summary { margin-top: 24px; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-summary strong { font-size: 34px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-summary span { font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-chart { margin-top: 18px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-chart svg { height: 170px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-axis-label { fill: var(--studio-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-label { font-size: 10px; }
+
+.dashboard-upcoming-list,
+.dashboard-campaign-list,
+.dashboard-recent-list { display: grid; margin-top: 14px; }
+.dashboard-upcoming-item,
+.dashboard-campaign-item,
+.dashboard-recent-item {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--studio-line);
+  padding: 11px 0;
+  color: var(--studio-text);
+  text-decoration: none;
+}
+.dashboard-upcoming-item { grid-template-columns: 42px minmax(0, 1fr) auto; }
+.dashboard-upcoming-date { display: grid; width: 40px; height: 42px; align-content: center; justify-items: center; border: 1px solid var(--studio-line); border-radius: 10px; background: var(--studio-panel-raised); }
+.dashboard-upcoming-date strong { font-size: 16px; line-height: 1; font-variant-numeric: tabular-nums; }
+.dashboard-upcoming-date small { margin-top: 3px; color: var(--studio-muted); font-size: 10px; }
+.dashboard-upcoming-copy,
+.dashboard-campaign-item > span,
+.dashboard-recent-copy { display: grid; min-width: 0; gap: 4px; }
+.dashboard-upcoming-copy strong,
+.dashboard-campaign-item strong,
+.dashboard-recent-copy strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-upcoming-copy small,
+.dashboard-campaign-item small,
+.dashboard-recent-copy small { overflow: hidden; color: var(--studio-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-upcoming-item time,
+.dashboard-recent-item time { color: var(--studio-muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dashboard-campaign-item { grid-template-columns: minmax(0, 1fr) auto; }
+.dashboard-campaign-item em { max-width: 120px; overflow: hidden; border-radius: 7px; padding: 5px 8px; background: color-mix(in srgb, var(--accent-500) 12%, var(--studio-panel)); color: var(--studio-text); font-size: 10px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-empty-state { display: grid; justify-items: start; gap: 8px; border-top: 1px solid var(--studio-line); padding-top: 13px; }
+.dashboard-empty-state p { margin: 0; color: var(--studio-muted); font-size: 12px; }
+.dashboard-empty-state a { display: inline-flex; align-items: center; gap: 5px; color: var(--studio-accent-soft, var(--accent-400)); font-size: 11px; text-decoration: none; }
+
+.dashboard-schedule-grid { display: grid; grid-template-columns: minmax(300px, .9fr) minmax(0, 1.1fr); align-items: stretch; gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar { min-height: 0; align-content: start; border-radius: 16px; padding: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-header { margin-bottom: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-header h2 { font-size: 19px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-header > a { font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-month { margin-bottom: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-month > strong { font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-grid { gap: 4px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-weekday { height: 24px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-day { height: 36px; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-selection { gap: 7px; margin-top: 12px; padding-top: 12px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-selection > strong { font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-posts { gap: 7px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-posts > a { font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-posts time,
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-more { font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-posts > a.dashboard-mini-calendar-campaign small { font-size: 11px; }
+.dashboard-recent-item { grid-template-columns: 30px minmax(0, 1fr) auto; }
+.dashboard-recent-mark { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: var(--studio-blue-bg); color: var(--studio-icon-blue); }
+.dashboard-recent-mark.is-failed { background: color-mix(in srgb, var(--danger, #df6b75) 15%, var(--studio-panel)); color: var(--danger, #df6b75); }
+.dashboard-recent-panel .dashboard-recent-list { margin-top: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-feature-card strong { font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-feature-card small { font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-creative-art > span { font-size: 11px; letter-spacing: .04em; }
+.dashboard-upcoming-item:hover,
+.dashboard-campaign-item:hover,
+.dashboard-recent-item:hover { color: var(--studio-accent-soft, var(--accent-400)); }
+
+@media (max-width: 1100px) {
+  .dashboard-priority-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-side-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-redesign-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-side-stack { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .workspace-dashboard.dashboard-redesign { gap: 18px; padding: 20px 18px 44px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-redesign-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card { min-height: 98px; padding: 14px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card > strong { font-size: 25px; }
+  .dashboard-side-stack,
+  .dashboard-schedule-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  html[data-theme-preset] body .app-shell .workspace-dashboard.dashboard-redesign { padding-inline: 14px; }
+  .dashboard-redesign .dashboard-hero { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-hero-art { min-height: 150px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-analytics-panel,
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-upcoming-panel,
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-panel,
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-recent-panel,
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar { padding: 16px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-panel-heading h2,
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-mini-calendar-header h2 { font-size: 17px !important; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-performance-chart svg { height: 140px; }
+  .dashboard-upcoming-item { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 9px; }
+  .dashboard-upcoming-date { width: 36px; height: 38px; }
+  .dashboard-redesign .dashboard-creative-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Page-scoped refinements for Analytics and Marketing Brain. */
+html[data-theme-preset] body .app-shell .analytics-page .analytics-page-heading { align-items: center; gap: 20px; }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-header-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-dashboard-overview { grid-template-columns: minmax(0, 1.55fr) minmax(260px, .85fr); }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-channel-panel { display: grid; align-content: start; gap: 10px; min-width: 0; }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-channel-panel > a,
+html[data-theme-preset] body .app-shell .analytics-page .analytics-dashboard-details > .analytics-panel > a { display: inline-flex; width: fit-content; align-items: center; gap: 5px; margin-top: auto; color: var(--studio-accent-soft, var(--accent-400)); font-size: 11px; text-decoration: none; }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-instagram-panel { margin-top: 14px; }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-snapshot-card.is-attention { --snapshot-accent: var(--danger, #df6b75); }
+html[data-theme-preset] body .app-shell .analytics-page .analytics-period-label { color: var(--studio-muted); font-size: 10px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-context-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-context-panel .brain-context-metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: stretch; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card { grid-column: span 2; min-width: 0; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card:nth-last-child(2):nth-child(3n + 1),
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card:last-child:nth-child(3n + 2) { grid-column: span 3; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card:last-child:nth-child(3n + 1) { grid-column: 2 / span 4; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-heading { margin: 24px 0 12px; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-priority-note { border-top: 1px solid var(--studio-line); padding-top: 9px; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-priority-note strong { color: var(--foreground); font-size: 11px; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-priority-note p { margin: 4px 0 0; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-campaign-meta { display: block; margin-top: 3px; color: var(--studio-muted); font-size: 10px; font-weight: 400; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-next-card .brain-decision-details { margin-top: 11px; }
+html[data-theme-preset] body .app-shell .marketing-brain-page .brain-next-card .brain-decision-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+@media (max-width: 980px) {
+  html[data-theme-preset] body .app-shell .analytics-page .analytics-dashboard-overview { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-context-panel .brain-context-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  html[data-theme-preset] body .app-shell .analytics-page .analytics-page-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .analytics-page .analytics-header-actions { width: 100%; justify-content: flex-start; }
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-context-panel .brain-context-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Calendar page: give planning controls, dates and scheduled posts a shared rhythm. */
+html[data-theme-preset] body .app-shell .calendar-page { display: grid; gap: 16px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-page-heading .eyebrow { margin: 0 0 8px; color: var(--studio-accent-soft, var(--accent-400)); font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-page-heading h1 { margin: 0; color: var(--foreground); font-size: clamp(26px, 3vw, 34px); line-height: 1.15; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-page-heading .dashboard-lead { margin: 7px 0 0; color: var(--navy-200); font-size: 13px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-create-button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; border: 1px solid var(--studio-line); border-radius: 12px; padding: 10px 12px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-month-controls { display: flex; min-width: 0; align-items: center; gap: 8px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-month-controls > button { flex: 0 0 auto; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-month-controls h2 { min-width: 190px; color: var(--foreground); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-view-switch { flex: 0 0 auto; margin-left: auto; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-filters { display: flex; min-height: 58px; align-items: end; gap: 10px; margin: 0; border: 1px solid var(--studio-line); border-radius: 12px; padding: 10px 12px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-filters label { min-width: 150px; gap: 5px; color: var(--studio-muted); font-size: 10px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-filters select { min-height: 36px; border-color: var(--studio-line); border-radius: 8px; background-color: var(--studio-panel-raised); color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-filter-count { margin-left: auto; padding-bottom: 8px; color: var(--studio-muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-drag-hint { margin: -8px 0 0; color: var(--studio-muted); font-size: 11px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-board-scroll { overflow: auto; border: 1px solid var(--studio-line); border-radius: 12px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-board { min-width: 0; overflow: hidden; border: 0; border-radius: 0; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-weekday { min-height: 38px; border-bottom: 1px solid var(--studio-line); padding: 10px 8px; background: var(--studio-panel-raised); color: var(--studio-muted); font-size: 10px; font-weight: 650; letter-spacing: .04em; text-transform: none; }
+html[data-theme-mode="light"] body .app-shell .calendar-page .calendar-weekday,
+html[data-theme-mode="dark"] body .app-shell .calendar-page .calendar-weekday { display: grid; min-height: 40px; place-items: center; padding: 8px 4px; color: color-mix(in srgb, var(--foreground) 68%, var(--studio-panel)); font-size: 10px; line-height: 1; text-align: center; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-board .calendar-weekday { display: grid; min-height: 40px; place-items: center; padding: 8px 4px; color: var(--studio-text); font-size: 10px; line-height: 1; text-align: center; }
+html[data-app-theme="dark"][data-theme-preset] body .app-shell .calendar-page .calendar-board .calendar-weekday { color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-board .calendar-weekday { color: #f8fafc !important; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day { min-width: 0; min-height: 132px; border-color: var(--studio-line); padding: 8px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-outside { background: color-mix(in srgb, var(--studio-panel-raised) 62%, var(--studio-panel)); color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-today { z-index: 1; border-color: color-mix(in srgb, var(--accent-500) 55%, var(--studio-line)); background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-500) 50%, transparent); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-heading { min-height: 28px; color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-heading .calendar-day-date { display: grid; box-sizing: border-box; width: 27px; min-width: 27px; height: 27px; min-height: 27px; place-items: center; border: 0; border-radius: 50%; padding: 0; background: transparent; color: inherit; font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-today .calendar-day-heading .calendar-day-date { background: transparent; color: var(--studio-text); }
+html[data-app-theme="dark"][data-theme-preset] body .app-shell .calendar-page .calendar-day-today .calendar-day-heading .calendar-day-date { background: transparent; color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-add-day { min-height: 26px; align-items: center; gap: 3px; border: 1px solid transparent; border-radius: 7px; padding: 0 6px; color: var(--studio-accent-soft, var(--accent-400)); font-size: 10px; text-decoration: none; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-events { gap: 5px; margin-top: 6px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event { gap: 4px; border: 1px solid var(--studio-line); border-left: 3px solid var(--accent-500); border-radius: 7px; padding: 6px; background: var(--studio-panel-raised); color: var(--studio-text); transition: border-color .16s ease, background-color .16s ease; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event-scheduled { border-left-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event-published { border-left-color: var(--success); background: color-mix(in srgb, var(--success) 6%, var(--studio-panel-raised)); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event-failed { border-left-color: var(--danger); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event-meta { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 4px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event-time { min-width: 0; color: var(--studio-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event-status { overflow: hidden; color: var(--studio-muted); font-size: 8px; text-overflow: ellipsis; text-transform: capitalize; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event strong { color: var(--studio-text); font-size: 10px; font-weight: 600; line-height: 1.35; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-event small { color: var(--studio-muted); font-size: 9px; }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-empty-note { margin: 0; border: 1px solid var(--studio-line); border-radius: 10px; padding: 14px 16px; background: var(--studio-panel); color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-detail { border-color: var(--studio-line); border-radius: 14px; background: var(--studio-panel); color: var(--studio-text); box-shadow: 0 18px 48px rgb(0 0 0 / 22%); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-detail > header { padding-bottom: 14px; border-bottom: 1px solid var(--studio-line); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-detail-post { border-color: var(--studio-line); background: var(--studio-panel-raised); color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .calendar-page .calendar-day-detail-actions { border-color: var(--studio-line); }
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-page-heading { align-items: flex-start; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-toolbar { flex-wrap: wrap; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-view-switch { margin-left: auto; }
+}
+@media (max-width: 620px) {
+  html[data-theme-preset] body .app-shell .calendar-page { gap: 12px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-page-heading { align-items: stretch; flex-direction: column; gap: 12px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-create-button { width: 100%; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-toolbar { align-items: stretch; flex-direction: column; padding: 10px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-month-controls { justify-content: center; gap: 6px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-month-controls h2 { min-width: 0; flex: 1; font-size: 15px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-view-switch { width: 100%; margin-left: 0; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-view-switch button { flex: 1; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-filters { align-items: stretch; flex-wrap: wrap; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-filters label { min-width: calc(50% - 6px); flex: 1 1 calc(50% - 6px); }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-filter-count { padding-bottom: 8px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-board { min-width: 700px; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-board-day { min-width: 0; }
+  html[data-theme-preset] body .app-shell .calendar-page .calendar-day { min-height: 112px; padding: 6px; }
+}
+@media (max-width: 850px) {
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card,
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card:nth-last-child(2):nth-child(3n + 1),
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card:last-child:nth-child(3n + 2),
+  html[data-theme-preset] body .app-shell .marketing-brain-page .brain-recommendations-grid > .brain-recommendation-card:last-child:nth-child(3n + 1) { grid-column: 1; }
+}
+
+html[data-theme-preset] body .app-shell .dashboard-content.create-page .create-page-heading h1::after { content: none; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-form .ai-artwork-photo-mode { display: flex; width: fit-content; min-height: 36px; align-items: center; justify-content: flex-start; gap: 10px; margin: 0; color: var(--studio-text); font-size: 12px; font-weight: 500; line-height: 1.4; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-form .ai-artwork-photo-mode input { display: block; width: 16px; height: 16px; flex: 0 0 16px; margin: 0; accent-color: var(--accent-600); }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-form .ai-artwork-photo-mode span { display: block; }
+html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-note { margin: 0; color: var(--studio-muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 720px) {
+  html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-controls { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .create-artwork-disclosure .ai-artwork-submit { width: 100%; }
+}
+
+/* Feature workspace layouts: scoped to Autopilot, Video Studio, Campaigns, Gallery, and Content Library. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page,
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page,
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page,
+html[data-theme-preset] body .app-shell .dashboard-content.library-page {
+  width: 100%;
+  max-width: 1440px;
+  min-width: 0;
+}
+
+/* Autopilot: keep generation settings, readiness, and the latest run in one clear work area. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page { display: grid; align-content: start; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page > * { margin-block: 0; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page :is(.instagram-autopilot-card, .instagram-autopilot-config, .instagram-autopilot-readiness, .instagram-autopilot-run) {
+  border: 1px solid var(--studio-line, var(--ivory-300));
+  border-radius: 14px;
+  background: var(--studio-panel-raised, var(--studio-panel));
+}
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-card { min-height: 112px; margin: 0; padding: 22px 24px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-card > div { max-width: 780px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-card h2 { margin-bottom: 6px; font-size: 20px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config { gap: 20px; margin: 0; padding: 24px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config-heading { align-items: flex-start; gap: 24px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config-heading > div { flex: 1 1 auto; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config-heading h2 { margin: 0 0 6px; color: var(--foreground); font-size: 20px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config-heading > label { min-width: 180px; color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-campaign { gap: 8px; color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-campaign textarea,
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config input { border-color: var(--studio-line); border-radius: 9px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-format-grid > label { min-height: 64px; border-color: var(--studio-line); border-radius: 10px; padding: 12px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-format-grid input { flex: 0 0 68px; width: 68px; text-align: center; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-total { display: flex; align-items: baseline; gap: 8px; justify-self: stretch; margin: 0; border-top: 1px solid var(--studio-line); padding-top: 14px; color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-total strong { color: var(--accent-500); font-size: 24px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page :is(.instagram-autopilot-readiness, .instagram-autopilot-run) { margin: 0; padding: 20px 24px; }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page :is(.instagram-autopilot-card h2, .instagram-autopilot-readiness h2, .instagram-autopilot-run h2) { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-format-grid small { color: var(--studio-muted, var(--navy-600)); }
+
+/* Video Studio: center the real generator and give the render queue an even, scannable grid. */
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page { display: grid; align-content: start; gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page > :is(.eyebrow, h1, .dashboard-lead) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .dashboard-lead { max-width: 760px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator { gap: 20px; margin-top: 4px; border-color: var(--studio-line); border-radius: 16px; padding: 24px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-job-heading { align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--studio-line); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-job-heading h2 { color: var(--foreground); font-size: 21px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-provider-badge { max-width: 100%; white-space: normal; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form { gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker { gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker i { border-radius: 9px; background: color-mix(in srgb, var(--accent-500) 14%, var(--studio-panel-raised)); color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker span { color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-credit-notice { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list { grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); align-items: stretch; gap: 16px; margin-top: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-heading { align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--studio-line); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-heading h2,
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-job-title h3 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card { display: grid; align-content: start; gap: 12px; border-color: var(--studio-line); border-radius: 12px; padding: 12px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-job-title { align-items: flex-start; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-job-title span,
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card > small { color: var(--studio-muted, var(--navy-600)); }
+
+/* Campaigns: readable brief, strategy, draft sequence, and saved campaign history. */
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page { display: grid; align-content: start; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page > :is(.eyebrow, h1, .dashboard-lead, .notice, .campaign-capability-note) { margin-block: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page > h1 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments { margin: 0; border: 1px solid var(--studio-line); border-radius: 14px; padding: 20px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-heading { align-items: center; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-heading h2 { color: var(--foreground); font-size: 19px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-heading > span { color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card { display: grid; align-content: start; gap: 8px; border-color: var(--studio-line); border-radius: 10px; padding: 14px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card h3 { margin: 0; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card p { margin: 0; color: var(--studio-muted, var(--navy-600)); line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-capability-note { border-color: var(--studio-line); border-radius: 10px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form { display: grid; gap: 20px; margin: 0; border-color: var(--studio-line); border-radius: 14px; padding: 24px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields { gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form :is(input:not([type="checkbox"]), textarea) { border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-fields { border-color: var(--studio-line); border-radius: 9px; padding: 12px 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-grid { gap: 12px; padding-top: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-strategy-section,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-section { gap: 14px; margin: 0; border: 1px solid var(--studio-line); border-radius: 14px; padding: 20px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-strategy-section > :is(.campaign-section-heading, .campaign-readiness-list, .campaign-readiness-score) { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-section-heading h2,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-section h2 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page :is(.campaign-concept-card, .campaign-insight-card, .campaign-funnel-grid > article, .campaign-pillars > article, .campaign-history-card, .campaign-draft-card, .campaign-timeline article) { border-color: var(--studio-line); border-radius: 10px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page :is(.campaign-concept-card p, .campaign-insight-card p, .campaign-funnel-grid p, .campaign-pillars p, .campaign-history-card p, .campaign-history-card small, .campaign-draft-details p, .campaign-draft-details small) { color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-concept-card > span,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-insight-card h3,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-card h3,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-draft-copy h3 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-draft-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-draft-card { align-content: start; gap: 10px; padding: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-card { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-actions { align-items: center; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-results,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-intelligence-workspace { display: grid; gap: 16px; margin: 0; }
+
+/* Gallery: prioritize visual assets, with a toolbar that collapses cleanly. */
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page { display: grid; align-content: start; gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-page-heading { align-items: center; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-page-heading h1 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-upload-note { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar { grid-template-columns: minmax(220px, 1fr) minmax(190px, 260px) auto; align-items: end; gap: 12px; margin: 0; border-color: var(--studio-line); border-radius: 12px; padding: 16px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar label { color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar :is(input, .compact-select-trigger) { min-height: 42px; border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-card { border-color: var(--studio-line); border-radius: 12px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-preview { aspect-ratio: 1.2; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-body { padding: 14px 16px 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-body :is(h2, p, small) { color: var(--studio-text, var(--foreground)); }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-body :is(p, small) { color: var(--studio-muted, var(--navy-600)); }
+
+/* Content Library: make saved posts scan-first while keeping every existing edit and reuse action. */
+html[data-theme-preset] body .app-shell .dashboard-content.library-page { display: grid; align-content: start; gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page > .eyebrow { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading { align-items: center; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading h1 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary > div { border-color: var(--studio-line); border-radius: 10px; padding: 14px 16px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary :is(span, strong) { color: var(--studio-text, var(--foreground)); font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(140px, 1fr)); align-items: end; gap: 12px; margin: 0; border-color: var(--studio-line); border-radius: 12px; padding: 16px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar label { min-width: 0; gap: 6px; color: var(--studio-muted, var(--navy-600)); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar :is(input, .compact-select-trigger) { width: 100%; min-width: 0; min-height: 42px; border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-item { grid-template-columns: 40px minmax(0, 1fr); align-items: start; gap: 12px; border-color: var(--studio-line); border-radius: 12px; padding: 16px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-type { width: 40px; height: 40px; border-radius: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy h2 { color: var(--foreground); font-size: 16px; line-height: 1.4; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy p { color: var(--studio-muted, var(--navy-600)); font-size: 12px; line-height: 1.6; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy small { color: var(--studio-muted, var(--navy-600)); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-tags { grid-column: 2; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-actions { gap: 6px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-refine { color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-refine input { min-height: 40px; border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); }
+
+@media (max-width: 1100px) {
+  html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar .library-search { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-card { align-items: stretch; flex-direction: column; gap: 16px; padding: 20px; }
+  html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config { padding: 18px; }
+  html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config-heading { flex-direction: column; gap: 16px; }
+  html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-config-heading > label { width: 100%; }
+  html[data-theme-preset] body .app-shell .instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .video-studio-page #magic-hour-creator { padding: 18px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form,
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page :is(.campaign-moments, .campaign-strategy-section, .campaign-history-section) { padding: 16px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar > span { grid-column: 1 / -1; padding: 0; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card { padding: 16px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config { padding: 16px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-job-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-strategy-edit-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar,
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar > span,
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar .library-search { grid-column: auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-item { grid-template-columns: 32px minmax(0, 1fr); padding: 12px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-type { width: 32px; height: 32px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-tags { grid-column: 1 / -1; }
+}
+
+/* Campaign page refinement: compact header, aligned seasonal ideas, and a two-column brief. */
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page { gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-page-heading { display: grid; gap: 8px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-page-heading > * { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-page-heading h1 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-page-heading .dashboard-lead { max-width: 760px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-capability-note { display: grid; gap: 6px; margin: 0; border: 0; border-left: 2px solid var(--accent-500); border-radius: 0 8px 8px 0; padding: 8px 12px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel)); color: var(--studio-muted, var(--navy-600)); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-capability-note > summary { color: var(--studio-text, var(--foreground)); cursor: pointer; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-capability-note > p { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments { padding: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-heading { margin-bottom: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-heading .eyebrow { margin: 0 0 4px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-heading h2 { margin: 0 0 4px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card { grid-template-rows: auto auto 1fr auto auto; min-width: 0; min-height: 246px; gap: 7px; padding: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card time { color: var(--accent-500); font-size: 12px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card h3 { min-height: 2.6em; font-size: 14px; line-height: 1.35; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card p,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card small { font-size: 12px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card > button { align-self: end; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form { gap: 16px; padding: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields { grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr); align-items: start; gap: 16px 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .campaign-optional-fields,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-select-grid { grid-column: 1 / -1; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-fieldset:first-of-type { grid-column: 1; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-fieldset:last-of-type { grid-column: 2; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-fieldset { align-self: stretch; border-top: 1px solid var(--studio-line); padding-top: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form .create-idea-field { gap: 7px; color: var(--studio-text, var(--foreground)); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form :is(input:not([type="checkbox"]), textarea, .compact-select-trigger) { font-size: 13px; font-weight: 400; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form textarea { min-height: 96px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-fields { padding: 12px 0 0; border: 0; border-top: 1px solid var(--studio-line); border-radius: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-fields > summary { padding: 2px 0; color: var(--studio-text, var(--foreground)); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; padding-top: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form .create-option-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form .create-platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form .create-check { min-width: 0; min-height: 38px; padding-inline: 10px; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-format-help { margin-top: 10px; color: var(--studio-muted, var(--navy-600)); font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-select-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; border-top: 1px solid var(--studio-line); padding-top: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-select-grid label,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .create-select-grid label { align-content: start; gap: 7px; color: var(--studio-text, var(--foreground)); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form .create-select-grid small { color: var(--studio-muted, var(--navy-600)); font-size: 11px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form > .button { justify-self: end; min-width: 240px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card { display: flex; height: 100%; flex-direction: column; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card > small { margin-top: auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card > button { width: 100%; margin-top: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-error-panel { display: grid; gap: 6px; min-width: 0; border: 1px solid color-mix(in srgb, var(--danger, #df6b75) 38%, var(--studio-line)); border-radius: 9px; padding: 12px 14px; background: color-mix(in srgb, var(--danger, #df6b75) 7%, var(--studio-panel)); color: var(--studio-text, var(--foreground)); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-error-panel > strong { font-size: 13px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-error-panel > p { margin: 0; color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-error-panel details { margin-top: 2px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-error-panel summary { width: fit-content; color: var(--accent-500); cursor: pointer; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-error-panel pre { max-height: 180px; overflow: auto; margin: 8px 0 0; border-radius: 6px; padding: 10px; background: var(--studio-panel); color: var(--studio-muted, var(--navy-600)); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 960px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > * { grid-column: 1 / -1 !important; }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-select-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moments-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-optional-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form .create-option-grid,
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-fields > .create-select-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card { min-height: 0; }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card h3 { min-height: 0; }
+  html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-form > .button { width: 100%; min-width: 0; }
+}
+
+/* Video Studio alignment: one compact page heading, a balanced creation form, and a flush render queue. */
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page { gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-studio-heading { display: grid; gap: 8px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-studio-heading > * { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-studio-heading h1 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-studio-heading .dashboard-lead { max-width: 760px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page > :is(.video-generation-error, .form-success) { width: 100%; min-width: 0; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator { width: 100%; min-width: 0; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form > label { display: grid; align-content: start; gap: 7px; min-width: 0; color: var(--studio-text, var(--foreground)); font-size: 12px; font-weight: 550; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form > label:has(textarea),
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form > :is(.video-mode-picker, .video-segmented-control, .video-selected-source, .video-camera-capture, .video-credit-notice, .video-advanced-workflows, button, p) { grid-column: 1 / -1; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form :is(input:not([type="checkbox"]), .compact-select-trigger) { width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form textarea { width: 100%; min-width: 0; min-height: 104px; box-sizing: border-box; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker button { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-job-heading { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-provider-badge { flex: 0 1 auto; text-align: right; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list { width: 100%; min-width: 0; margin: 4px 0 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list > .video-job-heading { align-items: center; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list > .video-job-heading h2 { margin: 0; color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-card-open { width: 100%; min-width: 0; overflow: hidden; }
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator { padding: 18px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form,
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-mode-picker { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-script-form > label:has(textarea) { grid-column: 1; }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-job-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page #magic-hour-creator .video-provider-badge { text-align: left; }
+}
+
+/* Final workspace polish: align real controls and content blocks across these feature pages. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config { display: grid; align-content: start; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid > label { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid > label > span { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config :is(.notice, .video-music-license) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-readiness ul { display: grid; gap: 8px; padding-left: 20px; }
+
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list { align-content: start; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list > .video-job-heading { grid-column: 1 / -1; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-card-open { display: grid; place-items: center; aspect-ratio: 16 / 9; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-card-thumbnail { object-fit: cover; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-job-title { display: flex; justify-content: space-between; gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-library-card .video-job-title > div { min-width: 0; }
+
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-moment-card > :is(p, small) { overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-history-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-results > *,
+html[data-theme-preset] body .app-shell .dashboard-content.campaign-page .campaign-intelligence-workspace > * { min-width: 0; }
+
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-page-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar > span { align-self: center; justify-self: end; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-card { min-width: 0; overflow: hidden; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-open-trigger { width: 100%; height: 100%; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-asset-preview :is(img, video) { width: 100%; height: 100%; object-fit: cover; }
+
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading { display: flex; justify-content: space-between; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-item { min-width: 0; align-content: start; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > div:first-child { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy :is(h2, p, small) { overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-actions { display: flex; align-items: center; flex-wrap: wrap; }
+
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card { align-items: stretch; }
+  html[data-theme-preset] body .app-shell .dashboard-content.video-studio-page .video-job-list > .video-job-heading { align-items: flex-start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-page-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-page-actions { justify-content: flex-start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar > span { justify-self: start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading { align-items: flex-start; flex-direction: column; }
+}
+
+/* Autopilot: one compact status surface above a focused batch builder. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading { align-items: flex-end; margin-bottom: 2px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .68fr); grid-template-rows: auto auto; align-items: center; gap: 16px 28px; min-height: 0; border: 1px solid color-mix(in srgb, var(--accent-500) 28%, var(--studio-line)); border-radius: 16px; padding: 22px 24px; background: linear-gradient(112deg, color-mix(in srgb, var(--accent-500) 10%, var(--studio-panel)), var(--studio-panel) 58%); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary > :is(.eyebrow, h2, p, small) { margin-block: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary > h2 { margin-block: 6px; line-height: 1.25; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary > p:not(.eyebrow) { line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary > small { display: block; margin-top: 8px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card > .button { justify-self: end; align-self: center; min-width: 180px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) minmax(180px, .45fr); align-items: center; gap: 16px 24px; min-width: 0; margin: 0; border: 1px solid color-mix(in srgb, var(--accent-500) 17%, var(--studio-line)); border-radius: 10px; padding: 14px 16px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel)); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy > :is(.eyebrow, h3, p) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy > h3 { margin-block: 3px; color: var(--foreground); font-size: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy > p:not(.eyebrow) { color: var(--studio-muted, var(--navy-600)); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run .instagram-autopilot-links { display: grid; justify-items: start; align-content: center; gap: 8px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading { align-items: end; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days { flex: 0 0 190px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-total { align-items: center; }
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card { grid-template-columns: minmax(0, 1fr); padding: 18px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card > .button { justify-self: stretch; width: 100%; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading { align-items: stretch; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days { flex-basis: auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run { grid-template-columns: minmax(0, 1fr); align-items: start; }
+}
+
+/* Light appearance: use the workspace's readable foregrounds on the redesigned cards. */
+html[data-theme-mode="light"] body .app-shell .dashboard-content.marketing-brain-page :is(.brain-health-card > span:not(.card-kicker), .brain-health-card small, .brain-next-card p, .brain-intelligence-grid :is(p, li, small)) { color: var(--studio-muted, var(--navy-600)); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.marketing-brain-page .brain-intelligence-grid a { color: var(--accent-700); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.marketing-brain-page :is(.brain-health-card, .brain-next-card, .brain-intelligence-grid > article) { border-color: var(--studio-line); box-shadow: 0 8px 20px rgb(9 20 40 / 6%); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.marketing-brain-page .brain-health-meter { background: color-mix(in srgb, var(--foreground) 12%, transparent); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.marketing-brain-page .brain-health-meter i { background: linear-gradient(90deg, var(--accent-700), var(--accent-500)); }
+
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-card, .instagram-autopilot-config, .instagram-autopilot-run, .instagram-autopilot-readiness) { color: var(--studio-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-card, .instagram-autopilot-config, .instagram-autopilot-run, .instagram-autopilot-readiness) { border-color: var(--studio-line); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.video-studio-page :is(#magic-hour-creator, .video-library-card) { color: var(--studio-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.campaign-page :is(.campaign-moments, .campaign-form, .campaign-strategy-section, .campaign-history-section, .campaign-moment-card, .campaign-history-card, .campaign-draft-card) { color: var(--studio-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.gallery-page :is(.media-toolbar, .media-asset-card) { color: var(--studio-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page :is(.library-summary > div, .library-toolbar, .library-item) { color: var(--studio-text); }
+
+/* Competitor Intelligence cards are component-local; explicitly map their surfaces in light mode. */
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page :is(.ci-card, .ci-kpi, .ci-comparison-card, .ci-keyword-card, .ci-format-card) {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface) !important;
+  color: var(--workspace-text) !important;
+  box-shadow: 0 6px 22px rgb(30 50 80 / 5%);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page :is(.ci-card h2, .ci-kpi strong, .ci-comparison-table th, .ci-comparison-table td, .ci-result strong) { color: var(--workspace-text) !important; }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page :is(.ci-insight-caption, .ci-note, .ci-kpi small, .ci-platform-filter, .ci-comparison-table thead th, .ci-comparison-table tbody th small, .ci-search-query, .ci-result span) { color: var(--workspace-muted) !important; }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page .ci-comparison-table-wrap { border-color: var(--workspace-border); background: var(--workspace-surface); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page .ci-comparison-table :is(th, td) { border-bottom-color: var(--workspace-border); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page .ci-search-form input { border-color: var(--workspace-border); background: var(--workspace-surface); color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page .ci-query { border-color: var(--workspace-border); background: var(--workspace-surface-soft); color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.ci-page .ci-query span.t { color: var(--workspace-text); }
+
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config,
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-readiness {
+  border: 1px solid var(--workspace-border) !important;
+  background: var(--workspace-surface) !important;
+  color: var(--workspace-text) !important;
+  box-shadow: 0 6px 22px rgb(30 50 80 / 5%);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config :is(h2, h3, label),
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-readiness h2 { color: var(--workspace-text) !important; }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config :is(.instagram-autopilot-config-heading > div > p:not(.eyebrow), .instagram-autopilot-campaign > span, .instagram-autopilot-campaign > small, .instagram-autopilot-format-grid small, .instagram-autopilot-formats-heading > span, .instagram-autopilot-days > small),
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-readiness > p,
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-readiness > ul { color: var(--workspace-muted) !important; }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config .eyebrow { color: var(--accent-700) !important; }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid > label,
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface-soft) !important;
+  color: var(--workspace-text) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config :is(input, textarea) {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface) !important;
+  color: var(--workspace-text) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-total { border-color: var(--workspace-border); color: var(--workspace-muted); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-total strong { color: var(--accent-700); }
+
+/* Content Library finish: organized metadata, clear selection state, and light/dark-safe controls. */
+html[data-theme-preset] body .app-shell .dashboard-content.library-page { gap: 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading { align-items: center; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading > div { display: grid; gap: 5px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading > div > * { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading h1 { color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; border: 1px solid var(--studio-line); border-radius: 11px; padding: 13px 16px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary span { color: var(--studio-muted, var(--navy-600)); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary strong { color: var(--studio-text, var(--foreground)); font-size: 21px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: minmax(210px, 1.7fr) repeat(5, minmax(105px, 1fr)); align-items: end; gap: 10px; margin: 0; border: 1px solid var(--studio-line); border-radius: 12px; padding: 14px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar label { min-width: 0; gap: 5px; color: var(--studio-muted, var(--navy-600)); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar :is(input, .compact-select-trigger) { width: 100%; min-width: 0; min-height: 40px; border: 1px solid var(--studio-line); border-radius: 8px; padding-inline: 10px; background: var(--studio-panel); color: var(--studio-text, var(--foreground)); font: inherit; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-results-bar { display: flex; align-items: center; gap: 14px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-results-bar > p { margin: 0; color: var(--studio-muted, var(--navy-600)); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-select-all { display: inline-flex; align-items: center; gap: 7px; color: var(--studio-muted, var(--navy-600)); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page :is(.library-select-all, .library-item-select) input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-clear-filters { margin-left: auto; border: 0; padding: 4px 0; background: transparent; color: var(--accent-500); cursor: pointer; font: inherit; font-size: 11px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid color-mix(in srgb, var(--accent-500) 36%, var(--studio-line)); border-radius: 11px; padding: 11px 14px; background: color-mix(in srgb, var(--accent-500) 7%, var(--studio-panel-raised)); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar > strong { color: var(--studio-text, var(--foreground)); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar > div { display: flex; flex-wrap: wrap; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar .button { min-height: 36px; padding-inline: 12px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); align-items: stretch; gap: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-item { position: relative; grid-template-columns: 40px minmax(0, 1fr) 18px; grid-template-rows: auto auto; align-content: start; gap: 10px 12px; min-width: 0; border: 1px solid var(--studio-line); border-radius: 13px; padding: 16px; background: var(--studio-panel-raised); box-shadow: 0 7px 20px rgb(0 0 0 / 5%); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-item.is-selected { border-color: color-mix(in srgb, var(--accent-500) 58%, var(--studio-line)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-500) 14%, transparent); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-type { grid-column: 1; grid-row: 1; width: 40px; height: 40px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-select { display: grid; grid-column: 3; grid-row: 1; justify-items: end; padding-top: 3px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy { grid-column: 2; grid-row: 1; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > .library-item-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy h2 { margin: 9px 0 5px; color: var(--foreground); font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > p { display: -webkit-box; overflow: hidden; margin: 0 0 10px; color: var(--studio-muted, var(--navy-600)); font-size: 12px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-badge,
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-status { display: inline-flex; align-items: center; min-height: 22px; border: 1px solid var(--studio-line); border-radius: 999px; padding: 3px 8px; background: var(--studio-panel); color: var(--studio-muted, var(--navy-600)); font-size: 9px; font-weight: 650; line-height: 1.2; text-transform: capitalize; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-status { border-color: color-mix(in srgb, var(--accent-500) 30%, var(--studio-line)); background: color-mix(in srgb, var(--accent-500) 9%, var(--studio-panel)); color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-meta { display: flex; flex-wrap: wrap; gap: 4px 9px; color: var(--studio-muted, var(--navy-600)); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-meta strong { color: var(--studio-text, var(--foreground)); font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-platforms { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-platforms > span { border-radius: 999px; padding: 4px 7px; background: color-mix(in srgb, var(--accent-500) 10%, var(--studio-panel)); color: var(--accent-500); font-size: 9px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-tags { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 5px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-tags > span { border-radius: 999px; padding: 4px 7px; background: color-mix(in srgb, var(--accent-500) 8%, var(--studio-panel)); color: var(--studio-muted, var(--navy-600)); font-size: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .content-detail { margin-top: 10px; border-top: 1px solid var(--studio-line); padding-top: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .content-detail > summary { color: var(--accent-500); cursor: pointer; font-size: 10px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .content-detail > p { margin: 7px 0 0; color: var(--studio-muted, var(--navy-600)); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-primary-actions { align-items: center; margin-top: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-primary-actions > button { min-height: 34px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-more-actions { position: relative; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-more-actions > summary { min-height: 34px; border: 1px solid var(--studio-line); border-radius: 7px; padding: 7px 10px; color: var(--studio-text, var(--foreground)); cursor: pointer; font-size: 11px; font-weight: 650; list-style: none; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-more-actions > summary::-webkit-details-marker { display: none; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-more-actions[open] > div { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-more-actions > div > button { min-height: 32px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-refine { margin-top: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-refine input { width: 100%; }
+@media (max-width: 1100px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar .library-search { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-heading { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-toolbar .library-search { grid-column: auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-summary { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-results-bar,
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar { align-items: flex-start; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar > div { width: 100%; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-selection-bar .button { flex: 1 1 auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-item { grid-template-columns: 32px minmax(0, 1fr) 18px; padding: 12px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-type { width: 32px; height: 32px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-card-grid .library-tags { grid-column: 2 / -1; }
+}
+
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page :is(.library-summary > div, .library-toolbar, .library-selection-bar, .library-card-grid .library-item) { border-color: var(--workspace-border); background-color: var(--workspace-surface); color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page .library-toolbar :is(input, .compact-select-trigger) { border-color: var(--workspace-border); background: var(--workspace-surface); color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page .library-card-grid .library-item.is-selected { border-color: var(--accent-500); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page .library-item-meta { color: var(--workspace-muted); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page :is(.library-item-meta strong, .library-selection-bar > strong, .library-more-actions > summary, .library-item-copy h2) { color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page :is(.library-toolbar label, .library-item-copy > p, .library-item-copy > small, .library-item-meta, .library-refine, .library-results-bar > p, .library-select-all) { color: var(--workspace-muted); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page :is(.library-item, .library-more-actions > summary, .library-refine input, .content-detail, .library-toolbar input, .library-toolbar .compact-select-trigger) { border-color: var(--workspace-border); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.library-page :is(.library-refine input, .library-more-actions > summary, .content-detail) { background: var(--workspace-soft); color: var(--workspace-text); }
+
+/* Compact content previews and align actions without reserving empty space. */
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy { display: flex; flex-direction: column; align-self: stretch; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > .library-item-badges { order: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > h2 { order: 1; min-height: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > p { order: 2; min-height: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-meta { order: 3; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-item-copy > .library-platforms { order: 4; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .content-detail { order: 5; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-primary-actions { order: 6; min-height: 36px; margin-top: auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .library-refine { order: 7; }
+html[data-theme-preset] body .app-shell .dashboard-content.library-page .content-version-list { order: 8; }
+
+/* Present the latest run as a status row inside the weekly automation card, not a second card. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card > .instagram-autopilot-run {
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
+  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
+  margin-top: 4px;
+  border: 0;
+  border-top: 1px solid var(--studio-line);
+  border-radius: 0;
+  padding: 16px 0 0;
+  background: transparent;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run.is-error { border-top-color: #d97777; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run .instagram-autopilot-links { display: flex; justify-content: flex-end; align-items: center; gap: 8px 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy > .eyebrow { margin-bottom: 4px; color: var(--studio-muted, var(--navy-600)); font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+@media (max-width: 640px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-card > .instagram-autopilot-run { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run .instagram-autopilot-links { justify-content: flex-start; }
+}
+
+/* Brand Kit and account identity share a consistent settings rhythm. */
+html[data-theme-preset] body .app-shell .onboarding-content { display: grid; align-content: start; gap: 16px; padding-top: 28px; }
+html[data-theme-preset] body .app-shell .onboarding-content > .brand-kit-page-heading { margin: 0; }
+html[data-theme-preset] body .app-shell .brand-kit-page-heading > div { display: grid; gap: 5px; }
+html[data-theme-preset] body .app-shell .brand-kit-page-heading > div > * { margin: 0; }
+html[data-theme-preset] body .app-shell .onboarding-content h1::after { content: none !important; }
+html[data-theme-preset] body .app-shell .brand-kit-overview { display: grid; grid-template-columns: 48px minmax(0, 1.4fr) minmax(150px, .8fr) minmax(130px, .65fr); align-items: center; gap: 16px; min-width: 0; border: 1px solid var(--studio-line); border-radius: 14px; padding: 20px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .brand-kit-monogram,
+html[data-theme-preset] body .app-shell .account-profile-avatar { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid color-mix(in srgb, var(--accent-500) 36%, var(--studio-line)); border-radius: 11px; background: color-mix(in srgb, var(--accent-500) 10%, var(--studio-panel)); color: var(--accent-700); font-size: 18px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .brand-kit-overview-logo { width: 40px; height: 40px; border-radius: 6px; background: #fff; object-fit: contain; }
+html[data-theme-preset] body .app-shell .brand-kit-overview-copy,
+html[data-theme-preset] body .app-shell .brand-kit-palette,
+html[data-theme-preset] body .app-shell .brand-kit-overview-fonts { display: grid; min-width: 0; gap: 4px; }
+html[data-theme-preset] body .app-shell .brand-kit-overview :is(.brand-kit-overview-copy > span, .brand-kit-palette > span, .brand-kit-overview-fonts > span) { color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .brand-kit-overview-copy h2 { margin: 0; color: var(--foreground); font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .brand-kit-overview-copy p { margin: 0; color: var(--studio-muted); font-size: 12px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .brand-kit-palette > div { display: flex; flex-wrap: wrap; gap: 6px; }
+html[data-theme-preset] body .app-shell .brand-kit-palette > div > span { width: 24px; height: 24px; border: 1px solid color-mix(in srgb, var(--foreground) 14%, transparent); border-radius: 6px; }
+html[data-theme-preset] body .app-shell .brand-kit-palette > small { color: var(--studio-muted); font-size: 10px; }
+html[data-theme-preset] body .app-shell .brand-kit-overview-fonts strong { color: var(--studio-text); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .profile-form { gap: 16px; margin-top: 0; }
+html[data-theme-preset] body .app-shell .brand-profile-primary-card { display: grid; gap: 16px; border: 0; padding: 0; background: transparent; }
+html[data-theme-preset] body .app-shell .brand-kit-section { display: grid; align-content: start; gap: 20px; min-width: 0; border: 1px solid var(--studio-line); border-radius: 14px; padding: 24px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .brand-kit-section .form-section-heading { align-items: center; gap: 12px; border-color: var(--studio-line); padding-bottom: 14px; }
+html[data-theme-preset] body .app-shell .brand-kit-section .form-section-heading > span { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--accent-700); font-size: 12px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .brand-kit-section .form-section-heading h2 { color: var(--foreground); font-size: 16px; line-height: 1.3; }
+html[data-theme-preset] body .app-shell .brand-kit-section .form-section-heading p { color: var(--studio-muted); font-size: 12px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .brand-kit-section .field-grid { column-gap: 16px; row-gap: 16px; }
+html[data-theme-preset] body .app-shell .brand-kit-section .field-grid > label,
+html[data-theme-preset] body .app-shell .brand-kit-section .country-field { gap: 6px; color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .brand-visual-grid { grid-template-columns: minmax(0, .9fr) minmax(220px, 1.1fr); }
+html[data-theme-preset] body .app-shell .brand-visual-grid .brand-kit-logo-field { grid-column: 1; grid-row: 1 / span 2; }
+html[data-theme-preset] body .app-shell .brand-visual-grid .brand-kit-color-field { grid-column: 2; grid-row: 1; }
+html[data-theme-preset] body .app-shell .brand-visual-grid .brand-kit-font-field { grid-column: 2; grid-row: 2; }
+html[data-theme-preset] body .app-shell .brand-kit-section .autopilot-toggle { margin: 0; border-color: var(--studio-line); border-radius: 10px; background: var(--studio-panel); }
+html[data-theme-preset] body .app-shell .brand-template-preferences { gap: 16px; margin: 0; border: 1px solid var(--studio-line); border-radius: 14px; padding: 22px; background: var(--studio-panel-raised); }
+html[data-theme-preset] body .app-shell .brand-template-preferences .brand-template-heading { margin: 0; }
+html[data-theme-preset] body .app-shell .brand-template-preferences .brand-template-heading strong { color: var(--foreground); font-size: 16px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .brand-template-preferences .field-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+html[data-theme-preset] body .app-shell .onboarding-content > .profile-form > .brand-kit-help { margin: 0; color: var(--studio-muted); font-size: 12px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .onboarding-content .form-actions { justify-content: flex-end; margin: 0; border-top: 1px solid var(--studio-line); padding-top: 16px; }
+
+html[data-theme-preset] body .app-shell .account-settings-page { gap: 16px; }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-heading { display: grid; gap: 5px; margin: 0 0 4px; }
+html[data-theme-preset] body .app-shell .account-settings-heading > * { margin: 0; }
+html[data-theme-preset] body .app-shell .account-settings-heading h2 { color: var(--foreground); font-size: 20px; }
+html[data-theme-preset] body .app-shell .account-settings-heading .dashboard-lead { color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card { width: 100%; max-width: none; gap: 16px; border-color: var(--studio-line); border-radius: 14px; padding: 20px; background: var(--studio-panel-raised); box-shadow: none; }
+html[data-theme-preset] body .app-shell .account-identity-heading { display: flex; align-items: center; gap: 12px; }
+html[data-theme-preset] body .app-shell .account-identity-heading h3 { color: var(--foreground); font-size: 16px; }
+html[data-theme-preset] body .app-shell .account-identity-heading p { margin-top: 4px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .account-profile-avatar { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 50%; }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card dl > div { grid-template-columns: minmax(0, 1fr); gap: 5px; border-top: 1px solid var(--studio-line); padding-top: 12px; }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card :is(dt, dd, p) { color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card dd { color: var(--studio-text); font-weight: 500; }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card label { color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card input { border-color: var(--studio-line); border-radius: 8px; background: var(--studio-panel); color: var(--studio-text); }
+html[data-theme-preset] body .app-shell .account-settings-page .account-danger-card { border-color: color-mix(in srgb, var(--danger) 36%, var(--studio-line)); }
+html[data-theme-preset] body .app-shell .account-settings-page .account-danger-card > div { padding-bottom: 4px; }
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .brand-kit-overview { grid-template-columns: 44px minmax(0, 1fr) minmax(150px, .8fr); }
+  html[data-theme-preset] body .app-shell .brand-kit-overview-fonts { grid-column: 2 / -1; }
+  html[data-theme-preset] body .app-shell .brand-template-preferences .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  html[data-theme-preset] body .app-shell .onboarding-content { padding: 20px 16px 36px; }
+  html[data-theme-preset] body .app-shell .brand-kit-overview { grid-template-columns: 44px minmax(0, 1fr); gap: 12px; padding: 16px; }
+  html[data-theme-preset] body .app-shell .brand-kit-palette,
+  html[data-theme-preset] body .app-shell .brand-kit-overview-fonts { grid-column: 2; }
+  html[data-theme-preset] body .app-shell .brand-kit-section,
+  html[data-theme-preset] body .app-shell .brand-template-preferences { gap: 16px; padding: 16px; }
+  html[data-theme-preset] body .app-shell .brand-visual-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .brand-visual-grid .brand-kit-logo-field,
+  html[data-theme-preset] body .app-shell .brand-visual-grid .brand-kit-color-field,
+  html[data-theme-preset] body .app-shell .brand-visual-grid .brand-kit-font-field { grid-column: 1; grid-row: auto; }
+  html[data-theme-preset] body .app-shell .brand-template-preferences .field-grid,
+  html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card dl { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .account-settings-page .account-settings-card { padding: 16px; }
+}
 
 
+
+
+/* Dashboard page refinements: live workspace summaries and compact navigation. */
+html[data-theme-preset] body .app-shell .workspace-dashboard.dashboard-redesign .dashboard-hero {
+  min-height: 218px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, .62fr);
+  align-items: center;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-hero-art { display: none; }
+.dashboard-hero-next {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 42px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-400) 36%, var(--studio-line));
+  border-radius: 15px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--studio-panel) 82%, transparent);
+  color: var(--studio-text);
+  text-decoration: none;
+  transition: border-color .18s ease, transform .18s ease, background .18s ease;
+}
+.dashboard-hero-next:hover { transform: translateY(-2px); border-color: var(--accent-400); background: color-mix(in srgb, var(--accent-500) 10%, var(--studio-panel)); }
+.dashboard-hero-next-icon { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--accent-500) 17%, var(--studio-panel)); color: var(--studio-accent-soft, var(--accent-400)); }
+.dashboard-hero-next > span:nth-child(2) { display: grid; min-width: 0; gap: 5px; }
+.dashboard-hero-next small { color: var(--studio-accent-soft, var(--accent-400)); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.dashboard-hero-next strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-hero-next em { overflow: hidden; color: var(--studio-muted); font-size: 11px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-hero-next > svg { color: var(--studio-muted); }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-redesign-stats { max-width: none; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-stat-card { min-height: 100px; }
+.dashboard-shortcuts-section { display: grid; gap: 14px; }
+.dashboard-shortcuts-section .dashboard-redesign-heading { margin-bottom: 0; }
+.dashboard-shortcut-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.dashboard-shortcut-card {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  grid-template-columns: 30px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--studio-line);
+  border-radius: 11px;
+  padding: 9px 11px;
+  background: var(--studio-panel);
+  color: var(--studio-text);
+  text-decoration: none;
+  transition: border-color .16s ease, background .16s ease, transform .16s ease;
+}
+.dashboard-shortcut-card:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--accent-400) 58%, var(--studio-line)); background: color-mix(in srgb, var(--accent-500) 7%, var(--studio-panel)); }
+.dashboard-shortcut-card strong { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-shortcut-card > svg { color: var(--studio-muted); }
+.dashboard-shortcut-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--accent-500) 14%, var(--studio-panel)); color: var(--studio-accent-soft, var(--accent-400)); }
+html[data-theme-preset] body .app-shell .dashboard-redesign-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-insight-card { min-width: 0; border-radius: 15px; padding: 18px; }
+.dashboard-redesign .dashboard-recommendation-title { display: block; margin-top: 15px; font-size: 15px; line-height: 1.4; }
+.dashboard-redesign .dashboard-recommendation-card > p:not(.eyebrow) { margin: 7px 0 12px; color: var(--studio-muted); font-size: 12px; line-height: 1.55; }
+.dashboard-redesign .dashboard-recommendation-card .dashboard-insight-link { margin-top: 12px; }
+.dashboard-channel-total { display: flex; align-items: baseline; gap: 8px; margin: 15px 0 9px; }
+.dashboard-channel-total strong { color: var(--studio-text); font-size: 29px; line-height: 1; font-variant-numeric: tabular-nums; }
+.dashboard-channel-total span { color: var(--studio-muted); font-size: 12px; }
+.dashboard-channel-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.dashboard-channel-list li { display: grid; min-width: 0; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 8px; border-top: 1px solid var(--studio-line); padding-top: 8px; font-size: 11px; }
+.dashboard-channel-list li > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-channel-list small { color: var(--studio-muted); font-size: 10px; text-transform: capitalize; }
+.dashboard-channel-indicator { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-400); }
+.dashboard-instagram-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; margin-top: 11px; border-top: 1px solid var(--studio-line); padding-top: 10px; color: var(--studio-muted); font-size: 10px; }
+.dashboard-instagram-summary strong { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--studio-text); font-size: 18px; }
+.dashboard-instagram-summary small { font-size: 10px; }
+.dashboard-channel-card .dashboard-insight-link { margin-top: 11px; }
+@media (max-width: 1100px) {
+  .dashboard-shortcut-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .workspace-dashboard.dashboard-redesign .dashboard-hero { grid-template-columns: minmax(0, 1fr); gap: 19px; }
+  .dashboard-hero-next { max-width: none; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign-insights { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .dashboard-shortcut-grid { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-shortcut-card { min-height: 54px; }
+}
+
+/* Dashboard competitor summary: give each market signal a clear inset row. */
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card {
+  gap: 8px;
+  padding: 22px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card > header {
+  min-height: 0;
+  margin: 0 0 4px;
+  border-bottom: 1px solid var(--studio-line);
+  padding: 0 0 13px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card .dashboard-competitor-row {
+  gap: 6px;
+  margin: 0;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  padding: 13px 14px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card .dashboard-competitor-row > strong {
+  font-size: 12px;
+  line-height: 1.45;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card .dashboard-competitor-row > span {
+  line-height: 1.5;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card > .dashboard-insight-link {
+  padding-top: 8px;
+}
+@media (max-width: 520px) {
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card { padding: 17px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-competitor-card .dashboard-competitor-row { padding: 12px; }
+}
+
+/* Give the campaign preview the full dashboard row so its cards use the available width. */
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel {
+  width: 100%;
+  padding: 21px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel .dashboard-panel-heading {
+  align-items: center;
+  margin-bottom: 2px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel .dashboard-campaign-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel .dashboard-campaign-item {
+  min-height: 70px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  padding: 13px 14px;
+  background: color-mix(in srgb, var(--studio-panel-raised) 54%, var(--studio-panel));
+}
+@media (max-width: 760px) {
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel .dashboard-campaign-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel { padding: 16px; }
+  html[data-theme-preset] body .app-shell .dashboard-redesign .dashboard-campaign-wide-panel .dashboard-campaign-list { grid-template-columns: minmax(0, 1fr); }
+}

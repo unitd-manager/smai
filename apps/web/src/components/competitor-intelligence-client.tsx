@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Activity, ArrowRight, BarChart3, Brain, Building2, CheckCircle2, Circle, Compass, FileText, Plus, RefreshCw, Search, UsersRound } from "lucide-react";
+import { CompactSelect } from "@/components/compact-select";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { apiRequest } from "@/lib/api";
 
@@ -290,6 +291,7 @@ function HorizontalBars({ rows, emptyText }: { rows: Array<{ label: string; valu
 
 export function CompetitorIntelligenceClient() {
   const profileFormRef = useRef<HTMLFormElement>(null);
+  const selectedProfileRef = useRef<HTMLDetailsElement>(null);
   const automaticDiscoveryStarted = useRef(false);
   const logoScansStarted = useRef(new Set<string>());
   const [data, setData] = useState<CompetitorResponse | null>(null);
@@ -299,6 +301,7 @@ export function CompetitorIntelligenceClient() {
   const [profileFormPlacement, setProfileFormPlacement] = useState<"page" | "empty">("page");
   const [loading, setLoading] = useState(true);
   const [searchBusy, setSearchBusy] = useState(false);
+  const [marketSearchInput, setMarketSearchInput] = useState("");
   const [searchResults, setSearchResults] = useState<CompetitorWebsiteResult[]>([]);
   const [searchError, setSearchError] = useState("");
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
@@ -339,13 +342,9 @@ export function CompetitorIntelligenceClient() {
       setData(response);
       setError("");
       setRetryDiscovery(false);
-      const topThree = response.competitors.map((competitor) => {
-        const posts = competitor.snapshots.flatMap((snapshot) => snapshot.observations.posts);
-        return { id: competitor.id, interactions: posts.reduce((total, post) => total + (postInteractions(post) ?? 0), 0), views: posts.reduce((total, post) => total + (post.metrics.views ?? 0), 0) };
-      }).sort((left, right) => right.interactions - left.interactions || right.views - left.views).slice(0, 3);
-      setSelectedId((current) => keepSelected && topThree.some((item) => item.id === current)
+      setSelectedId((current) => keepSelected && response.competitors.some((competitor) => competitor.id === current)
         ? current
-        : topThree[0]?.id ?? "");
+        : "");
     } catch (requestError) {
       setRetryDiscovery(false);
       setError(requestError instanceof Error ? requestError.message : "Could not load competitor intelligence.");
@@ -383,6 +382,10 @@ export function CompetitorIntelligenceClient() {
     formElement.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
   }, [data?.competitors.length, profileFormPlacement, showProfileForm]);
 
+  useEffect(() => {
+    if (selectedId) selectedProfileRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selectedId]);
+
   const selected = data?.competitors.find((competitor) => competitor.id === selectedId) ?? null;
   const latest = selected?.snapshots[0] ?? null;
   const analysis = latest?.analysisJson ?? null;
@@ -400,7 +403,7 @@ export function CompetitorIntelligenceClient() {
     const measuredPosts = posts.filter((post) => postInteractions(post) !== null).length;
     const views = posts.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
     return { competitor, posts, interactions, measuredPosts, views };
-  }).sort((left, right) => right.interactions - left.interactions || right.views - left.views || right.measuredPosts - left.measuredPosts || left.competitor.name.localeCompare(right.competitor.name)).slice(0, 3);
+  }).sort((left, right) => right.interactions - left.interactions || right.views - left.views || right.measuredPosts - left.measuredPosts || left.competitor.name.localeCompare(right.competitor.name));
   const allCompetitorPosts = rankedCompetitors.flatMap(({ competitor }) => {
     const uniquePosts = new Map<string, { competitor: CompetitorProfile; snapshot: CompetitorSnapshot; post: ObservedPost; interactions: number | null }>();
     for (const snapshot of competitor.snapshots) for (const post of snapshot.observations.posts) {
@@ -439,9 +442,7 @@ export function CompetitorIntelligenceClient() {
       if (postSort === "date") return (right.publishedAt ?? "").localeCompare(left.publishedAt ?? "");
       return (postInteractions(right) ?? -1) - (postInteractions(left) ?? -1);
     });
-  const selectedRank = rankedCompetitors.findIndex((item) => item.competitor.id === selected?.id) + 1;
-
-  const comparisonRows = rankedCompetitors.map(({ competitor }) => {
+  const comparisonRows = (data?.competitors ?? []).filter(competitorIsBusiness).map((competitor) => {
     const snapshot = competitor.snapshots[0];
     const platformMetrics = snapshot?.observations.platformMetrics.filter((item) => comparisonPlatform === "all" || item.platform === comparisonPlatform) ?? [];
     const posts = snapshot?.observations.posts.filter((post) => comparisonPlatform === "all" || post.platform === comparisonPlatform) ?? [];
@@ -853,6 +854,10 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp.is-s
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; color: var(--foreground); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comp small { display: block; margin-top: 3px; font-size: 11px; color: var(--navy-600); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-queries { display: grid; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin: 2px 0 4px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-form input { min-width: 0; min-height: 42px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 9px; padding: 0 12px; background: var(--studio-panel, var(--ivory-50)); color: var(--foreground); font: inherit; font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-form input:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 2px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-form .button { min-height: 42px; padding: 0 15px; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query { display: grid; grid-template-columns: 32px minmax(0, 1fr) 16px; align-items: center; gap: 10px; width: 100%; min-height: 0 !important; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 10px !important; padding: 9px 10px !important; background: var(--studio-panel, var(--ivory-50)); color: var(--foreground); text-align: left; cursor: pointer; font-size: 13px; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query:hover:not(:disabled) { border-color: var(--c); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-query-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
@@ -2090,6 +2095,8 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-a
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions { padding-top: 14px; border-top: 1px solid var(--studio-line, var(--ivory-300)); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions .button { flex: 1 1 auto; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-company-actions .button { min-height: 34px; padding: 7px 10px; font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-actions { display: grid; grid-column: 1 / -1; grid-row: 2; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 8px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-actions > button.button { box-sizing: border-box; width: 100%; min-width: 0; height: 48px; min-height: 48px; max-height: 48px; justify-content: center; margin: 0; padding: 0 6px; white-space: nowrap; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 13px; padding-bottom: 11px; border-bottom: 1px solid var(--studio-line, var(--ivory-300)); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-panel { padding: clamp(20px, 2.1vw, 28px); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-content-heading h3 { margin: 3px 0 0; font-size: 17px; }
@@ -2127,6 +2134,9 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts 
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; background: color-mix(in srgb, var(--accent-500) 4%, var(--studio-panel, var(--ivory-50))); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts::before { content: "!"; display: grid; width: 28px; height: 28px; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--accent-500) 14%, transparent); color: var(--accent-500); font-weight: 800; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts p { grid-column: 2; margin: -7px 0 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts { display: block; grid-template-columns: minmax(0, 1fr); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts::before { display: none; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-no-posts p { margin: 5px 0 0; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--studio-line, var(--ivory-300)); border-left: 3px solid var(--accent-500); border-radius: 10px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel, var(--ivory-50))); }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary h4 { margin: 0 0 6px; font-size: 12px; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-strategy-summary ul { display: grid; gap: 4px; margin: 0; padding-left: 17px; color: var(--navy-600); font-size: 11px; line-height: 1.5; }
@@ -2144,6 +2154,63 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leaders-heading { align-items: flex-start; flex-direction: column; }
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-leader-posts,
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-form { grid-template-columns: minmax(0, 1fr); }
+}
+
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-market-dashboard { display: grid; gap: 14px; margin: 22px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-card { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-card > .ci-card-head { align-items: flex-start; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-platform-filter { display: grid; flex: 0 0 190px; gap: 5px; color: var(--navy-600); font-size: 10px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-platform-filter .compact-select-trigger { min-height: 42px; border-color: var(--studio-line); border-radius: 9px; padding-inline: 10px; background: var(--studio-panel-raised); color: var(--studio-text, var(--foreground)); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-platform-filter .compact-select-menu { z-index: 100; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table-wrap { overflow-x: auto; margin-top: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table { width: 100%; min-width: 690px; border-collapse: separate; border-spacing: 0; text-align: left; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table th,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table td { border-bottom: 1px solid var(--studio-line, var(--ivory-300)); padding: 11px 10px; color: var(--studio-text, var(--foreground)); font-size: 11px; vertical-align: middle; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table thead th { color: var(--studio-muted, var(--navy-600)); font-size: 9px; font-weight: 700; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table tbody th { min-width: 120px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-table tbody th small { display: block; margin-top: 3px; color: var(--studio-muted, var(--navy-600)); font-size: 9px; font-weight: 400; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-table-action { border: 0; padding: 4px 0; background: transparent; color: var(--accent-500); cursor: pointer; font: inherit; font-size: 10px; font-weight: 700; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-research-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(250px, .9fr); gap: 14px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-keyword-card,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-format-card { display: grid; align-self: start; align-content: start; gap: 10px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section { display: grid; gap: 14px; margin: 22px 0; scroll-margin-top: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-snapshot-list { grid-template-columns: minmax(0, 1fr); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts > div { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 5px; min-width: 0; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 9px; padding: 10px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts > .ci-company-fact-wide { grid-column: 1 / -1; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts dt { color: var(--accent-500); font-size: 9px; font-weight: 750; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts dd { font-size: 11px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-social-block { margin-top: 4px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-no-posts { border: 1px dashed var(--studio-line, var(--ivory-300)); background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-no-posts > strong { color: var(--foreground); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-no-posts > p { margin: 5px 0 8px; color: var(--navy-600); font-size: 10px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-no-posts > details { margin: 8px 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-no-posts > details > summary { color: var(--accent-500); cursor: pointer; font-size: 10px; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-no-posts > details ul { max-height: 160px; overflow-y: auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics { display: grid; gap: 9px; margin: 0 0 14px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 11px; padding: 12px; background: color-mix(in srgb, var(--accent-500) 4%, var(--studio-panel-raised, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics > header strong { color: var(--foreground); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics > header span { color: var(--navy-600); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics article { display: grid; gap: 5px; min-width: 0; border-radius: 8px; padding: 9px; background: var(--studio-panel, var(--ivory-50)); color: var(--navy-600); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics article > strong { color: var(--accent-500); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics article b { color: var(--foreground); font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-analytics-empty { margin: 0 0 14px; border-radius: 10px; padding: 10px 12px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel)); color: var(--navy-600); font-size: 10px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-keyword-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-keyword-query { display: inline-flex; align-items: center; gap: 6px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-error { margin: 0; color: var(--danger, #df6b75); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-query { margin: 0; overflow-wrap: anywhere; color: var(--studio-muted, var(--navy-600)); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-chart > div { gap: 7px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-track { height: 7px; border-radius: 99px; background: color-mix(in srgb, var(--accent-500) 10%, var(--studio-panel-raised)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-track > i { border-radius: inherit; background: linear-gradient(90deg, var(--accent-500), var(--accent-700)); }
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-research-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-actions { grid-row: auto; }
+}
+@media (max-width: 620px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-card > .ci-card-head { align-items: stretch; flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-platform-filter { flex-basis: auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts { grid-template-columns: minmax(0, 1fr); }
 }
 
 `}</style>
@@ -2168,12 +2235,91 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
 
       {showProfileForm && (profileFormPlacement === "page" || Boolean(data?.competitors.length)) && renderProfileForm()}
 
-      {data && <div className="ci-leaders">
-        <div className="ci-leaders-heading">
-          <div><p className="ci-kicker">COMPETITOR SNAPSHOT</p><h2>Leading businesses</h2><p>Business details, public social channels, and the posts with the strongest recorded engagement.</p></div>
+      {data && <section className="ci-market-dashboard" aria-label="Competitor comparison and keyword research">
+        <section className="ci-card ci-comparison-card" aria-labelledby="ci-comparison-title">
+          <header className="ci-card-head">
+            <div><p className="ci-kicker">Market comparison</p><h2 id="ci-comparison-title">Recorded competitor metrics</h2><p className="ci-insight-caption">Compare the latest saved snapshot. Missing values stay marked as not captured.</p></div>
+            <label className="ci-platform-filter">Platform
+              <CompactSelect value={comparisonPlatform} onChange={(event) => setComparisonPlatform(event.target.value)} aria-label="Filter competitor metrics by platform">
+                <option value="all">All captured platforms</option>
+                {[...new Set(data.competitors.flatMap((competitor) => competitor.snapshots[0]?.observations.platformMetrics.map((item) => item.platform) ?? []))].sort().map((platform) => <option value={platform} key={platform}>{platform}</option>)}
+              </CompactSelect>
+            </label>
+          </header>
+          {comparisonRows.length ? <div className="ci-comparison-table-wrap">
+            <table className="ci-comparison-table">
+              <thead><tr><th scope="col">Business</th><th scope="col">Followers</th><th scope="col">Posts observed</th><th scope="col">Recorded interactions</th><th scope="col">Snapshot</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <tbody>{comparisonRows.map((row) => {
+                const interactionsByPlatform = new Map<string, { count: number; total: number }>();
+                for (const post of row.posts) {
+                  const interactions = postInteractions(post);
+                  if (interactions === null) continue;
+                  const current = interactionsByPlatform.get(post.platform) ?? { count: 0, total: 0 };
+                  current.count += 1;
+                  current.total += interactions;
+                  interactionsByPlatform.set(post.platform, current);
+                }
+                const interactionSummary = [...interactionsByPlatform].map(([platform, value]) => comparisonPlatform === "all"
+                  ? `${platform}: ${value.total.toLocaleString()}`
+                  : value.total.toLocaleString()).join(" · ") || "Not captured";
+                const followerSummary = row.hasFollowers
+                  ? comparisonPlatform === "all" ? row.byPlatform("followers") : metricNumber(row.followerTotal)
+                  : "Not captured";
+                return <tr key={row.competitor.id}>
+                  <th scope="row"><strong>{row.competitor.name}</strong><small>{categoryMeta[row.competitor.category]?.label ?? "Competitor"}</small></th>
+                  <td>{followerSummary}</td><td>{row.snapshot ? row.posts.length : "Not captured"}</td><td>{interactionSummary}</td>
+                  <td>{row.snapshot ? new Date(row.snapshot.observedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Not captured"}</td>
+                  <td><button className="ci-table-action" type="button" aria-expanded={selectedId === row.competitor.id} onClick={() => setSelectedId((current) => current === row.competitor.id ? "" : row.competitor.id)}>{selectedId === row.competitor.id ? "Close profile" : "Open profile"}</button></td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div> : <p className="ci-insight-empty">Add verified business profiles to compare recorded channel metrics.</p>}
+          <p className="ci-note">Interactions sum recorded likes, comments, and shares for the selected snapshot. Values across platforms are shown separately.</p>
+        </section>
+
+        <div className="ci-research-grid">
+          <section className="ci-card ci-keyword-card" aria-labelledby="ci-keyword-title">
+            <header className="ci-card-head"><div><p className="ci-kicker">Keyword research</p><h2 id="ci-keyword-title">Search the market</h2></div><Search size={18} aria-hidden="true" /></header>
+            <p className="ci-insight-caption">Saved profile keywords and brand context create searches. Search results are public pages, not keyword rankings or volume estimates.</p>
+            <form className="ci-search-form" onSubmit={(event) => { event.preventDefault(); const query = marketSearchInput.trim(); if (query.length >= 2) void searchWebsites(query); }}>
+              <input aria-label="Search public businesses and websites" placeholder="Search businesses, brands, or keywords…" value={marketSearchInput} maxLength={160} onChange={(event) => setMarketSearchInput(event.target.value)} />
+              <button className="button button-gold" type="submit" disabled={searchBusy || marketSearchInput.trim().length < 2}>{searchBusy ? "Searching…" : "Search"}</button>
+            </form>
+            {selected?.keywords.length ? <div className="ci-chips ci-keyword-chips" aria-label={`Keywords saved for ${selected.name}`}>
+              {selected.keywords.map((keyword) => <button type="button" className="ci-chip ci-keyword-query" key={keyword} onClick={() => void searchWebsites(`${keyword} ${data.brand.location}`)} disabled={searchBusy}><Search size={12} aria-hidden="true" />{keyword}<ArrowRight size={12} aria-hidden="true" /></button>)}
+            </div> : <p className="ci-note">Choose a competitor with saved keywords or use a market search below.</p>}
+            <div className="ci-queries">
+              {searchQueries.slice(0, 4).map((query, index) => <button className="ci-query" type="button" key={query.query} style={{ "--c": accentFor(index) } as CSSProperties} onClick={() => { setMarketSearchInput(query.query); void searchWebsites(query.query); }} disabled={searchBusy}>
+                <span className="ci-query-icon"><Search size={15} aria-hidden="true" /></span><span className="t">{query.label}</span><ArrowRight size={14} aria-hidden="true" />
+              </button>)}
+            </div>
+            {!data.dataCollection.websiteSearchAvailable && <p className="ci-note">Live results need a Tavily Search API key. Set TAVILY_API_KEY in apps/api/.env and restart the API server to enable searches.</p>}
+            {searchBusy && <p className="ci-note" role="status">Searching public websites…</p>}
+            {searchError && <p className="ci-search-error" role="alert">{searchError}</p>}
+            {activeSearchQuery && <p className="ci-search-query">Results for <strong>{activeSearchQuery}</strong></p>}
+            {searchResults.length > 0 && <div className="ci-results">{searchResults.map((result) => <article className="ci-result" key={result.url}>
+              <div><strong>{result.title}</strong><span>{result.domain}</span></div>
+              <div className="ci-result-actions"><a href={result.url} target="_blank" rel="noreferrer">Open source</a><button type="button" onClick={() => startNewProfile({ name: result.title, websiteUrl: result.url, industry: data.brand.industry ?? "", location: data.brand.location }, "page")}>Add profile</button></div>
+            </article>)}</div>}
+          </section>
+
+          <section className="ci-card ci-format-card" aria-labelledby="ci-format-title">
+            <header className="ci-card-head"><div><p className="ci-kicker">Observed content</p><h2 id="ci-format-title">Formats in saved posts</h2></div><Activity size={18} aria-hidden="true" /></header>
+            <p className="ci-insight-caption">Recorded post counts and interactions from the leading profiles.</p>
+            {topTactics.length ? <div className="ci-tactic-chart">{topTactics.map((item, index) => {
+              const maximum = Math.max(1, ...topTactics.map((tactic) => tactic.interactions));
+              return <div key={item.format}>
+                <div><strong>{item.format}</strong><span>{item.count} {item.count === 1 ? "post" : "posts"} · {item.interactions.toLocaleString()} interactions</span></div>
+                <span className="ci-tactic-track"><i style={{ width: `${item.interactions ? Math.max(4, item.interactions / maximum * 100) : 0}%`, background: `linear-gradient(90deg, ${accentFor(index)}, ${accentFor(index)}aa)` }} /></span>
+              </div>;
+            })}</div> : <p className="ci-insight-empty">No observed post formats are available yet.</p>}
+            <p className="ci-note">Interactions indicate recorded activity only; they do not establish what caused a post’s performance.</p>
+          </section>
         </div>
-        {!data.dataCollection.websiteSearchAvailable && <p className="ci-setup-note">Website discovery unavailable · Add profiles manually.</p>}
-        {rankedCompetitors.length ? <div className="ci-snapshot-list">{rankedCompetitors.map(({ competitor }, index) => {
+      </section>}
+
+      {data && <section className="ci-profile-section" aria-label="Selected competitor profile">
+        {rankedCompetitors.length ? <div className="ci-snapshot-list">{rankedCompetitors.filter(({ competitor }) => competitor.id === selectedId).map(({ competitor }) => {
           const snapshot = competitor.snapshots[0] ?? null;
           const allPosts = [...new Map(competitor.snapshots.flatMap((item) => item.observations.posts).map((post) => [post.url, post])).values()];
           const measuredPostsList = allPosts.filter((post) => postInteractions(post) !== null || typeof post.metrics.views === "number");
@@ -2190,13 +2336,12 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
             .filter((pattern) => !/^(not available|no patterns? (?:were )?available|insufficient (?:data|evidence)|not enough evidence)/i.test(pattern.trim()))
             .slice(0, 3) ?? [];
           const socialLinks = Object.entries(competitor.socialProfiles).filter((entry): entry is [string, string] => Boolean(entry[1]));
-          const placeholderOverview = competitor.overview?.startsWith("Automatically discovered from a public web search") ?? false;
-          const offer = competitor.products || (placeholderOverview ? "Business description not verified yet" : competitor.overview) || competitor.industry || "Not listed in public profile";
           const savedLogoUrl = snapshot?.observations.websiteResearch?.competitorWebsite?.logoUrl || "";
           let logoUrl = savedLogoUrl;
           try { if (logoUrl && new URL(logoUrl).pathname === "/") logoUrl = ""; } catch { logoUrl = ""; }
           const logoText = snapshot?.observations.websiteResearch?.competitorWebsite?.logoText || "";
           const websiteReport = snapshot?.observations.websiteResearch?.competitorWebsite;
+          const websiteDescription = websiteReport?.description && websiteReport.description !== competitor.overview ? websiteReport.description : null;
           const postAccessLimits = socialLinks.flatMap(([platform]) => {
             if (platform === "Instagram" && !data.dataCollection.instagramCompetitorInsightsAvailable) return ["Instagram post metrics need an eligible professional account, Facebook Login, and Meta Business Discovery permissions."];
             if (platform === "YouTube" && !data.dataCollection.youtubeApiAvailable) return ["YouTube post metrics need the YouTube Data API key in the API environment."];
@@ -2207,36 +2352,48 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
           const researchWarnings = snapshot?.observations.websiteResearch?.warnings.filter((warning) => /instagram|youtube|\bx\b|facebook|linkedin|tiktok|pinterest/i.test(warning)) ?? [];
           const topPostViews = measuredPostsList.reduce((total, post) => total + (post.metrics.views ?? 0), 0);
           const topPostInteractions = measuredPostsList.reduce((total, post) => total + (postInteractions(post) ?? 0), 0);
-          return <details className="ci-leader-card ci-snapshot-card" key={competitor.id} open={selectedId === competitor.id} onToggle={(event) => {
+          return <details ref={selectedProfileRef} className="ci-leader-card ci-snapshot-card" key={competitor.id} open onToggle={(event) => {
             if (event.currentTarget.open && selectedId !== competitor.id) setSelectedId(competitor.id);
             else if (!event.currentTarget.open && selectedId === competitor.id) setSelectedId("");
           }}>
             <summary className="ci-snapshot-summary">
               <span className={`ci-company-logo${logoText ? " ci-logo-has-text" : ""}${logoText && !logoUrl ? " ci-logo-text-mark" : ""}`}>{logoUrl ? <img src={logoUrl} alt="" onError={(event) => { event.currentTarget.style.display = "none"; event.currentTarget.parentElement?.classList.add("ci-logo-missing"); }} /> : null}{logoText && <span className="ci-site-logo-mark">{logoText}</span>}<span className="ci-logo-fallback">{competitor.name.slice(0, 1)}</span></span>
-              <span className="ci-snapshot-identity"><small>SNAPSHOT {String(index + 1).padStart(2, "0")} · {categoryMeta[competitor.category]?.label ?? "Competitor"}</small><strong>{competitor.name}</strong><span>{websiteReport?.description || offer}</span><span className="ci-snapshot-platforms">{socialLinks.length ? socialLinks.map(([platform]) => <em key={platform}>{platform}</em>) : <em>Website research</em>}</span></span>
-              <span className="ci-snapshot-metrics"><span><strong>{allPosts.length}</strong><small>posts</small></span><span><strong>{topPostViews ? topPostViews.toLocaleString() : "—"}</strong><small>views</small></span><span><strong>{topPostInteractions ? topPostInteractions.toLocaleString() : "—"}</strong><small>interactions</small></span></span>
-              <span className="ci-snapshot-open"><span>{selectedId === competitor.id ? "Close snapshot" : "Open snapshot"}</span><ArrowRight size={16} aria-hidden="true" /></span>
+              <span className="ci-snapshot-identity"><small>PROFILE · {categoryMeta[competitor.category]?.label ?? "Competitor"}</small><strong>{competitor.name}</strong><span>{[competitor.industry, competitor.location].filter(Boolean).join(" · ") || "Business profile"}</span><span className="ci-snapshot-platforms">{socialLinks.length ? socialLinks.map(([platform]) => <em key={platform}>{platform}</em>) : <em>Website research</em>}</span></span>
+              <span className="ci-snapshot-metrics"><span><strong>{allPosts.length}</strong><small>saved posts</small></span><span><strong>{measuredPostsList.some((post) => typeof post.metrics.views === "number") ? topPostViews.toLocaleString() : "—"}</strong><small>recorded views</small></span><span><strong>{measuredPostsList.some((post) => postInteractions(post) !== null) ? topPostInteractions.toLocaleString() : "—"}</strong><small>interactions</small></span></span>
+              <span className="ci-snapshot-open"><span>Selected profile</span><ArrowRight size={16} aria-hidden="true" /></span>
             </summary>
             <div className="ci-snapshot-details">
             <section className="ci-company-panel">
               <div className="ci-company-heading">
                 <span className={`ci-company-logo${logoText ? " ci-logo-has-text" : ""}${logoText && !logoUrl ? " ci-logo-text-mark" : ""}`}>{logoUrl ? <img src={logoUrl} alt={`${competitor.name} logo`} onError={(event) => { event.currentTarget.style.display = "none"; event.currentTarget.parentElement?.classList.add("ci-logo-missing"); }} /> : null}{logoText && <span className="ci-site-logo-mark">{logoText}</span>}<span className="ci-logo-fallback">Logo unavailable</span></span>
-                <div><span className="ci-rank-label">COMPETITOR {String(index + 1).padStart(2, "0")}</span><h3>{competitor.name}</h3></div>
+                <div><span className="ci-rank-label">PROFILE DETAILS</span><h3>{competitor.name}</h3></div>
               </div>
-              <div className="ci-company-summary">{offer}</div>
               <dl className="ci-company-facts">
-                <div><dt>What they do</dt><dd>{websiteReport?.description || offer}</dd></div>
+                {websiteDescription && <div className="ci-company-fact-wide"><dt>Website summary</dt><dd>{websiteDescription}</dd></div>}
+                {competitor.industry && <div><dt>Industry</dt><dd>{competitor.industry}</dd></div>}
                 <div><dt>Location</dt><dd>{competitor.location || "Not listed"}</dd></div>
                 <div><dt>Website</dt><dd>{competitor.websiteUrl ? <a href={competitor.websiteUrl} target="_blank" rel="noreferrer">{new URL(competitor.websiteUrl).hostname} ↗</a> : "No website saved"}</dd></div>
-                {competitor.audience && <div><dt>Audience</dt><dd>{competitor.audience}</dd></div>}
-                {competitor.uniqueValue && <div><dt>Positioning</dt><dd>{competitor.uniqueValue}</dd></div>}
+                {competitor.overview && <div className="ci-company-fact-wide"><dt>Business overview</dt><dd>{competitor.overview}</dd></div>}
+                {competitor.products && <div className="ci-company-fact-wide"><dt>Products / services</dt><dd>{competitor.products}</dd></div>}
+                {competitor.audience && <div className="ci-company-fact-wide"><dt>Audience</dt><dd>{competitor.audience}</dd></div>}
+                {competitor.uniqueValue && <div className="ci-company-fact-wide"><dt>Positioning</dt><dd>{competitor.uniqueValue}</dd></div>}
                 {competitor.brandVoice && <div><dt>Brand voice</dt><dd>{competitor.brandVoice}</dd></div>}
+                {competitor.keywords.length > 0 && <div className="ci-company-fact-wide"><dt>Keywords</dt><dd>{competitor.keywords.join(" · ")}</dd></div>}
+                {competitor.notes && <div className="ci-company-fact-wide"><dt>Research notes</dt><dd>{competitor.notes}</dd></div>}
               </dl>
               <div className="ci-social-block"><strong>Social channels</strong>{socialLinks.length ? <div className="ci-social-links">{socialLinks.map(([platform, url]) => <a key={platform} href={url} target="_blank" rel="noreferrer">{platform} ↗</a>)}</div> : <p>No public accounts linked on the company website.</p>}{researchWarnings.length > 0 && <details className="ci-research-warnings"><summary>Data access notes · {researchWarnings.length}</summary><ul>{researchWarnings.slice(0, 6).map((warning, warningIndex) => <li key={`${warningIndex}-${warning}`}>{warning}</li>)}</ul></details>}</div>
-              <div className="ci-company-actions"><button className="button button-outline" type="button" onClick={() => editProfile(competitor)}>Edit</button><button className="button button-outline" type="button" onClick={() => exportReport(competitor)}>Export report</button><button className="button button-outline ci-refresh-research" type="button" onClick={() => void refreshWebsiteFindings(competitor)} disabled={busy === "website"}>{busy === "website" ? "Scanning…" : "Refresh site"}</button></div>
             </section>
             <section className="ci-content-panel">
               <div className="ci-content-heading"><div><p className="ci-kicker">SOCIAL CONTENT</p><h3>Standout posts & strategy</h3></div><span>{posts.length} post{posts.length === 1 ? "" : "s"} with saved evidence</span></div>
+              {snapshot?.observations.platformMetrics.length ? <section className="ci-profile-channel-analytics" aria-label="Latest recorded channel analytics">
+                <header><strong>Latest channel analytics</strong><span>{new Date(snapshot.observedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span></header>
+                <div>{snapshot.observations.platformMetrics.map((item) => <article key={`${item.platform}-${item.capturedAt ?? snapshot.observedAt}`}>
+                  <strong>{item.platform}</strong>
+                  <span><b>{metricNumber(item.metrics.followers)}</b> followers</span>
+                  <span><b>{metricNumber(item.metrics.following)}</b> following</span>
+                  <span><b>{metricNumber(item.metrics.totalPosts)}</b> profile posts</span>
+                </article>)}</div>
+              </section> : <p className="ci-profile-analytics-empty">No channel-level metrics have been saved for this profile yet. Add dated public post evidence below to track available figures.</p>}
               {posts.length ? <><div className="ci-post-ranking-note">Top posts ranked by recorded views and interactions.</div><div className="ci-leader-posts">{posts.map((post, postIndex) => {
                 const interactions = postInteractions(post);
                 const postRef = `${post.url} ${post.topic} ${post.hook}`.toLowerCase();
@@ -2249,7 +2406,7 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
                   {reverse ? <div className="ci-post-strategy"><strong>Why it may attract attention</strong><p>{[reverse.hook, reverse.emotionalTrigger, reverse.audienceNeed, reverse.visualApproach, reverse.engagementApproach].filter(Boolean).join(" · ")}</p><small>Content interpretation · {reverse.evidence || "Based on the cited post content; not proof of what caused its results."}</small></div> : (post.hook || post.captionApproach || post.callToAction) ? <div className="ci-post-strategy"><strong>Visible content tactic</strong><p>{[post.hook && `Opening: ${post.hook.slice(0, 180)}`, post.captionApproach && post.captionApproach !== post.hook ? `Caption: ${post.captionApproach.slice(0, 180)}` : "", post.callToAction && `Call to action: ${post.callToAction}`].filter(Boolean).join(" · ")}</p><small>Observed in the post. No causal performance claim.</small></div> : <p className="ci-post-strategy">Post details were not captured, so its attention tactic cannot be assessed yet.</p>}
                   <a href={post.url} target="_blank" rel="noreferrer">View original post ↗</a>
                 </article>;
-              })}</div></> : <div className="ci-no-posts"><strong>No post metrics captured</strong>{postAccessLimits.length ? <ul>{[...new Set(postAccessLimits)].map((limit) => <li key={limit}>{limit}</li>)}</ul> : <p>Link a public profile or add a post URL and visible metrics below.</p>}<a href="#add-public-post-evidence" onClick={(event) => { event.preventDefault(); const details = event.currentTarget.closest(".ci-content-panel")?.querySelector<HTMLDetailsElement>(".ci-record-details"); if (details) { details.open = true; details.scrollIntoView({ behavior: "smooth", block: "center" }); } }}>Add post evidence</a></div>}
+              })}</div></> : <div className="ci-no-posts"><strong>No post analytics captured yet</strong><p>{postAccessLimits.length ? "Some connected platforms need additional access before post metrics can be collected." : "Add a public post and its visible metrics to start tracking this profile."}</p>{postAccessLimits.length > 0 && <details><summary>Platform access details · {postAccessLimits.length}</summary><ul>{[...new Set(postAccessLimits)].map((limit) => <li key={limit}>{limit}</li>)}</ul></details>}<a href="#add-public-post-evidence" onClick={(event) => { event.preventDefault(); const details = event.currentTarget.closest(".ci-content-panel")?.querySelector<HTMLDetailsElement>(".ci-record-details"); if (details) { details.open = true; details.scrollIntoView({ behavior: "smooth", block: "center" }); } }}>Add post evidence</a></div>}
               {patterns.length > 0 && <div className="ci-strategy-summary"><h4>Recurring content tactics</h4><ul>{patterns.map((pattern, patternIndex) => <li key={`${patternIndex}-${pattern}`}>{pattern}</li>)}</ul><small>These are content-based interpretations. The recorded post metrics show association only, not that a tactic caused the results.</small></div>}
               <details className="ci-record-details">
                 <summary>Add public post evidence</summary>
@@ -2269,10 +2426,12 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-record-fo
                 </form>
               </details>
             </section>
+            <div className="ci-company-actions"><button className="button button-outline" type="button" onClick={() => editProfile(competitor)}>Edit</button><button className="button button-outline" type="button" onClick={() => exportReport(competitor)}>Export report</button><button className="button button-outline ci-refresh-research" type="button" onClick={() => void refreshWebsiteFindings(competitor)} disabled={busy === "website"}>{busy === "website" ? "Scanning…" : "Refresh site"}</button></div>
             </div>
           </details>;
-        })}</div> : <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Set your industry and location in Brand Profile, then discover individual businesses with a homepage logo.</p><div className="ci-empty-actions">{data.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Searching…" : "Discover competitors"}</button>}<button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
-      </div>}
+        })}</div> : null}
+        {!rankedCompetitors.length && <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Set your industry and location in Brand Profile, then discover individual businesses with a homepage logo.</p><div className="ci-empty-actions">{data.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Searching…" : "Discover competitors"}</button>}<button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
+      </section>}
       {showProfileForm && renderProfileForm()}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void (retryDiscovery ? discoverAndAnalyze() : load())}>{retryDiscovery ? "Retry" : "Try again"}</button></div>}

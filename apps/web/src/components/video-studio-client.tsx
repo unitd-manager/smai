@@ -829,9 +829,11 @@ export function VideoStudioClient() {
 
   return (
     <section className="dashboard-content video-studio-page">
-      <p className="eyebrow">YOUR STUDIO · VIDEO</p>
-      <h1>Video Studio</h1>
-      <p className="dashboard-lead">Create, preview, and prepare branded product or presenter videos.</p>
+      <header className="video-studio-heading">
+        <p className="eyebrow">YOUR STUDIO · VIDEO</p>
+        <h1>Video Studio</h1>
+        <p className="dashboard-lead">Create, preview, and prepare branded product or presenter videos.</p>
+      </header>
       {error && <div className="video-generation-error" role="alert"><strong>We couldn&apos;t complete that step</strong><p>{error}</p></div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       <MagicHourCreator onCreated={() => { void loadJobs(); }} />

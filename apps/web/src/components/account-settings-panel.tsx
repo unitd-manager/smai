@@ -95,11 +95,16 @@ export function AccountSettingsPanel() {
         <p className="dashboard-lead">Manage sign-in details for your account.</p>
       </header>
       <div className="account-settings-card">
-        <h3>Account details</h3>
-        {account ? <dl>
-          <div><dt>Name</dt><dd>{account.name}</dd></div>
-          <div><dt>Email</dt><dd>{account.email}</dd></div>
-        </dl> : <p className="loading-label">Loading account details…</p>}
+        {account ? <>
+          <div className="account-identity-heading">
+            <span className="account-profile-avatar" aria-hidden="true">{account.name.trim().slice(0, 1).toUpperCase() || "U"}</span>
+            <div><h3>Account details</h3><p>Your personal sign-in identity</p></div>
+          </div>
+          <dl>
+            <div><dt>Name</dt><dd>{account.name}</dd></div>
+            <div><dt>Email</dt><dd>{account.email}</dd></div>
+          </dl>
+        </> : <><h3>Account details</h3><p className="loading-label">Loading account details…</p></>}
       </div>
       <form className="account-settings-card account-password-form" onSubmit={(event) => void changePassword(event)}>
         <div><h3>Change password</h3><p>Choose at least 12 characters. Changing your password signs out other active sessions.</p></div>

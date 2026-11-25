@@ -339,38 +339,54 @@ export function AnalyticsClient() {
     <section className="dashboard-content analytics-page">
       <header className="analytics-page-heading">
         <div>
-          <p className="eyebrow">YOUR STUDIO · GROW</p>
+          <p className="eyebrow">Your studio · Grow</p>
           <h1>Analytics</h1>
           <p className="dashboard-lead">A clear view of your publishing activity across connected channels.</p>
         </div>
-        <Link className="button button-primary analytics-manage-link" href="/dashboard/social-accounts">Manage channels <ArrowUpRight size={15} aria-hidden="true" /></Link>
+        <div className="analytics-header-actions">
+          <div className="analytics-period-switch" role="group" aria-label="Analytics period">
+            {periodOptions.map((days) => (
+              <button key={days} type="button" className={period === days ? "is-active" : ""} aria-pressed={period === days} onClick={() => setPeriod(days)}>
+                {days} days
+              </button>
+            ))}
+          </div>
+          <Link className="button button-primary analytics-manage-link" href="/dashboard/social-accounts">Manage channels <ArrowUpRight size={15} aria-hidden="true" /></Link>
+        </div>
       </header>
       {error && <p className="form-error" role="alert">{error}</p>}
       {loading ? <p className="loading-label" role="status">Loading publishing activity…</p> : (
         <>
           <section className="analytics-marketing-snapshot" aria-labelledby="analytics-snapshot-title">
             <header className="analytics-section-heading">
-              <div><p className="card-kicker">MARKETING SNAPSHOT</p><h2 id="analytics-snapshot-title">Your publishing at a glance</h2></div>
+              <div><p className="card-kicker">Publishing overview</p><h2 id="analytics-snapshot-title">Your publishing at a glance</h2></div>
               <span className="analytics-data-source">Live publishing records</span>
             </header>
             <div className="analytics-snapshot-grid">
               <article className="analytics-snapshot-card is-published">
                 <span>Published posts</span><strong>{summary.published}</strong>
-                <small>In the selected period</small><Send size={17} aria-hidden="true" />
+                <small>Unique posts · selected period</small><Send size={17} aria-hidden="true" />
               </article>
               <article className="analytics-snapshot-card is-channel">
                 <span>Most active platform</span><strong>{leadingPlatform?.[0] ?? "—"}</strong>
-                <small>{leadingPlatform ? `${leadingPlatform[1]} confirmed live ${leadingPlatform[1] === 1 ? "post" : "posts"}` : "No confirmed live posts in this period"}</small>
+                <small>{leadingPlatform ? `${leadingPlatform[1]} live ${leadingPlatform[1] === 1 ? "target" : "targets"} in this period` : "No confirmed live posts in this period"}</small>
                 <ArrowUpRight size={17} aria-hidden="true" />
               </article>
               <article className="analytics-snapshot-card is-queued">
                 <span>Queued live targets</span><strong>{summary.scheduled}</strong>
-                <small>Waiting or pending publication</small><CalendarClock size={17} aria-hidden="true" />
+                <small>Current queue · waiting or pending</small><CalendarClock size={17} aria-hidden="true" />
               </article>
-              <article className="analytics-snapshot-card is-unavailable">
-                <span>Instagram reach</span><strong>{instagramLoading ? "Loading" : instagramSummary.reach === null ? "Unavailable" : instagramSummary.reach.toLocaleString()}</strong>
-                <small>{instagramSummary.reach === null ? "Instagram account insights only; other platforms unavailable" : "Recent Instagram media · live API insights"}</small><Eye size={17} aria-hidden="true" />
+              <article className="analytics-snapshot-card is-attention">
+                <span>Needs attention</span><strong>{summary.failed}</strong>
+                <small>Current failed live targets</small><CircleAlert size={17} aria-hidden="true" />
               </article>
+            </div>
+          </section>
+
+          <section className="analytics-instagram-panel analytics-panel" aria-labelledby="analytics-instagram-title">
+            <div className="analytics-section-heading">
+              <div><p className="card-kicker">Instagram · recent media</p><h2 id="analytics-instagram-title">Account insights</h2></div>
+              <span className="analytics-data-source">{instagramLoading ? "Checking access" : instagramError ? "Unavailable" : "Instagram API insights"}</span>
             </div>
             <div className="analytics-instagram-detail" aria-live="polite">
               {instagramError
@@ -393,7 +409,7 @@ export function AnalyticsClient() {
 
           <section className="analytics-insights-panel analytics-panel" aria-labelledby="analytics-insights-title">
             <div className="analytics-section-heading">
-              <div><p className="card-kicker">ACTIONABLE INSIGHTS</p><h2 id="analytics-insights-title">What to do next</h2></div>
+              <div><p className="card-kicker">Actionable insights</p><h2 id="analytics-insights-title">What to do next</h2></div>
               <Sparkles size={18} aria-hidden="true" />
             </div>
             <div className="analytics-insights-grid">
@@ -410,22 +426,10 @@ export function AnalyticsClient() {
           </section>
 
           <div className="analytics-dashboard-overview">
-            <div className="analytics-summary-stack">
-              <article className="analytics-kpi-published"><span>Published posts</span><strong>{summary.published}</strong><small>In the selected period</small><span className="analytics-kpi-icon" aria-hidden="true"><Send size={18} /></span></article>
-              <article className="analytics-kpi-scheduled"><span>Scheduled posts</span><strong>{summary.scheduled}</strong><small>Waiting to publish</small><span className="analytics-kpi-icon" aria-hidden="true"><CalendarClock size={18} /></span></article>
-              <article className="analytics-kpi-failed"><span>Needs attention</span><strong>{summary.failed}</strong><small>Failed live targets</small><span className="analytics-kpi-icon" aria-hidden="true"><CircleAlert size={18} /></span></article>
-            </div>
-
             <section className="analytics-panel analytics-activity-panel">
             <div className="analytics-section-heading">
-              <div><p className="card-kicker">PUBLISHING OVER TIME</p><h2>Activity</h2></div>
-              <div className="analytics-period-switch" role="group" aria-label="Activity chart time period">
-                {periodOptions.map((days) => (
-                  <button key={days} type="button" className={period === days ? "is-active" : ""} aria-pressed={period === days} onClick={() => setPeriod(days)}>
-                    {days} days
-                  </button>
-                ))}
-              </div>
+              <div><p className="card-kicker">Publishing over time</p><h2>Daily activity</h2></div>
+              <span className="analytics-period-label">Last {period} days</span>
             </div>
             <p className="analytics-chart-caption">Live posts confirmed as published each day. Demo activity is excluded.</p>
             {summary.published ? (
@@ -439,30 +443,9 @@ export function AnalyticsClient() {
             )}
             {summary.publishedWithoutTimestamp > 0 && <p className="analytics-data-note">{summary.publishedWithoutTimestamp} published {summary.publishedWithoutTimestamp === 1 ? "post has" : "posts have"} no platform timestamp and {summary.publishedWithoutTimestamp === 1 ? "is" : "are"} not placed on the chart.</p>}
             </section>
-          </div>
 
-          <div className="analytics-panels analytics-dashboard-details">
-            <section className="analytics-panel analytics-busiest-panel">
-              <div className="analytics-section-heading"><div><p className="card-kicker">SCHEDULED TIMES</p><h2>Upcoming posting pattern</h2></div></div>
-              <p className="analytics-chart-caption">Upcoming live posts grouped by their saved local time.</p>
-              <SchedulePattern rows={summary.schedulePattern} />
-              {!summary.schedulePattern.some((row) => row.some((count) => count > 0)) && <p className="analytics-empty-chart">No upcoming live posts are scheduled yet.</p>}
-              <Link href="/dashboard/calendar">Open calendar <ArrowRight size={14} aria-hidden="true" /></Link>
-            </section>
-
-            <section className="analytics-panel analytics-status-panel">
-              <div className="analytics-section-heading"><div><p className="card-kicker">EFFICIENCY</p><h2>Publishing results</h2></div></div>
-              <p className="analytics-chart-caption">Current status of live publishing targets. No reach or engagement metrics are connected.</p>
-              <p className="analytics-active-channels"><strong>{summary.activeChannels}</strong> active {summary.activeChannels === 1 ? "channel" : "channels"}</p>
-              <StatusChart {...summary.statusCounts} />
-              {!summary.hasLiveTargets && <p className="analytics-empty-chart">Schedule a post to start tracking live delivery.</p>}
-              <Link href="/dashboard/posts">Review publishing status <ArrowRight size={14} aria-hidden="true" /></Link>
-            </section>
-          </div>
-
-          <div className="analytics-panels analytics-platform-row">
             <section className="analytics-panel analytics-channel-panel">
-              <div className="analytics-section-heading"><div><p className="card-kicker">CHANNEL PERFORMANCE</p><h2>Published by platform</h2></div></div>
+              <div className="analytics-section-heading"><div><p className="card-kicker">Channel performance</p><h2>Published by platform</h2></div></div>
               <p className="analytics-chart-caption">Live publishing targets in the selected period</p>
               {summary.byPlatform.length ? (
                 <div className="analytics-platform-chart">
@@ -478,8 +461,27 @@ export function AnalyticsClient() {
             </section>
           </div>
 
+          <div className="analytics-panels analytics-dashboard-details">
+            <section className="analytics-panel analytics-busiest-panel">
+              <div className="analytics-section-heading"><div><p className="card-kicker">Scheduled times</p><h2>Upcoming posting pattern</h2></div></div>
+              <p className="analytics-chart-caption">Upcoming live posts grouped by their saved local time.</p>
+              <SchedulePattern rows={summary.schedulePattern} />
+              {!summary.schedulePattern.some((row) => row.some((count) => count > 0)) && <p className="analytics-empty-chart">No upcoming live posts are scheduled yet.</p>}
+              <Link href="/dashboard/calendar">Open calendar <ArrowRight size={14} aria-hidden="true" /></Link>
+            </section>
+
+            <section className="analytics-panel analytics-status-panel">
+              <div className="analytics-section-heading"><div><p className="card-kicker">Delivery status</p><h2>Publishing results</h2></div></div>
+              <p className="analytics-chart-caption">Current status across live targets. No reach or engagement metrics are connected.</p>
+              <p className="analytics-active-channels"><strong>{summary.activeChannels}</strong> active {summary.activeChannels === 1 ? "channel" : "channels"}</p>
+              <StatusChart {...summary.statusCounts} />
+              {!summary.hasLiveTargets && <p className="analytics-empty-chart">Schedule a post to start tracking live delivery.</p>}
+              <Link href="/dashboard/posts">Review publishing status <ArrowRight size={14} aria-hidden="true" /></Link>
+            </section>
+          </div>
+
           <section className="analytics-panel analytics-recent-panel">
-            <div className="analytics-section-heading"><div><p className="card-kicker">LATEST RESULTS</p><h2>Recently published</h2></div><Link href="/dashboard/posts">View all <ArrowRight size={14} aria-hidden="true" /></Link></div>
+            <div className="analytics-section-heading"><div><p className="card-kicker">Latest results</p><h2>Recently published</h2></div><Link href="/dashboard/posts">View all <ArrowRight size={14} aria-hidden="true" /></Link></div>
             {summary.recent.length ? summary.recent.map(({ post, targets }, index) => {
               const publishedAt = targets.map((target) => target.publishedAt).filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
               const deletedOnInstagram = targets.some((target) => target.status === "DELETED_ON_PLATFORM");
