@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DesignDocument, DesignLayer } from "@united-technologies/shared/design-document";
 import { apiRequest } from "@/lib/api";
 import { CompactSelect } from "@/components/compact-select";
-import { DesignDocumentPreview } from "@/components/design-document-preview";
+import { DesignDocumentPreview, DesignImagePreview } from "@/components/design-document-preview";
 
 type Design = {
   id: string;
@@ -84,6 +84,7 @@ export function DesignsClient() {
   const [query, setQuery] = useState("");
   const [platform, setPlatform] = useState("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [sortOrder, setSortOrder] = useState("newest");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [brands, setBrands] = useState<BrandOption[]>([]);
@@ -161,7 +162,11 @@ export function DesignsClient() {
       && (platform === "all" || set.designs.some((item) => item.designJson.platforms?.includes(platform)))
       && (!query.trim() || searchText.includes(query.trim().toLowerCase()))
       && (!favoritesOnly || favorites.includes(set.id));
-  }), [designSets, format, status, platform, query, favoritesOnly, favorites]);
+  }).sort((left, right) => {
+    if (sortOrder === "oldest") return left.designs[0]!.createdAt.localeCompare(right.designs[0]!.createdAt);
+    if (sortOrder === "title") return left.title.localeCompare(right.title);
+    return right.designs[0]!.createdAt.localeCompare(left.designs[0]!.createdAt);
+  }), [designSets, format, status, platform, query, favoritesOnly, favorites, sortOrder]);
 
   function toggleFavorite(setId: string) {
     const next = favorites.includes(setId) ? favorites.filter((id) => id !== setId) : [...favorites, setId];
@@ -290,18 +295,16 @@ export function DesignsClient() {
       <p className="eyebrow">YOUR STUDIO · LIBRARY</p>
       <h1>Saved designs</h1>
       <p className="dashboard-lead">Review, edit, and restore your saved brand designs.</p>
-      <div className="design-toolbar">
-        <label className="design-search">Search designs<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, brand, or platform" /></label>
+      <div className="design-library-toolbar">
+        <label className="design-search"><span>Search designs</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by name, brand, or platform" /></label>
         <label>Format<CompactSelect aria-label="Format filter" value={format} onChange={(event) => setFormat(event.target.value)}><option value="all">All formats</option>{formats.map((item) => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
-        <label>Status<CompactSelect aria-label="Status filter" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option></CompactSelect></label>
+        <label>Status<CompactSelect aria-label="Status filter" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option>{[...new Set(designs.map((design) => design.status.toLowerCase()))].sort().map((item) => <option key={item} value={item}>{item.replace(/^./, (letter) => letter.toUpperCase())}</option>)}</CompactSelect></label>
         <label>Platform<CompactSelect aria-label="Platform filter" value={platform} onChange={(event) => setPlatform(event.target.value)}><option value="all">All platforms</option>{platforms.map((item) => <option key={item} value={item}>{item}</option>)}</CompactSelect></label>
-        <label>Brand<CompactSelect aria-label="Brand filter" value={brandFilter} onChange={(event) => {
-          const value = event.target.value;
-          setBrandFilter(value);
-        }}><option value="active">Current brand</option><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</CompactSelect></label>
-        <label className="design-favorites-filter"><input type="checkbox" checked={favoritesOnly} onChange={(event) => setFavoritesOnly(event.target.checked)} /> Favorites</label>
-        <span>{visibleSets.length} design sets · {designs.length} saved designs</span>
+        <label>Brand<CompactSelect aria-label="Brand filter" value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}><option value="active">Current brand</option><option value="all">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</CompactSelect></label>
+        <label>Sort by<CompactSelect aria-label="Sort designs" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)}><option value="newest">Recently saved</option><option value="oldest">Oldest first</option><option value="title">Title A-Z</option></CompactSelect></label>
+        <label className="design-favorites-filter"><input type="checkbox" checked={favoritesOnly} onChange={(event) => setFavoritesOnly(event.target.checked)} /> Favorites only</label>
       </div>
+      <div className="design-library-summary"><span><strong>{visibleSets.length}</strong> design sets <span className="design-summary-divider">/</span> {designs.length} saved designs</span>{(query || format !== "all" || status !== "all" || platform !== "all" || favoritesOnly) && <button type="button" onClick={() => { setQuery(""); setFormat("all"); setStatus("all"); setPlatform("all"); setFavoritesOnly(false); }}>Clear filters</button>}</div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {loading ? <p role="status">Loading designs…</p> : designs.length === 0 ? (
@@ -371,15 +374,31 @@ export function DesignsClient() {
                         <button type="button" role="menuitem" disabled={busy} onClick={() => void remove(set)}>Delete design set</button>
                       </>}
                     />
-                  : <p>No preview available for this saved design.</p>}
+                  : selectedDesign.previewUrl
+                    ? <DesignImagePreview previewUrl={selectedDesign.previewUrl} title={set.title} subtitle={`${selectedDesign.brand.name} / ${selectedDesign.status.toLowerCase()}`} modalDetails={<>
+                        <p className="design-post-date">{new Date(selectedDesign.createdAt).toLocaleDateString()} / {set.designs.length} style option{set.designs.length === 1 ? "" : "s"}</p>
+                        {content?.contentJson.caption && <p className="design-post-caption">{content.contentJson.caption}</p>}
+                        {content?.contentJson.hashtags?.length ? <p className="design-post-hashtags">{content.contentJson.hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}</p> : null}
+                        {content?.request && <div className="design-source-brief"><strong>Original creation brief</strong><p>{content.request}</p></div>}
+                      </>} modalActions={<>
+                        {generatedContentId && <Link href={`/dashboard/content?edit=${encodeURIComponent(generatedContentId)}`} role="menuitem">Edit content</Link>}
+                        <button type="button" role="menuitem" disabled={busy} onClick={() => void duplicate(selectedDesign)}>Duplicate design</button>
+                        <button type="button" role="menuitem" onClick={() => toggleFavorite(set.id)}>{favorites.includes(set.id) ? "Remove favorite" : "Add favorite"}</button>
+                        <button type="button" role="menuitem" disabled={busy} onClick={() => void remove(set)}>Delete design set</button>
+                      </>} />
+                    : <div className="design-preview-unavailable">Preview unavailable<span>Design details remain available</span></div>}
+                <span className="design-card-status">{selectedDesign.status}</span>
+                <button type="button" className={`design-favorite ${favorites.includes(set.id) ? "is-favorite" : ""}`} aria-label={favorites.includes(set.id) ? `Remove ${set.title} from favorites` : `Add ${set.title} to favorites`} aria-pressed={favorites.includes(set.id)} onClick={() => toggleFavorite(set.id)}>{favorites.includes(set.id) ? "\u2605" : "\u2606"}</button>
               </div>
-              <div className="design-origin-summary">
-                <span>Created from</span>
-                <strong>{content?.contentJson.title || set.title}</strong>
-                {content?.request
-                  ? <p>{content.request.length > 180 ? `${content.request.slice(0, 180).trimEnd()}…` : content.request}</p>
-                  : <p>Source prompt is not available for this saved design.</p>}
-                {generatedContentId && <Link href={`/dashboard/content?edit=${encodeURIComponent(generatedContentId)}`}>View source post brief</Link>}
+              <div className="design-card-details">
+                <div className="design-card-title-row"><div><h2>{set.title}</h2><p>{selectedDesign.brand.name}</p></div><span className="design-variant-count">{set.designs.length} {set.designs.length === 1 ? "version" : "versions"}</span></div>
+                <div className="design-card-meta"><span>{selectedDesign.designJson.format ?? "Design"}</span>{selectedDesign.designJson.platforms?.slice(0, 2).map((item) => <span key={item}>{item}</span>)}<time dateTime={selectedDesign.createdAt}>{new Date(selectedDesign.createdAt).toLocaleDateString()}</time></div>
+                {content?.contentJson.title && content.contentJson.title !== set.title && <p className="design-card-source-title">From post: {content.contentJson.title}</p>}
+                <details className="design-origin-summary">
+                  <summary>Creation brief</summary>
+                  {content?.request ? <p>{content.request}</p> : <p>Source prompt is not available for this saved design.</p>}
+                  {generatedContentId && <Link href={`/dashboard/content?edit=${encodeURIComponent(generatedContentId)}`}>View source post</Link>}
+                </details>
               </div>
             </article>;
           })}

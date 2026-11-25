@@ -58,6 +58,21 @@ type MediaAsset =
   | { kind: "video"; id: string; title: string; description: string; brand: string; createdAt: string; videoUrl: string; status: string }
   | { kind: "upload"; id: string; title: string; description: string; brand: string; createdAt: string; fileUrl: string; mimeType: string; contentId: string | null; status: string };
 
+type GallerySort = "newest" | "oldest" | "name";
+
+function mediaAssetKey(asset: MediaAsset) {
+  return `${asset.kind}-${asset.id}`;
+}
+
+function mediaAssetType(asset: MediaAsset) {
+  if (asset.kind === "video") return "Video";
+  if (asset.kind === "design") return "Design";
+  if (asset.kind === "content") return "Content";
+  if (asset.mimeType.startsWith("image/")) return "Image";
+  if (asset.mimeType.startsWith("video/")) return "Video";
+  return "PDF";
+}
+
 function AuthenticatedMediaImage({ src, alt, width, height, className }: {
   src: string;
   alt: string;
@@ -111,6 +126,9 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [filter, setFilter] = useState(importMode ? "upload" : "all");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<GallerySort>("newest");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [canRetryLoad, setCanRetryLoad] = useState(false);
@@ -193,6 +211,7 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
         status: "IMPORTED",
       }));
       setAssets([...uploadedAssets, ...videoAssets, ...designAssets, ...contentAssets].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)));
+      setSelectedIds([]);
       setCanRetryLoad(failures.length > 0);
       setError(failures.length ? `Some Gallery items could not be loaded (${failures.join("; ")}). Refresh to try again.` : "");
     } catch (requestError) {
@@ -214,8 +233,15 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
     return assets.filter((asset) =>
       (filter === "all" || asset.kind === filter || (filter === "video" && asset.description.toLowerCase().includes("video"))) &&
       (!query || `${asset.title} ${asset.description} ${asset.brand}`.toLocaleLowerCase().includes(query)),
-    );
-  }, [assets, filter, search]);
+    ).sort((first, second) => sort === "name"
+      ? first.title.localeCompare(second.title)
+      : sort === "oldest"
+        ? Date.parse(first.createdAt) - Date.parse(second.createdAt)
+        : Date.parse(second.createdAt) - Date.parse(first.createdAt));
+  }, [assets, filter, search, sort]);
+  const selectedAssets = assets.filter((asset) => selectedIds.includes(mediaAssetKey(asset)));
+  const duplicateableSelectedCount = selectedAssets.filter((asset) => asset.kind === "design" || asset.kind === "content").length;
+  const allVisibleSelected = visibleAssets.length > 0 && visibleAssets.every((asset) => selectedIds.includes(mediaAssetKey(asset)));
 
   useEffect(() => {
     if (!detailAsset) return;
@@ -364,6 +390,52 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
     }
   }
 
+  async function runBulkAction(action: "move" | "duplicate" | "delete") {
+    const targets = action === "duplicate"
+      ? selectedAssets.filter((asset) => asset.kind === "design" || asset.kind === "content")
+      : selectedAssets;
+    if (!targets.length || bulkBusy) return;
+    if (action === "delete" && !window.confirm(`Delete ${targets.length} selected ${targets.length === 1 ? "item" : "items"}? This cannot be undone.`)) return;
+
+    setBulkBusy(true);
+    setError("");
+    setNotice("");
+    const results = await Promise.allSettled(targets.map((asset) => {
+      if (action === "move") {
+        return apiRequest(`/api/gallery/${encodeURIComponent(asset.kind)}/${encodeURIComponent(asset.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ inGallery: !galleryMode }),
+        });
+      }
+      if (action === "duplicate") {
+        const path = asset.kind === "design"
+          ? `/api/designs/${encodeURIComponent(asset.id)}/duplicate`
+          : `/api/content/${encodeURIComponent(asset.id)}/duplicate`;
+        return apiRequest(path, { method: "POST" });
+      }
+      const path = asset.kind === "video"
+        ? `/api/videos/jobs/${encodeURIComponent(asset.id)}`
+        : asset.kind === "upload"
+          ? `/api/media/uploads/${encodeURIComponent(asset.id)}`
+          : asset.kind === "design"
+            ? `/api/designs/${encodeURIComponent(asset.id)}`
+            : `/api/content/${encodeURIComponent(asset.id)}`;
+      return apiRequest(path, { method: "DELETE" });
+    }));
+    const succeeded = results.filter((result) => result.status === "fulfilled").length;
+    const failed = results.length - succeeded;
+    setSelectedIds([]);
+    await loadAssets();
+    if (succeeded) {
+      const label = action === "move"
+        ? galleryMode ? "moved to Media Library" : "moved to Gallery"
+        : action === "duplicate" ? "duplicated" : "deleted";
+      setNotice(`${succeeded} ${succeeded === 1 ? "item" : "items"} ${label}.`);
+    }
+    if (failed) setError(`${failed} selected ${failed === 1 ? "item could" : "items could"} not be ${action === "move" ? "moved" : action === "duplicate" ? "duplicated" : "deleted"}.`);
+    setBulkBusy(false);
+  }
+
   const uploadControl = (
       <label className="button button-primary media-upload-button">
       <Upload size={16} aria-hidden="true" />{uploading ? "Uploading…" : galleryMode ? "Upload media" : "Choose from device"}
@@ -379,7 +451,7 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
     <section className={`dashboard-content media-library-page${galleryMode ? " gallery-page" : ""}`}>
       <header className="media-page-heading">
         <div>
-          <p className="eyebrow">{importMode ? "YOUR STUDIO · IMPORT" : galleryMode ? "YOUR STUDIO · GALLERY" : "YOUR STUDIO · LIBRARY"}</p>
+          <p className="eyebrow">{importMode ? "YOUR STUDIO · IMPORT" : galleryMode ? "Gallery" : "YOUR STUDIO · LIBRARY"}</p>
           <h1>{importMode ? "Import files" : galleryMode ? "Gallery" : "Media Library"}</h1>
           <p className="dashboard-lead">{importMode
         ? "Bring images, MP4 videos, or PDFs from your device into your workspace, then prepare supported media for a post."
@@ -401,9 +473,9 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
            <progress value={uploadProgress} max={100} aria-label="Large-file upload progress" />
       </div>}
       <div className="media-toolbar">
-        <label>Search assets<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, brief or brand" /></label>
+        <label>{galleryMode ? "Search" : "Search assets"}<input value={search} onChange={(event) => { setSearch(event.target.value); if (galleryMode) setSelectedIds([]); }} placeholder="Search title, brief or brand" /></label>
         <label>Asset type
-          <CompactSelect aria-label="Asset type filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
+          <CompactSelect aria-label="Asset type filter" value={filter} onChange={(event) => { setFilter(event.target.value); if (galleryMode) setSelectedIds([]); }}>
             <option value="all">All saved assets</option>
             <option value="design">Designs</option>
             <option value="content">Content and scripts</option>
@@ -411,8 +483,29 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
             <option value="upload">Imported files</option>
           </CompactSelect>
         </label>
-        <span>{visibleAssets.length} assets</span>
+        {galleryMode && <label>Sort by
+          <CompactSelect aria-label="Sort Gallery assets" value={sort} onChange={(event) => setSort(event.target.value as GallerySort)}>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="name">Name A to Z</option>
+          </CompactSelect>
+        </label>}
+        {galleryMode && <label className="gallery-select-visible"><input type="checkbox" checked={allVisibleSelected} disabled={bulkBusy || !visibleAssets.length} onChange={(event) => {
+          setSelectedIds((current) => event.target.checked
+            ? [...new Set([...current, ...visibleAssets.map(mediaAssetKey)])]
+            : current.filter((id) => !visibleAssets.some((asset) => mediaAssetKey(asset) === id)));
+        }} /><span>Select visible</span></label>}
+        <span>{visibleAssets.length}{galleryMode ? ` ${visibleAssets.length === 1 ? "asset" : "assets"}` : " assets"}</span>
       </div>
+      {galleryMode && selectedIds.length > 0 && <div className="gallery-selection-toolbar" role="region" aria-label="Selected asset actions">
+        <span><strong>{selectedIds.length}</strong> selected</span>
+        <div>
+          <button className="button button-outline" type="button" onClick={() => void runBulkAction("move")} disabled={bulkBusy}>{bulkBusy ? "Working…" : "Move to Media Library"}</button>
+          <button className="button button-outline" type="button" title="Duplicates selected designs and content" onClick={() => void runBulkAction("duplicate")} disabled={bulkBusy || duplicateableSelectedCount === 0}>Duplicate {duplicateableSelectedCount}</button>
+          <button className="button button-outline" type="button" onClick={() => void runBulkAction("delete")} disabled={bulkBusy}>Delete</button>
+          <button className="gallery-clear-selection" type="button" onClick={() => setSelectedIds([])} disabled={bulkBusy}>Clear selection</button>
+        </div>
+      </div>}
       {error && <div className="media-library-error"><p className="form-error" role="alert">{error}</p>{canRetryLoad && <button type="button" className="button button-outline" disabled={loading || uploading} onClick={() => void loadAssets()}>{loading ? "Retrying…" : "Retry library load"}</button>}</div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {loading ? <p className="loading-label" role="status">Loading saved assets…</p> : visibleAssets.length === 0 ? (
@@ -424,7 +517,7 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
       ) : (
         <div className="media-asset-grid">
           {visibleAssets.map((asset) => (
-            <article className="media-asset-card" key={`${asset.kind}-${asset.id}`}>
+            <article className={`media-asset-card${galleryMode && selectedIds.includes(mediaAssetKey(asset)) ? " is-selected" : ""}`} key={mediaAssetKey(asset)}>
               <div className={`media-asset-preview${asset.kind === "video" || asset.kind === "upload" || asset.previewUrl ? "" : " media-asset-preview-copy"}`}>
                 {asset.kind === "video"
                   ? <button type="button" className="media-asset-open-trigger" onClick={() => setDetailAsset(asset)} aria-label={`Open ${asset.title}`}><video src={`${apiBaseUrl}${asset.videoUrl}`} crossOrigin="use-credentials" muted preload="metadata" /></button>
@@ -474,7 +567,23 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
                   : asset.kind === "content"
                     ? <button type="button" className="media-asset-open-trigger media-asset-preview-copy" onClick={() => setDetailAsset(asset)} aria-label={`Open ${asset.title}`}><span className="media-asset-copy-preview"><strong>{asset.title}</strong><span>{asset.description}</span></span></button>
                   : <div className="media-asset-copy-preview"><strong>{asset.title}</strong><span>{asset.description}</span></div>}
+                {galleryMode && <span className="media-asset-kind-badge">{mediaAssetType(asset)}</span>}
+                {galleryMode && <label className="gallery-asset-select">
+                  <input type="checkbox" aria-label={`Select ${asset.title}`} checked={selectedIds.includes(mediaAssetKey(asset))} disabled={bulkBusy} onChange={(event) => setSelectedIds((current) => event.target.checked
+                    ? [...new Set([...current, mediaAssetKey(asset)])]
+                    : current.filter((id) => id !== mediaAssetKey(asset)))} />
+                </label>}
               </div>
+              {galleryMode && <div className="media-asset-body">
+                  <div className="media-asset-title-row"><h2 title={asset.title}>{asset.title}</h2></div>
+                  <p className="media-asset-brand">{asset.brand}</p>
+                  <div className="media-asset-details">
+                    <small>{asset.kind === "upload" ? asset.description : asset.status.toLowerCase().replaceAll("_", " ")}</small>
+                    <time dateTime={asset.createdAt}>{new Date(asset.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</time>
+                  </div>
+                  {asset.kind === "content" && <p className="media-asset-description">{asset.description}</p>}
+                </div>
+              }
             </article>
           ))}
         </div>
