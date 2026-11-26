@@ -184,6 +184,11 @@ export function AuthForm({ mode }: AuthFormProps) {
           {isSignup ? "Sign in" : "Create an account"}
         </Link>
       </p>
+      <nav className="auth-legal-links" aria-label="Legal information">
+        <Link href="/privacy-policy">Privacy Policy</Link>
+        <Link href="/terms-of-service">Terms of Service</Link>
+        <Link href="/data-deletion">Data Deletion</Link>
+      </nav>
     </form>
   );
 }
