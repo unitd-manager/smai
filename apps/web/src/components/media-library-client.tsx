@@ -474,7 +474,7 @@ export function MediaLibraryClient({ importMode = false, galleryMode = false }: 
       </div>}
       <div className="media-toolbar">
         <label>{galleryMode ? "Search" : "Search assets"}<input value={search} onChange={(event) => { setSearch(event.target.value); if (galleryMode) setSelectedIds([]); }} placeholder="Search title, brief or brand" /></label>
-        <label>Asset type
+        <label className={galleryMode ? "gallery-asset-type-filter" : undefined}>Asset type
           <CompactSelect aria-label="Asset type filter" value={filter} onChange={(event) => { setFilter(event.target.value); if (galleryMode) setSelectedIds([]); }}>
             <option value="all">All saved assets</option>
             <option value="design">Designs</option>

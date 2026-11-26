@@ -177,6 +177,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           </>
         ) : isSignup ? "Start my 14-day trial" : "Sign in"}
       </button>
+      {!isSignup && <Link className="auth-forgot-link" href="/forgot-password">Forgot your password?</Link>}
       <p className="auth-switch">
         {isSignup ? "Already have an account?" : `New to ${brand.productName}?`}{" "}
         <Link href={isSignup ? "/login" : "/signup"}>

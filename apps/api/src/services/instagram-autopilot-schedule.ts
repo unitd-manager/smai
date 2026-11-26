@@ -10,6 +10,29 @@ function localDateParts(date: Date, timezone: string) {
   return { year: part("year"), month: part("month"), day: part("day") };
 }
 
+export function getNextWeeklyAutopilotRunAt(now: Date, timezone: string, weekday: number, time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+  const cursor = localDateParts(now, timezone);
+  const currentDate = new Date(Date.UTC(cursor.year, cursor.month - 1, cursor.day));
+  const currentWeekday = currentDate.getUTCDay();
+  let dayOffset = (weekday - currentWeekday + 7) % 7;
+  let candidate = localDateTimeToDate({
+    year: cursor.year,
+    month: cursor.month,
+    day: cursor.day + dayOffset,
+  }, hour!, minute!, timezone);
+  if (candidate <= now) {
+    dayOffset += 7;
+    const nextDate = new Date(currentDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+    candidate = localDateTimeToDate({
+      year: nextDate.getUTCFullYear(),
+      month: nextDate.getUTCMonth() + 1,
+      day: nextDate.getUTCDate(),
+    }, hour!, minute!, timezone);
+  }
+  return candidate;
+}
+
 function localDateTimeToDate(date: { year: number; month: number; day: number }, hour: number, minute: number, timezone: string) {
   const desired = Date.UTC(date.year, date.month - 1, date.day, hour, minute);
   let result = desired;

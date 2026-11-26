@@ -33,18 +33,19 @@ enum EmailType {
 }
 
 model User {
-  id              String         @id @default(cuid())
-  name            String
-  email           String         @unique
-  passwordHash    String
-  emailVerifiedAt DateTime?
-  themePreference Json?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  memberships     Membership[]
-  refreshTokens   RefreshToken[]
-  ownedResellers  Reseller[]     @relation("ResellerOwner")
-  teamInvites     TeamInvite[]
+  id                  String               @id @default(cuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  emailVerifiedAt     DateTime?
+  themePreference     Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  memberships         Membership[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  ownedResellers      Reseller[]           @relation("ResellerOwner")
+  teamInvites         TeamInvite[]
 }
 
 model Reseller {
@@ -174,6 +175,7 @@ model CompanyProfile {
   preferredPlatforms          Json?
   instagramAutopilotEnabled   Boolean     @default(false)
   instagramAutopilotNextRunAt DateTime?
+  instagramAutopilotSettings  Json?
   brand                       Brand       @relation(fields: [brandId], references: [id], onDelete: Cascade)
   updatedAt                   DateTime    @updatedAt
 
@@ -226,6 +228,18 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 model TeamInvite {

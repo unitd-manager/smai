@@ -29,10 +29,12 @@ export function ApprovalReviewClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [complete, setComplete] = useState("");
+  const [batchNotice, setBatchNotice] = useState("");
   const [comment, setComment] = useState("");
   const [itemBusyId, setItemBusyId] = useState("");
   const [pageByApprovalId, setPageByApprovalId] = useState<Record<string, number>>({});
   const [commentByApprovalId, setCommentByApprovalId] = useState<Record<string, string>>({});
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
 
   useEffect(() => {
     const value = new URLSearchParams(window.location.search).get("token") ?? "";
@@ -62,6 +64,7 @@ export function ApprovalReviewClient() {
   async function respond(status: "APPROVED" | "CHANGES_REQUESTED") {
     setBusy(true);
     setError("");
+    setBatchNotice("");
     try {
       const path = batchTokenRef.current
         ? `/api/approval-email/batch/${encodeURIComponent(batchTokenRef.current)}`
@@ -92,6 +95,7 @@ export function ApprovalReviewClient() {
         body: JSON.stringify({ status, comment: commentByApprovalId[item.id] ?? "" }),
       });
       setApprovals((current) => current.filter((approvalItem) => approvalItem.id !== item.id));
+      setSelectedApprovalIds((current) => current.filter((id) => id !== item.id));
       setCommentByApprovalId((current) => { const next = { ...current }; delete next[item.id]; return next; });
       if (approvals.length === 1) setComplete(status === "APPROVED"
         ? response.draftOnly ? "Draft approved and saved. Live publishing is not connected for this channel, so download it from the library when ready." : "Post approved and queued for its scheduled time."
@@ -103,6 +107,38 @@ export function ApprovalReviewClient() {
     }
   }
 
+  async function approveSelected() {
+    const selected = approvals.filter((item) => selectedApprovalIds.includes(item.id));
+    if (!selected.length) return;
+    setBusy(true);
+    setError("");
+    setBatchNotice("");
+    let approved = 0;
+    try {
+      for (const item of selected) {
+        await apiRequest(`/api/approval-email/batch/${encodeURIComponent(batchTokenRef.current)}/item/${encodeURIComponent(item.id)}`, {
+          method: "POST",
+          body: JSON.stringify({ status: "APPROVED", comment: commentByApprovalId[item.id] ?? "" }),
+        });
+        approved += 1;
+        setApprovals((current) => current.filter((currentItem) => currentItem.id !== item.id));
+        setSelectedApprovalIds((current) => current.filter((id) => id !== item.id));
+      }
+      if (approved === approvals.length) {
+        setComplete(`${approved} selected ${approved === 1 ? "post was" : "posts were"} approved and queued for their scheduled time.`);
+      } else {
+        setBatchNotice(`${approved} selected ${approved === 1 ? "post was" : "posts were"} approved. ${approvals.length - approved} unselected ${approvals.length - approved === 1 ? "post remains" : "posts remain"} pending your review.`);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : `${approved} posts were approved; the remaining selections could not be saved.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const allBatchItemsSelected = approvals.length > 0 && approvals.every((item) => selectedApprovalIds.includes(item.id));
+  const selectedPendingCount = approvals.filter((item) => selectedApprovalIds.includes(item.id)).length;
+
   return (
     <main className="approval-email-page">
       <article className="approval-email-card">
@@ -110,9 +146,15 @@ export function ApprovalReviewClient() {
         {loading ? <h1>Loading your review…</h1> : complete ? <><h1>Review recorded</h1><p>{complete}</p></> : error && !approval && approvals.length === 0 ? <><h1>Review link unavailable</h1><p>{error}</p></> : approvals.length > 0 ? <>
           <h1>Review this post batch</h1>
           <p>{approvals.length} scheduled {approvals.length === 1 ? "post is" : "posts are"} waiting for your decision. Approved Instagram posts queue for their scheduled times; LinkedIn and Facebook items stay downloadable drafts until those channels are connected.</p>
+          <div className="approval-email-batch-toolbar">
+            <label><input type="checkbox" checked={allBatchItemsSelected} onChange={(event) => setSelectedApprovalIds(event.target.checked ? approvals.map((item) => item.id) : [])} /> Select all pending posts</label>
+            <button className="button button-primary" type="button" disabled={busy || selectedPendingCount === 0} onClick={() => void approveSelected()}>{busy ? "Approving…" : `Approve selected (${selectedPendingCount})`}</button>
+          </div>
+          {batchNotice && <p className="form-success" role="status">{batchNotice}</p>}
           <div className="approval-email-batch">
             {approvals.map((item) => (
               <article className="approval-email-batch-item" key={item.id}>
+                <label className="approval-email-select"><input type="checkbox" checked={selectedApprovalIds.includes(item.id)} onChange={(event) => setSelectedApprovalIds((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /> Select this post</label>
                 <p className="approval-email-brand">{item.brand.name} · {item.targets.map((target) => target.platform).join(", ")}</p>
                 {item.previewUrl && (item.previewPages?.length ?? 0) <= 1 && <Image className="approval-email-preview" src={item.previewUrl} alt={`Preview for ${item.title ?? "scheduled post"}`} width={420} height={560} unoptimized referrerPolicy="no-referrer" />}
                 {(item.previewPages?.length ?? 0) > 1 && <div className="approval-email-carousel-controls"><button type="button" disabled={(pageByApprovalId[item.id] ?? 0) === 0} onClick={() => setPageByApprovalId((current) => ({ ...current, [item.id]: Math.max(0, (current[item.id] ?? 0) - 1) }))}>Previous</button><span>Page {(pageByApprovalId[item.id] ?? 0) + 1} of {item.previewPages!.length}</span><button type="button" disabled={(pageByApprovalId[item.id] ?? 0) >= item.previewPages!.length - 1} onClick={() => setPageByApprovalId((current) => ({ ...current, [item.id]: Math.min(item.previewPages!.length - 1, (current[item.id] ?? 0) + 1) }))}>Next</button></div>}

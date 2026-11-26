@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   --teal-950: #042625;
@@ -334,6 +334,10 @@ html[data-app-theme="dark"] .app-shell .profile-form .autopilot-toggle small { c
 .auth-form .button-gold { display: flex; min-height: 46px; align-items: center; justify-content: center; gap: 8px; background: var(--action-primary); color: var(--navy-800); font-size: 14px; font-weight: 600; }
 .auth-form .button-gold:hover { background: var(--action-primary-hover); }
 .auth-form .button-gold:disabled { cursor: wait; opacity: .8; }
+.auth-forgot-link { justify-self: end; color: var(--accent-700); font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.auth-forgot-link:focus-visible { outline: 2px solid var(--accent-600); outline-offset: 3px; }
+.auth-form-success { margin: 0; border: 1px solid color-mix(in srgb, #19724a 28%, transparent); border-radius: 8px; padding: 12px; background: color-mix(in srgb, #dff3e8 70%, white); color: #155d3c; font-size: 12px; line-height: 1.6; }
+.auth-reset-note { color: var(--navy-600); font-size: 11px; line-height: 1.55; }
 .auth-submit-spinner { animation: auth-submit-spin .8s linear infinite; }
 @keyframes auth-submit-spin { to { transform: rotate(360deg); } }
 .auth-form select { color-scheme: light; }
@@ -12504,6 +12508,42 @@ html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .cr
   background: #fff !important;
   color: var(--foreground) !important;
 }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure {
+  border-color: var(--studio-line);
+  background: #fff !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure > summary {
+  background: #fff !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure .custom-ai-artwork {
+  gap: 16px;
+  padding: 20px;
+  background: #fff !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure .ai-artwork-intro {
+  display: block;
+  margin: 0;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure .ai-artwork-icon {
+  display: none;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure .ai-artwork-controls :is(select, input[type="file"], .compact-select-trigger) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-color: var(--studio-line);
+  background: #fff !important;
+  color: #172b45 !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure .ai-artwork-controls input[type="file"]::file-selector-button {
+  background: #f0edff !important;
+  color: var(--accent-700) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.create-page .create-artwork-disclosure .ai-artwork-prompt textarea {
+  border-color: var(--studio-line);
+  background: #fff !important;
+  color: #172b45 !important;
+}
 
 /* Analytics: remove dark-token surfaces from light insight tiles and schedule cells. */
 html[data-theme-mode="light"] body .app-shell .dashboard-content.analytics-page :is(
@@ -12735,3 +12775,470 @@ html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-a
 .gallery-asset-select input:focus-visible,
 .gallery-clear-selection:focus-visible { outline: 2px solid var(--accent-500); outline-offset: 2px; }
 .gallery-selection-toolbar .button { white-space: normal; }
+
+/* Autopilot schedule controls stay separate from the on-demand batch action. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly {
+  display: grid;
+  gap: 18px;
+  margin-top: 16px;
+  border: 1px solid var(--studio-line);
+  border-radius: 14px;
+  padding: 20px 22px;
+  background: var(--studio-panel);
+  color: var(--foreground);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading > div { max-width: 680px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading :is(.eyebrow, h2, p:not(.eyebrow)) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading h2 { margin-block: 5px; color: var(--foreground); font-size: 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading p:not(.eyebrow) { color: var(--studio-muted); font-size: 13px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-toggle { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; color: var(--foreground); font-size: 13px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-toggle input { width: 18px; min-height: 18px; accent-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls { display: grid; grid-template-columns: minmax(170px, .8fr) minmax(210px, 1fr) auto; align-items: end; gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls label { display: grid; gap: 6px; color: var(--studio-muted); font-size: 12px; font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls :is(select, input) { width: 100%; min-height: 42px; border: 1px solid var(--studio-line); border-radius: 9px; padding: 8px 11px; background: var(--studio-panel-raised); color: var(--foreground); font: inherit; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .button { min-height: 42px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-next-run { margin: 0; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-next-run strong { color: var(--foreground); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly { border-color: var(--workspace-border); background: var(--workspace-surface); color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading h2,
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-toggle,
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-next-run strong { color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading p:not(.eyebrow),
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls label,
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-next-run { color: var(--workspace-muted); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls :is(select, input) { border-color: var(--workspace-border); background: var(--workspace-surface-soft); color: var(--workspace-text); }
+@media (max-width: 700px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading { flex-direction: column; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .button { width: 100%; }
+}
+
+.approval-email-batch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--studio-line); border-radius: 10px; padding: 12px 14px; background: var(--studio-panel-raised); }
+.approval-email-batch-toolbar label, .approval-email-select { display: inline-flex; align-items: center; gap: 8px; color: var(--foreground); font-size: 13px; font-weight: 600; }
+.approval-email-batch-toolbar input, .approval-email-select input { width: 16px; height: 16px; accent-color: var(--accent-500); }
+.approval-email-batch-toolbar .button { min-height: 40px; }
+@media (max-width: 560px) {
+  .approval-email-batch-toolbar { align-items: stretch; flex-direction: column; }
+  .approval-email-batch-toolbar .button { width: 100%; }
+}
+
+
+/* Instagram Autopilot: one batch recipe, with on-demand and recurring runs kept distinct. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page {
+  max-width: 1440px;
+  gap: 20px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page > * { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page :is(.eyebrow, .instagram-autopilot-weekly-heading .eyebrow) {
+  color: var(--accent-500);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  line-height: 1.4;
+  text-transform: none;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading {
+  margin: 0;
+  align-items: flex-end;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading > div { display: grid; gap: 6px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading :is(.eyebrow, h1, .dashboard-lead) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading h1 { color: var(--foreground); font-size: clamp(30px, 3vw, 38px); line-height: 1.12; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading .dashboard-lead { max-width: 680px; color: var(--studio-muted); font-size: 14px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-approval-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  border: 1px solid var(--studio-line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--studio-panel);
+  color: var(--studio-muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-approval-badge i,
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy h3 i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--studio-muted);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-approval-badge.is-on i { background: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-workspace { display: grid; gap: 16px; min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-overview,
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config,
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly,
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-readiness {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--studio-line);
+  border-radius: 14px;
+  background: var(--studio-panel);
+  color: var(--foreground);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+  align-items: center;
+  gap: 20px 28px;
+  padding: 22px 24px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary > :is(.eyebrow, h2, p, small) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary h2 { margin-block: 6px; color: var(--foreground); font-size: 21px; line-height: 1.3; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary > p:not(.eyebrow) { color: var(--studio-muted); font-size: 13px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-brand-summary small { display: block; margin-top: 10px; color: var(--studio-muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--studio-line);
+  border-radius: 11px;
+  padding: 16px;
+  background: var(--studio-panel-raised);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual-copy { display: grid; gap: 3px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual-copy > span { color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual-copy > strong { color: var(--foreground); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual-copy > strong span { color: var(--studio-muted); font-weight: 400; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual-copy > small { color: var(--studio-muted); font-size: 11px; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-manual .button { width: 100%; min-height: 42px; white-space: normal; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--studio-line);
+  border-radius: 0;
+  padding: 16px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy > :is(.eyebrow, h3, p) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy h3 { display: flex; align-items: center; gap: 8px; margin-block: 4px; color: var(--foreground); font-size: 15px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy h3 i { background: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run.is-error .instagram-autopilot-run-copy h3 i { background: #d97777; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run-copy > p:not(.eyebrow) { margin-top: 3px; color: var(--studio-muted); font-size: 12px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 18px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-error-details { margin-top: 9px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-error-details summary { width: fit-content; color: #d97777; cursor: pointer; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-error-details pre { max-height: 180px; overflow: auto; margin: 8px 0 0; border: 1px solid var(--studio-line); border-radius: 8px; padding: 10px; background: var(--studio-panel-raised); color: var(--studio-text); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config { display: grid; align-content: start; gap: 20px; padding: 24px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading > div { min-width: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading :is(.eyebrow, h2, p:not(.eyebrow)) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading h2 { margin-block: 5px; color: var(--foreground); font-size: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading p:not(.eyebrow) { color: var(--studio-muted); font-size: 13px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days { display: grid; flex: 0 0 180px; gap: 6px; margin: 0; border: 1px solid var(--studio-line); border-radius: 10px; padding: 11px 12px; background: var(--studio-panel-raised); color: var(--foreground); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days-input { display: flex; align-items: center; gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days-input input { width: 76px; min-height: 38px; text-align: center; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days-input span,
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days small { color: var(--studio-muted); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-campaign { display: grid; gap: 7px; margin: 0; color: var(--foreground); font-size: 13px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-campaign > span { display: flex; align-items: baseline; gap: 7px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-campaign > span small { color: var(--studio-muted); font-size: 11px; font-weight: 400; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-campaign textarea { width: 100%; min-height: 88px; resize: vertical; border: 1px solid var(--studio-line); border-radius: 9px; padding: 12px; background: var(--studio-panel-raised); color: var(--foreground); font: inherit; font-size: 13px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-campaign > small { color: var(--studio-muted); font-size: 11px; font-weight: 400; line-height: 1.45; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading > div { display: grid; gap: 3px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading h3 { margin: 0; color: var(--foreground); font-size: 15px; font-weight: 600; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading span { color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading .instagram-autopilot-mix-total { color: var(--accent-500); font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid > label { min-width: 0; min-height: 66px; border: 1px solid var(--studio-line); border-radius: 10px; padding: 12px; background: var(--studio-panel-raised); color: var(--foreground); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid > label > span { display: grid; gap: 4px; font-size: 13px; font-weight: 550; line-height: 1.3; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid small { color: var(--studio-muted); font-size: 11px; font-weight: 400; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid input { flex: 0 0 64px; width: 64px; min-height: 38px; text-align: center; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-total { display: flex; align-items: baseline; gap: 7px; margin: 0; border-top: 1px solid var(--studio-line); padding-top: 14px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-total strong { color: var(--accent-500); font-size: 24px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-total b { color: var(--foreground); font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly { display: grid; gap: 18px; padding: 22px 24px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading > div { max-width: 720px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading :is(.eyebrow, h2, p:not(.eyebrow)) { margin: 0; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading h2 { margin-block: 5px; color: var(--foreground); font-size: 19px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading p:not(.eyebrow) { color: var(--studio-muted); font-size: 13px; line-height: 1.55; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-toggle { display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto; color: var(--foreground); font-size: 13px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-toggle input { width: 18px; height: 18px; min-height: 18px; margin: 0; accent-color: var(--accent-500); }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(220px, 1fr) auto; align-items: end; gap: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls label { display: grid; gap: 6px; min-width: 0; color: var(--studio-muted); font-size: 12px; font-weight: 550; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls :is(select, input) { width: 100%; min-height: 42px; border: 1px solid var(--studio-line); border-radius: 9px; padding: 8px 11px; background: var(--studio-panel-raised); color: var(--foreground); font: inherit; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .button { min-height: 42px; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-next-run { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin: 0; border-top: 1px solid var(--studio-line); padding-top: 14px; color: var(--studio-muted); font-size: 12px; }
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-next-run strong { color: var(--foreground); font-weight: 550; }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-overview, .instagram-autopilot-config, .instagram-autopilot-weekly, .instagram-autopilot-readiness) { border-color: var(--workspace-border); background: var(--workspace-surface); color: var(--workspace-text); box-shadow: 0 6px 22px rgb(30 50 80 / 5%); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-brand-summary h2, .instagram-autopilot-manual-copy > strong, .instagram-autopilot-run-copy h3, .instagram-autopilot-config-heading h2, .instagram-autopilot-formats-heading h3, .instagram-autopilot-total b, .instagram-autopilot-weekly-heading h2, .instagram-autopilot-next-run strong) { color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-heading .dashboard-lead, .instagram-autopilot-brand-summary > p:not(.eyebrow), .instagram-autopilot-brand-summary small, .instagram-autopilot-manual-copy > span, .instagram-autopilot-manual-copy > small, .instagram-autopilot-run-copy > p:not(.eyebrow), .instagram-autopilot-config-heading p:not(.eyebrow), .instagram-autopilot-campaign > small, .instagram-autopilot-formats-heading span, .instagram-autopilot-total, .instagram-autopilot-weekly-heading p:not(.eyebrow), .instagram-autopilot-weekly-controls label, .instagram-autopilot-next-run) { color: var(--workspace-muted); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-manual, .instagram-autopilot-days, .instagram-autopilot-format-grid > label) { border-color: var(--workspace-border); background: var(--workspace-surface-soft); color: var(--workspace-text); }
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page :is(.instagram-autopilot-days-input input, .instagram-autopilot-campaign textarea, .instagram-autopilot-format-grid input, .instagram-autopilot-weekly-controls select, .instagram-autopilot-weekly-controls input, .instagram-autopilot-error-details pre) { border-color: var(--workspace-border); background: var(--workspace-surface); color: var(--workspace-text); }
+@media (max-width: 900px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .button { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 680px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page { gap: 16px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-overview { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 18px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-run { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-links { justify-content: flex-start; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config,
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly { padding: 18px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-config-heading { align-items: stretch; flex-direction: column; gap: 14px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-days { width: 100%; flex-basis: auto; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-heading { flex-direction: column; gap: 14px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .button { grid-column: auto; justify-self: stretch; width: 100%; }
+}
+@media (max-width: 440px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-format-grid { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-formats-heading { align-items: flex-start; }
+}
+
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls {
+  align-items: end;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls label {
+  grid-template-rows: 16px 42px;
+  align-content: end;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls label > span {
+  min-width: 0;
+  overflow: hidden;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls :is(select, input),
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .button {
+  box-sizing: border-box;
+  height: 42px;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls select {
+  margin: 0;
+  line-height: 1.2;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+/* Use the shared accessible listbox for weekday selection so its menu follows the app theme. */
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls label > .compact-select {
+  width: 100%;
+  height: 42px;
+  min-width: 0;
+  align-self: end;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+  border: 1px solid var(--studio-line);
+  border-radius: 9px;
+  padding: 0 12px;
+  background: var(--studio-panel-raised);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger > span {
+  flex: 1 1 auto;
+  text-align: left;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--studio-muted);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger[aria-expanded="true"] {
+  border-color: var(--accent-500);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-500) 18%, transparent);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu {
+  z-index: 160;
+  max-height: min(280px, calc(100vh - 32px));
+  gap: 3px;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--studio-panel-raised);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu > button {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: left;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger {
+  border-color: var(--studio-line) !important;
+  background: var(--studio-panel-raised) !important;
+  color: var(--foreground) !important;
+  color-scheme: dark;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu {
+  border-color: var(--studio-line) !important;
+  background: var(--studio-panel-raised) !important;
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu > button {
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu > button:is(:hover, :focus-visible, [aria-selected="true"], .is-selected) {
+  background: color-mix(in srgb, var(--accent-500) 18%, var(--studio-panel-raised)) !important;
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface) !important;
+  color: var(--workspace-text) !important;
+  color-scheme: light;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface-raised) !important;
+  color: var(--workspace-text) !important;
+  box-shadow: 0 12px 28px rgb(20 30 50 / 14%);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu > button {
+  color: var(--workspace-text) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-menu > button:is(:hover, :focus-visible, [aria-selected="true"], .is-selected) {
+  background: color-mix(in srgb, var(--accent-500) 12%, var(--workspace-surface-raised)) !important;
+  color: var(--workspace-text) !important;
+}
+html[data-theme-mode] body .app-shell .dashboard-content.instagram-autopilot-page .instagram-autopilot-weekly-controls .compact-select-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* Gallery filters: keep the trigger and option panel aligned in both themes. */
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select {
+  width: 100%;
+  min-width: 0;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  border: 1px solid var(--studio-line);
+  border-radius: 9px;
+  padding: 0 12px;
+  background: var(--studio-panel-raised);
+  color: var(--foreground);
+  line-height: 1.2;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger > span {
+  flex: 1 1 auto;
+  text-align: left;
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger > svg {
+  flex: 0 0 16px;
+  color: var(--studio-muted);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger[aria-expanded="true"] {
+  border-color: var(--accent-500);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-500) 20%, transparent);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu {
+  z-index: 120;
+  left: 0;
+  right: auto;
+  width: 100%;
+  min-width: 100%;
+  max-height: min(280px, 40vh);
+  gap: 3px;
+  border: 1px solid var(--studio-line);
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--studio-panel-raised);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 24%);
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .gallery-asset-type-filter .compact-select-menu {
+  width: max(100%, 260px);
+  min-width: min(260px, calc(100vw - 32px));
+  max-width: min(320px, calc(100vw - 32px));
+}
+html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu > button {
+  display: flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  border-radius: 7px;
+  padding: 8px 10px;
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger {
+  border-color: var(--studio-line) !important;
+  background: var(--studio-panel-raised) !important;
+  color: var(--foreground) !important;
+  color-scheme: dark;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu {
+  border-color: var(--studio-line) !important;
+  background: var(--studio-panel-raised) !important;
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu > button {
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="dark"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu > button:is(:hover, :focus-visible, [aria-selected="true"], .is-selected) {
+  background: color-mix(in srgb, var(--accent-500) 18%, var(--studio-panel-raised)) !important;
+  color: var(--foreground) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface) !important;
+  color: var(--workspace-text) !important;
+  color-scheme: light;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu {
+  border-color: var(--workspace-border) !important;
+  background: var(--workspace-surface-raised) !important;
+  color: var(--workspace-text) !important;
+  box-shadow: 0 12px 28px rgb(20 30 50 / 14%);
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu > button {
+  color: var(--workspace-text) !important;
+}
+html[data-theme-mode="light"] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-menu > button:is(:hover, :focus-visible, [aria-selected="true"], .is-selected) {
+  background: color-mix(in srgb, var(--accent-500) 12%, var(--workspace-surface-raised)) !important;
+  color: var(--workspace-text) !important;
+}
+html[data-theme-mode] body .app-shell .dashboard-content.gallery-page .media-toolbar .compact-select-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 55%, transparent);
+  outline-offset: 2px;
+}
+@media (max-width: 620px) {
+  html[data-theme-preset] body .app-shell .dashboard-content.gallery-page .media-toolbar .gallery-asset-type-filter .compact-select-menu {
+    width: 100%;
+    min-width: 100%;
+  }
+}

@@ -3,18 +3,25 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 import { approvalEmailConfigured, env } from "../env.js";
 import { isInstagramMediaHostingConfigured } from "./instagram.js";
-import { createInstagramAutopilotSchedule } from "./instagram-autopilot-schedule.js";
+import { createInstagramAutopilotSchedule, getNextWeeklyAutopilotRunAt } from "./instagram-autopilot-schedule.js";
 import { getMagicHourVoices } from "./magic-hour.js";
+import { sendAutopilotApprovalEmail } from "./approval-email.js";
 
 export const autopilotFormatOptions = ["post", "carousel", "brochure", "video-product-demo", "video-avatar", "linkedin-banner", "facebook-cover"] as const;
 type AutopilotFormat = typeof autopilotFormatOptions[number];
 export type AutopilotSettings = { days: number; counts: Record<AutopilotFormat, number>; campaignGoal: string };
+export type AutopilotScheduleSettings = AutopilotSettings & { weekday: number; time: string };
 export const defaultInstagramAutopilotSettings: AutopilotSettings = {
   days: 7,
   // The unattended weekly run should work without external video services or assets.
   // It creates native Instagram image posts and carousels from the saved brand profile.
   counts: { post: 4, carousel: 3, brochure: 0, "video-product-demo": 0, "video-avatar": 0, "linkedin-banner": 0, "facebook-cover": 0 },
   campaignGoal: "",
+};
+export const defaultInstagramAutopilotScheduleSettings: AutopilotScheduleSettings = {
+  ...defaultInstagramAutopilotSettings,
+  weekday: 2,
+  time: "09:00",
 };
 const retryIntervalMs = 15 * 60 * 1000;
 const renderPollIntervalMs = 30 * 1000;
@@ -63,6 +70,23 @@ function readSettings(value: Prisma.JsonValue | null | undefined): AutopilotSett
   };
 }
 
+export function readAutopilotScheduleSettings(value: Prisma.JsonValue | null | undefined): AutopilotScheduleSettings {
+  const defaults = defaultInstagramAutopilotScheduleSettings;
+  if (!value || Array.isArray(value) || typeof value !== "object") return defaults;
+  const counts = { ...defaults.counts };
+  for (const format of autopilotFormatOptions) {
+    const count = value.counts && !Array.isArray(value.counts) && typeof value.counts === "object" ? value.counts[format] : undefined;
+    if (typeof count === "number" && Number.isInteger(count) && count >= 0 && count <= 30) counts[format] = count;
+  }
+  return {
+    days: typeof value.days === "number" && Number.isInteger(value.days) && value.days >= 1 && value.days <= 30 ? value.days : defaults.days,
+    counts,
+    campaignGoal: typeof value.campaignGoal === "string" ? value.campaignGoal.slice(0, 500) : defaults.campaignGoal,
+    weekday: typeof value.weekday === "number" && Number.isInteger(value.weekday) && value.weekday >= 0 && value.weekday <= 6 ? value.weekday : defaults.weekday,
+    time: typeof value.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time) ? value.time : defaults.time,
+  };
+}
+
 function selectedFormats(settings: AutopilotSettings) {
   const remaining = { ...settings.counts };
   const formats: AutopilotFormat[] = [];
@@ -79,6 +103,12 @@ function selectedFormats(settings: AutopilotSettings) {
 
 function contentIdsWithSettings(contentIds: Record<string, string>, settings: AutopilotSettings): Prisma.InputJsonObject {
   return { ...contentIds, __settings: settings as unknown as Prisma.InputJsonObject };
+}
+
+function approvalPostIds(value: Prisma.JsonValue | null | undefined) {
+  if (!value || Array.isArray(value) || typeof value !== "object") return [];
+  const ids = value.__approvalPostIds;
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
 }
 
 export function getAutopilotPostCount(settings: AutopilotSettings) {
@@ -371,6 +401,7 @@ async function finalizeRun(run: {
     select: { status: true, planJson: true },
   });
   if (!plan) throw new Error("The saved weekly content plan is no longer available.");
+  let postIds = approvalPostIds(run.contentIds);
   if (plan.status !== "IN_REVIEW" && plan.status !== "SCHEDULED") {
     const planJson = plan.planJson;
     if (planJson && typeof planJson === "object" && !Array.isArray(planJson) && Array.isArray(planJson.items)) {
@@ -385,12 +416,36 @@ async function finalizeRun(run: {
         data: { planJson: { ...planJson, items } as Prisma.InputJsonObject },
       });
     }
-    await internalRequest(run.brand, userId, `/api/content-plans/${encodeURIComponent(planId)}/execute`, { mode: "approval" });
+    const execution = await internalRequest<{ postIds?: string[] }>(run.brand, userId, `/api/content-plans/${encodeURIComponent(planId)}/execute`, { mode: "approval" });
+    postIds = execution.postIds ?? [];
+    await prisma.instagramAutopilotRun.update({
+      where: { id: run.id },
+      data: { contentIds: { ...(run.contentIds && typeof run.contentIds === "object" && !Array.isArray(run.contentIds) ? run.contentIds : {}), __approvalPostIds: postIds } as Prisma.InputJsonObject },
+    });
   }
+  const emailSent = postIds.length ? await sendAutopilotApprovalEmail(run.workspaceId, postIds) : true;
+  if (!emailSent && postIds.length) console.error("Instagram Autopilot batch completed but the immediate approval email could not be delivered; it will retry.", { runId: run.id, planId });
   await prisma.instagramAutopilotRun.update({
     where: { id: run.id },
-    data: { status: "IN_REVIEW", lockedAt: null, nextAttemptAt: null, completedAt: new Date(), error: null },
+    data: { status: "IN_REVIEW", lockedAt: null, nextAttemptAt: emailSent ? null : new Date(Date.now() + retryIntervalMs), completedAt: new Date(), error: null },
   });
+}
+
+async function retryAutopilotApprovalEmails(now: Date) {
+  const runs = await prisma.instagramAutopilotRun.findMany({
+    where: { status: "IN_REVIEW", nextAttemptAt: { lte: now } },
+    orderBy: { nextAttemptAt: "asc" },
+    take: 10,
+    select: { id: true, workspaceId: true, contentIds: true },
+  });
+  for (const run of runs) {
+    const postIds = approvalPostIds(run.contentIds);
+    const sent = postIds.length ? await sendAutopilotApprovalEmail(run.workspaceId, postIds) : true;
+    await prisma.instagramAutopilotRun.update({
+      where: { id: run.id },
+      data: { nextAttemptAt: sent ? null : new Date(now.getTime() + retryIntervalMs) },
+    });
+  }
 }
 
 async function failRun(runId: string, brandId: string, attempts: number, error: unknown) {
@@ -420,12 +475,13 @@ async function queueDueProfiles(now: Date) {
       brandId: true,
       workspaceId: true,
       instagramAutopilotNextRunAt: true,
+      instagramAutopilotSettings: true,
       industry: true,
       products: true,
       audience: true,
       tone: true,
       goals: true,
-      brand: { select: { name: true, kit: { select: { colors: true, fonts: true } } } },
+      brand: { select: { name: true, timezone: true, kit: { select: { colors: true, fonts: true } } } },
     },
   });
   for (const profile of profiles) {
@@ -447,7 +503,8 @@ async function queueDueProfiles(now: Date) {
       !approvalEmailConfigured || !isInstagramMediaHostingConfigured() ||
       (!env.GOOGLE_AI_STUDIO_API_KEY && !env.GROQ_API_KEY && !env.OPENAI_API_KEY)) continue;
     const weekStart = profile.instagramAutopilotNextRunAt ?? now;
-    const settings = defaultInstagramAutopilotSettings;
+    const scheduleSettings = readAutopilotScheduleSettings(profile.instagramAutopilotSettings);
+    const { weekday, time, ...settings } = scheduleSettings;
     const run = await prisma.instagramAutopilotRun.upsert({
       where: { brandId_weekStart: { brandId: profile.brandId, weekStart } },
       create: {
@@ -467,7 +524,7 @@ async function queueDueProfiles(now: Date) {
           ? { instagramAutopilotNextRunAt: profile.instagramAutopilotNextRunAt }
           : { instagramAutopilotNextRunAt: null }),
       },
-      data: { instagramAutopilotNextRunAt: new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000) },
+      data: { instagramAutopilotNextRunAt: getNextWeeklyAutopilotRunAt(now, profile.brand.timezone, weekday, time) },
     });
     if (advanced.count === 0) continue;
     console.info("Instagram Autopilot queued a weekly batch.", { brandId: profile.brandId, runId: run.id });
@@ -554,6 +611,7 @@ export async function runInstagramAutopilot(now = new Date()) {
   if (workerRunning) return;
   workerRunning = true;
   try {
+    await retryAutopilotApprovalEmails(now);
     await recoverStaleLocks(now);
     await queueDueProfiles(now);
     await processDueRuns(now);

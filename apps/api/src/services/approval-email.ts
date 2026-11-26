@@ -16,7 +16,7 @@ function approvalBatchToken(workspaceId: string, approvalIds: string[]) {
   return jwt.sign(
     { workspaceId, approvalIds, purpose: "approval-batch" },
     env.JWT_ACCESS_SECRET,
-    { issuer: approvalBatchIssuer, expiresIn: "14d" },
+    { issuer: approvalBatchIssuer, expiresIn: "45d" },
   );
 }
 
@@ -163,6 +163,30 @@ async function sendApprovalBatch(
     data: { emailSentAt: now },
   });
   return true;
+}
+
+export async function sendAutopilotApprovalEmail(workspaceId: string, postIds: string[]) {
+  const uniquePostIds = [...new Set(postIds)].slice(0, maxApprovalsPerEmail);
+  if (uniquePostIds.length === 0 || !approvalEmailProvider) return false;
+  const approvals = await prisma.approval.findMany({
+    where: { workspaceId, postId: { in: uniquePostIds }, status: "PENDING", emailSentAt: null },
+    orderBy: { post: { scheduledAt: "asc" } },
+    include: {
+      post: {
+        select: {
+          title: true,
+          caption: true,
+          scheduledAt: true,
+          timezone: true,
+          brand: { select: { name: true } },
+          targets: { select: { platform: true } },
+        },
+      },
+    },
+  });
+  if (!approvals.length) return true;
+  if (approvals.some(({ post }) => !post.scheduledAt)) return false;
+  return sendApprovalBatch(approvals as ApprovalEmailRow[], workspaceId, false);
 }
 
 type ApprovalEmailRow = {

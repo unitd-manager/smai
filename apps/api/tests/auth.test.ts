@@ -5,7 +5,13 @@ process.env.DATABASE_URL ??= "mysql://root:root@localhost:3306/united_technologi
 process.env.JWT_ACCESS_SECRET ??= "a-development-access-secret-with-more-than-32-characters";
 process.env.JWT_REFRESH_SECRET ??= "a-development-refresh-secret-with-more-than-32-characters";
 
-const { deleteAccountSchema, inviteSignupSchema, signupSchema } = await import("../src/routes/auth.js");
+const {
+  deleteAccountSchema,
+  forgotPasswordSchema,
+  inviteSignupSchema,
+  resetPasswordSchema,
+  signupSchema,
+} = await import("../src/routes/auth.js");
 
 test("business signup requires a website unless the user declares they do not have one", () => {
   const base = {
@@ -70,6 +76,25 @@ test("invite signup validates the invited account credentials and normalizes ema
     name: "Taylor Sample",
     email: "taylor@example.org",
     password: "short",
+  }).success, false);
+});
+
+test("forgot-password requests normalize valid email addresses", () => {
+  const result = forgotPasswordSchema.safeParse({ email: "Bushra@UnitdTechnologies.com" });
+
+  assert.equal(result.success, true);
+  if (result.success) assert.equal(result.data.email, "bushra@unitdtechnologies.com");
+  assert.equal(forgotPasswordSchema.safeParse({ email: "not-an-email" }).success, false);
+});
+
+test("password reset requires a sufficiently long password and a plausible one-time token", () => {
+  const valid = { token: "a".repeat(43), password: "a secure replacement password" };
+  assert.equal(resetPasswordSchema.safeParse(valid).success, true);
+  assert.equal(resetPasswordSchema.safeParse({ ...valid, token: "short" }).success, false);
+  assert.equal(resetPasswordSchema.safeParse({ ...valid, password: "too short" }).success, false);
+  assert.equal(resetPasswordSchema.safeParse({
+    ...valid,
+    password: "é".repeat(37),
   }).success, false);
 });
 

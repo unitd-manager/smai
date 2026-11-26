@@ -11,7 +11,8 @@ import {
 } from "../middleware/auth.js";
 import { isInstagramMediaHostingConfigured } from "../services/instagram.js";
 import { runInstagramAutopilot } from "../services/instagram-autopilot.js";
-import { autopilotFormatOptions, defaultInstagramAutopilotSettings, getAutopilotPostCount } from "../services/instagram-autopilot.js";
+import { autopilotFormatOptions, defaultInstagramAutopilotScheduleSettings, defaultInstagramAutopilotSettings, getAutopilotPostCount, readAutopilotScheduleSettings } from "../services/instagram-autopilot.js";
+import { getNextWeeklyAutopilotRunAt } from "../services/instagram-autopilot-schedule.js";
 import { starterTemplates } from "../services/template-library.js";
 
 const router = Router();
@@ -29,6 +30,18 @@ const autopilotRunSchema = z.object({
 }).default(defaultInstagramAutopilotSettings).superRefine((settings, context) => {
   const total = getAutopilotPostCount(settings);
   if (total < 1 || total > 30) context.addIssue({ code: "custom", path: ["counts"], message: "Choose between 1 and 30 posts for each Autopilot run." });
+  if (total < settings.days) context.addIssue({ code: "custom", path: ["days"], message: "Choose no more scheduled days than posts." });
+});
+const autopilotAutomationSchema = z.object({
+  enabled: z.boolean(),
+  weekday: z.number().int().min(0).max(6).default(defaultInstagramAutopilotScheduleSettings.weekday),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default(defaultInstagramAutopilotScheduleSettings.time),
+  days: z.number().int().min(1).max(30).default(defaultInstagramAutopilotSettings.days),
+  campaignGoal: z.string().trim().max(500).default(""),
+  counts: z.object(Object.fromEntries(autopilotFormatOptions.map((format) => [format, z.number().int().min(0).max(30).default(defaultInstagramAutopilotSettings.counts[format])])) as Record<typeof autopilotFormatOptions[number], z.ZodDefault<z.ZodNumber>>),
+}).superRefine((settings, context) => {
+  const total = getAutopilotPostCount(settings);
+  if (total < 1 || total > 30) context.addIssue({ code: "custom", path: ["counts"], message: "Choose between 1 and 30 posts for each weekly run." });
   if (total < settings.days) context.addIssue({ code: "custom", path: ["days"], message: "Choose no more scheduled days than posts." });
 });
 
@@ -52,6 +65,7 @@ async function getInstagramAutopilotStatus(workspaceId: string, brandId?: string
           goals: true,
           instagramAutopilotEnabled: true,
           instagramAutopilotNextRunAt: true,
+          instagramAutopilotSettings: true,
         },
       },
       kit: { select: { colors: true, fonts: true } },
@@ -144,6 +158,7 @@ async function getInstagramAutopilotStatus(workspaceId: string, brandId?: string
       connectedPlatforms,
       instagramAutopilotEnabled: Boolean(brand.profile?.instagramAutopilotEnabled),
       instagramAutopilotNextRunAt: brand.profile?.instagramAutopilotNextRunAt ?? null,
+      automationSettings: readAutopilotScheduleSettings(brand.profile?.instagramAutopilotSettings ?? null),
     },
     latestRun: brand.instagramAutopilotRuns[0] ?? null,
     blockers,
@@ -223,6 +238,53 @@ router.get("/instagram-autopilot/status", async (req, res, next) => {
   }
 });
 
+router.put("/instagram-autopilot/settings", requireWorkspaceRole("OWNER"), requireWritableWorkspace, async (req, res, next) => {
+  try {
+    const settings = autopilotAutomationSchema.parse(req.body ?? {});
+    const brand = await prisma.brand.findFirst({
+      where: { workspaceId: req.workspace!.id, ...(req.header("x-brand-id") ? { id: req.header("x-brand-id")! } : {}) },
+      select: { id: true, timezone: true },
+    });
+    if (!brand) {
+      res.status(404).json({ error: "No brand profile exists in this workspace." });
+      return;
+    }
+    const nextRunAt = settings.enabled
+      ? getNextWeeklyAutopilotRunAt(new Date(), brand.timezone, settings.weekday, settings.time)
+      : null;
+    await prisma.companyProfile.upsert({
+      where: { brandId: brand.id },
+      create: {
+        workspaceId: req.workspace!.id,
+        resellerId: req.workspace!.resellerId,
+        brandId: brand.id,
+        segment: "business-unverified",
+        instagramAutopilotEnabled: settings.enabled,
+        instagramAutopilotNextRunAt: nextRunAt,
+        instagramAutopilotSettings: { weekday: settings.weekday, time: settings.time, days: settings.days, counts: settings.counts, campaignGoal: settings.campaignGoal },
+      },
+      update: {
+        instagramAutopilotEnabled: settings.enabled,
+        instagramAutopilotNextRunAt: nextRunAt,
+        instagramAutopilotSettings: { weekday: settings.weekday, time: settings.time, days: settings.days, counts: settings.counts, campaignGoal: settings.campaignGoal },
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        workspaceId: req.workspace!.id,
+        actorId: req.auth!.userId,
+        action: settings.enabled ? "instagram_autopilot.schedule_updated" : "instagram_autopilot.schedule_paused",
+        targetType: "brand",
+        targetId: brand.id,
+        metadata: { weekday: settings.weekday, time: settings.time, days: settings.days, totalPosts: getAutopilotPostCount(settings) },
+      },
+    });
+    res.json({ enabled: settings.enabled, settings: { weekday: settings.weekday, time: settings.time, days: settings.days, counts: settings.counts, campaignGoal: settings.campaignGoal }, nextRunAt });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post(
   "/instagram-autopilot/run",
   requireWorkspaceRole("OWNER"),
@@ -257,28 +319,8 @@ router.post(
         return;
       }
 
-      const now = new Date();
-      const run = await prisma.$transaction(async (tx) => {
-        const profile = await tx.companyProfile.findUnique({
-          where: { brandId: status.brand.id },
-          select: { id: true, instagramAutopilotEnabled: true, instagramAutopilotNextRunAt: true },
-        });
-        const dueRecurringRun = Boolean(profile?.instagramAutopilotEnabled &&
-          (!profile.instagramAutopilotNextRunAt || profile.instagramAutopilotNextRunAt <= now));
-        const weekStart = dueRecurringRun ? profile!.instagramAutopilotNextRunAt ?? now : now;
-        if (dueRecurringRun && profile) {
-          await tx.companyProfile.updateMany({
-            where: {
-              id: profile.id,
-              instagramAutopilotEnabled: true,
-              ...(profile.instagramAutopilotNextRunAt
-                ? { instagramAutopilotNextRunAt: profile.instagramAutopilotNextRunAt }
-                : { instagramAutopilotNextRunAt: null }),
-            },
-            data: { instagramAutopilotNextRunAt: new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000) },
-          });
-        }
-        return tx.instagramAutopilotRun.upsert({
+      const weekStart = new Date();
+      const run = await prisma.instagramAutopilotRun.upsert({
           where: { brandId_weekStart: { brandId: status.brand.id, weekStart } },
           create: {
             workspaceId: req.workspace!.id,
@@ -289,7 +331,6 @@ router.post(
           },
           update: {},
           select: { id: true, status: true, createdAt: true },
-        });
       });
       void runInstagramAutopilot().catch((error: unknown) => {
         console.error("Manually started Instagram Autopilot run failed.", { runId: run.id, error });
@@ -309,7 +350,8 @@ router.put("/", requireWorkspaceRole("OWNER", "ADMIN"), requireWritableWorkspace
       where: { workspaceId: req.workspace!.id, ...(brandId ? { id: brandId } : {}) },
       select: {
         id: true,
-        profile: { select: { instagramAutopilotEnabled: true } },
+        timezone: true,
+        profile: { select: { instagramAutopilotEnabled: true, instagramAutopilotNextRunAt: true, instagramAutopilotSettings: true } },
       },
     });
     if (!brand) {
@@ -320,6 +362,12 @@ router.put("/", requireWorkspaceRole("OWNER", "ADMIN"), requireWritableWorkspace
       brandName, timezone, brandColors, fonts, logoAssetId, templateIds,
       instagramAutopilotEnabled, ...profile
     } = input;
+    const automationSettings = readAutopilotScheduleSettings(brand.profile?.instagramAutopilotSettings ?? null);
+    const nextAutopilotRunAt = instagramAutopilotEnabled === undefined || !instagramAutopilotEnabled
+      ? null
+      : brand.profile?.instagramAutopilotEnabled && brand.profile.instagramAutopilotNextRunAt
+        ? brand.profile.instagramAutopilotNextRunAt
+        : getNextWeeklyAutopilotRunAt(new Date(), timezone ?? brand.timezone, automationSettings.weekday, automationSettings.time);
     if (templateIds) {
       const savedTemplates = await prisma.template.findMany({
         where: {
@@ -375,7 +423,7 @@ router.put("/", requireWorkspaceRole("OWNER", "ADMIN"), requireWritableWorkspace
           ...profile,
           ...(instagramAutopilotEnabled !== undefined ? {
             instagramAutopilotEnabled,
-            instagramAutopilotNextRunAt: instagramAutopilotEnabled ? new Date() : null,
+            instagramAutopilotNextRunAt: nextAutopilotRunAt,
           } : {}),
         },
         update: {
@@ -383,7 +431,7 @@ router.put("/", requireWorkspaceRole("OWNER", "ADMIN"), requireWritableWorkspace
           ...(instagramAutopilotEnabled !== undefined ? {
             instagramAutopilotEnabled,
             ...(instagramAutopilotEnabled
-              ? brand.profile?.instagramAutopilotEnabled ? {} : { instagramAutopilotNextRunAt: new Date() }
+              ? { instagramAutopilotNextRunAt: nextAutopilotRunAt }
               : { instagramAutopilotNextRunAt: null }),
           } : {}),
         },

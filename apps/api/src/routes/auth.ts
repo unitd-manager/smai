@@ -4,9 +4,10 @@ import type { AccountType as PrismaAccountType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { env } from "../env.js";
+import { approvalEmailConfigured, env } from "../env.js";
 import { prisma } from "../db.js";
 import { hashToken, requireAuth } from "../middleware/auth.js";
+import { sendPasswordResetEmail } from "../services/password-reset-email.js";
 
 const router = Router();
 const freeEmailDomains = new Set([
@@ -64,6 +65,18 @@ const loginSchema = z.object({
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
 });
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+});
+const resetPasswordSchema = z.object({
+  token: z.string().min(32).max(128),
+  password: z.string().min(12).max(72).refine(
+    (value) => Buffer.byteLength(value, "utf8") <= 72,
+    "Password must not exceed 72 bytes.",
+  ),
+});
+const passwordResetRequestMessage = "If an account exists for that email, a password reset link will be sent shortly.";
+const invalidPasswordResetMessage = "This password reset link is invalid or has expired. Request a new one.";
 const inviteSignupSchema = z.object({
   token: z.string().min(32).max(128),
   name: z.string().trim().min(2).max(100),
@@ -388,6 +401,86 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+router.post("/forgot-password", async (req, res, next) => {
+  try {
+    const input = forgotPasswordSchema.parse(req.body);
+    if (!approvalEmailConfigured) {
+      res.status(503).json({
+        error: "Password reset email is not configured. Set up SMTP or Resend in the API environment, then try again.",
+      });
+      return;
+    }
+    const user = await prisma.user.findUnique({
+      where: { email: input.email },
+      select: { id: true, email: true },
+    });
+    if (!user) {
+      res.status(202).json({ message: passwordResetRequestMessage });
+      return;
+    }
+
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await prisma.$transaction([
+      prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
+      prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } }),
+    ]);
+
+    const resetUrl = new URL("/reset-password", env.WEB_ORIGIN);
+    resetUrl.searchParams.set("token", token);
+    const emailResult = await sendPasswordResetEmail(user.email, resetUrl.toString());
+    if (emailResult.status !== "sent") {
+      await prisma.passwordResetToken.deleteMany({ where: { tokenHash } });
+      if (emailResult.status === "not_configured") {
+        res.status(503).json({ error: emailResult.message });
+        return;
+      }
+      console.error("Password reset request could not send its email.", { reason: emailResult.message });
+    }
+    res.status(202).json({ message: passwordResetRequestMessage });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/reset-password", async (req, res, next) => {
+  try {
+    const input = resetPasswordSchema.parse(req.body);
+    const tokenHash = hashToken(input.token);
+    const passwordHash = await bcrypt.hash(input.password, 12);
+    const now = new Date();
+    const reset = await prisma.$transaction(async (tx) => {
+      const token = await tx.passwordResetToken.findUnique({
+        where: { tokenHash },
+        select: { id: true, userId: true, expiresAt: true, usedAt: true },
+      });
+      if (!token || token.usedAt || token.expiresAt <= now) return false;
+
+      const claimed = await tx.passwordResetToken.updateMany({
+        where: { id: token.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (claimed.count !== 1) return false;
+
+      await tx.user.update({
+        where: { id: token.userId },
+        data: { passwordHash, emailVerifiedAt: now },
+      });
+      await tx.refreshToken.deleteMany({ where: { userId: token.userId } });
+      await tx.passwordResetToken.deleteMany({ where: { userId: token.userId } });
+      return true;
+    });
+    if (!reset) {
+      res.status(400).json({ error: invalidPasswordResetMessage });
+      return;
+    }
+    res.json({ ok: true, message: "Your password has been reset. Sign in with your new password." });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/refresh", async (req, res, next) => {
   try {
     const oldToken = req.cookies?.pf_refresh;
@@ -636,4 +729,11 @@ router.post("/accept-invite", requireAuth, async (req, res, next) => {
   }
 });
 
-export { router as authRouter, deleteAccountSchema, inviteSignupSchema, signupSchema };
+export {
+  router as authRouter,
+  deleteAccountSchema,
+  forgotPasswordSchema,
+  inviteSignupSchema,
+  resetPasswordSchema,
+  signupSchema,
+};
