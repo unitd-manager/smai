@@ -109,7 +109,7 @@ export function MarketingPage({
       </section>
       {legal ? (
         <footer className="legal-page-footer">
-          <small>Copyright © 2026 United Technologies</small>
+          <small>Copyright © 2026 United Technologies Solutions</small>
           <nav aria-label="Legal pages">
             <Link href="/terms-of-service">Terms of Service</Link>
             <span aria-hidden="true" className="legal-footer-separator">|</span>
