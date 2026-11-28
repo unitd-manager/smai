@@ -124,3 +124,52 @@ export async function searchCompetitorWebsites(query: string, apiKey: string): P
     throw new CompetitorWebSearchError("Tavily Search returned an unexpected response. Retry discovery in a moment.");
   }
 }
+
+const socialHosts = {
+  Instagram: ["instagram.com"], Facebook: ["facebook.com"], TikTok: ["tiktok.com"],
+  YouTube: ["youtube.com"], X: ["x.com", "twitter.com"],
+} as const;
+
+function isProfilePath(platform: keyof typeof socialHosts, url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (platform === "Instagram") return parts.length === 1 && /^[a-z\d._]{1,30}$/i.test(parts[0]!);
+  if (platform === "Facebook") return parts.length === 1 || (parts.length === 1 && parts[0] === "profile.php");
+  if (platform === "TikTok") return parts.length === 1 && /^@[\w.-]{2,24}$/.test(parts[0]!);
+  if (platform === "YouTube") return parts.length === 1 && (parts[0]!.startsWith("@") || ["channel", "c", "user"].includes(parts[0]!));
+  return parts.length === 1 && /^[\w]{1,15}$/i.test(parts[0]!);
+}
+
+/** Tavily's indexed results are treated as candidates. Caller verifies against official-site links and identity text. */
+export async function searchCompetitorSocialProfiles(input: {
+  name: string; websiteUrl?: string | null; location?: string | null; apiKey: string;
+}): Promise<Array<{ platform: keyof typeof socialHosts; url: string; evidence: string }>> {
+  const host = (() => { try { return new URL(input.websiteUrl ?? "").hostname.replace(/^www\./, ""); } catch { return ""; } })();
+  const platforms = Object.keys(socialHosts) as Array<keyof typeof socialHosts>;
+  const results = await Promise.all(platforms.map(async (platform) => {
+    const query = `"${input.name}" ${host} ${input.location ?? ""} official ${platform} profile`;
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: input.apiKey, query, topic: "general", search_depth: "basic", max_results: 6,
+        include_domains: [...socialHosts[platform]], include_answer: false, include_raw_content: false }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return [];
+    let body: unknown;
+    try { body = await response.json(); } catch { return []; }
+    const parsed = tavilyResponseSchema.safeParse(body);
+    if (!parsed.success) return [];
+    const nameTokens = input.name.toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 2);
+    return (parsed.data.results ?? []).flatMap((result) => {
+      let url: URL;
+      try { url = new URL(result.url); } catch { return []; }
+      const resultHost = url.hostname.toLowerCase().replace(/^www\./, "");
+      if (url.protocol !== "https:" || !socialHosts[platform].some((allowed) => resultHost === allowed || resultHost.endsWith(`.${allowed}`)) || !isProfilePath(platform, url)) return [];
+      const evidence = `${result.title ?? ""} ${result.content ?? ""}`.toLowerCase();
+      const nameMatched = nameTokens.filter((token) => evidence.includes(token)).length;
+      if (!host || (!evidence.includes(host) && nameMatched < Math.min(2, nameTokens.length))) return [];
+      url.search = ""; url.hash = "";
+      return [{ platform, url: url.toString(), evidence: (result.content ?? result.title ?? "").slice(0, 500) }];
+    });
+  }));
+  return [...new Map(results.flat().map((item) => [`${item.platform}:${item.url}`, item])).values()];
+}

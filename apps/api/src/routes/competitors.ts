@@ -9,6 +9,8 @@ import { CompetitorWebSearchError, searchCompetitorWebsites } from "../services/
 import { researchPublicWebsite } from "../services/public-website-research.js";
 import { researchCompetitorSocial } from "../services/competitor-social-research.js";
 import { env } from "../env.js";
+import { enqueueCompetitorResearch } from "../services/competitor-research-worker.js";
+import { apifyCompetitorPlatforms, collectInstagramProfileMetricsWithApify } from "../services/competitor-apify.js";
 
 const router = Router();
 const httpUrl = z.string().trim().url().max(2048).refine((value) => {
@@ -163,6 +165,18 @@ router.get("/", async (req, res, next) => {
       take: 100,
       include: { snapshots: { orderBy: { observedAt: "desc" }, take: 8 } },
     });
+    let researchJobs = await prisma.competitorResearchJob.findMany({
+      where: { workspaceId: req.workspace!.id, brandId: brand.id },
+      orderBy: { createdAt: "desc" }, take: 3,
+      select: { id: true, status: true, stage: true, progress: true, error: true, warnings: true, createdAt: true, completedAt: true },
+    });
+    // Existing workspaces predate persistent research jobs. Queue a one-time
+    // background collection when their page is opened so saved profiles begin
+    // showing current public evidence without requiring a separate setup step.
+    if (competitors.length && researchJobs.length === 0) {
+      const initialJob = await enqueueCompetitorResearch(req.workspace!.id, brand.id);
+      if (initialJob) researchJobs = [initialJob as typeof researchJobs[number]];
+    }
     const [instagramAccount, facebookUserAccount, connectedFacebookPages] = await Promise.all([
       prisma.socialAccount.findFirst({
         where: { workspaceId: req.workspace!.id, provider: "instagram", status: "CONNECTED" },
@@ -190,8 +204,12 @@ router.get("/", async (req, res, next) => {
         description: brand.profile?.description ?? null,
       },
       competitors,
+      researchJobs,
       dataCollection: {
-        automaticMonitoring: false,
+        automaticMonitoring: true,
+        weeklyRefreshAvailable: Boolean(env.TAVILY_API_KEY),
+        publicPostCollectionAvailable: Boolean(env.APIFY_API_TOKEN || env.YOUTUBE_DATA_API_KEY || env.X_API_BEARER_TOKEN),
+        apifyConfiguredPlatforms: env.APIFY_API_TOKEN ? apifyCompetitorPlatforms : [],
         connectedCompetitorPlatforms: [],
         websiteSearchAvailable: Boolean(env.TAVILY_API_KEY),
         websiteSearchProvider: env.TAVILY_API_KEY ? "Tavily Search" : null,
@@ -201,10 +219,33 @@ router.get("/", async (req, res, next) => {
         youtubeApiAvailable: Boolean(env.YOUTUBE_DATA_API_KEY),
         xApiAvailable: Boolean(env.X_API_BEARER_TOKEN),
         message: `${env.TAVILY_API_KEY
-          ? "Brand Profile can automatically discover and analyze up to three relevant providers when industry, products, or business description are saved."
-          : "Configure a public web search API to enable automatic provider discovery."} Public post performance is available only where an approved API returns metrics; otherwise, record visible post links and counts as evidence.`,
+          ? "Saving Brand Profile automatically discovers and analyzes up to three relevant providers; saved profiles refresh weekly."
+          : "Background research runs on saved Brand Profile data. Configure TAVILY_API_KEY to enable automatic discovery and weekly refresh."} Public post collection requires APIFY_API_TOKEN or the corresponding official platform API credentials. Missing public fields remain unavailable rather than estimated.`,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/research", searchLimiter, async (req, res, next) => {
+  try {
+    const brand = await selectedBrand(req.workspace!.id, req.header("x-brand-id"));
+    if (!brand) {
+      res.status(404).json({ error: "No brand profile exists in this workspace." });
+      return;
+    }
+    const existing = await prisma.competitor.count({ where: { workspaceId: req.workspace!.id, brandId: brand.id } });
+    if (!existing && !env.TAVILY_API_KEY) {
+      res.status(503).json({ error: "Add competitors or configure TAVILY_API_KEY for automatic discovery." });
+      return;
+    }
+    const job = await enqueueCompetitorResearch(req.workspace!.id, brand.id, `requested-${Math.floor(Date.now() / 60_000)}`);
+    if (!job) {
+      res.status(400).json({ error: "Complete the industry, products, or business description in Brand Kit before research can run." });
+      return;
+    }
+    res.status(202).json({ job: { id: job.id, status: job.status, stage: job.stage } });
   } catch (error) {
     next(error);
   }
@@ -605,18 +646,26 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
       facebookPages,
     });
     websiteWarnings.push(...socialResearch.warnings);
+    const apifyInstagramMetric: Awaited<ReturnType<typeof collectInstagramProfileMetricsWithApify>> = instagramProfileUrl && !socialResearch.platformMetrics.some((metric) => metric.platform === "Instagram" && metric.metrics.followers !== undefined)
+      ? await collectInstagramProfileMetricsWithApify(instagramProfileUrl)
+      : {};
+    if (apifyInstagramMetric.warning) websiteWarnings.push(`Instagram profile metrics: ${apifyInstagramMetric.warning}`);
+    const refreshedPlatformMetrics = [
+      ...socialResearch.platformMetrics,
+      ...(apifyInstagramMetric.metric ? [apifyInstagramMetric.metric] : []),
+    ];
     const newPostUrls = new Set(socialResearch.posts.map((post) => post.url));
     const savedPosts = boundedList("posts").filter((post) => {
       const record = jsonRecord(post);
       return !record || typeof record.url !== "string" || !newPostUrls.has(record.url);
     });
     const mergedPosts = [...socialResearch.posts, ...savedPosts].slice(0, 50);
-    const updatedPlatforms = new Set(socialResearch.platformMetrics.map((metric) => metric.platform));
+    const updatedPlatforms = new Set(refreshedPlatformMetrics.map((metric) => metric.platform));
     const savedMetrics = boundedList("platformMetrics").filter((metric) => {
       const record = jsonRecord(metric);
       return !record || typeof record.platform !== "string" || !updatedPlatforms.has(record.platform);
     });
-    const mergedMetrics = [...socialResearch.platformMetrics, ...savedMetrics].slice(0, 12);
+    const mergedMetrics = [...refreshedPlatformMetrics, ...savedMetrics].slice(0, 12);
     const existingSources = Array.isArray(snapshot.sources)
       ? snapshot.sources.map(jsonRecord).filter((source): source is Prisma.JsonObject => source !== null)
       : [];
@@ -624,7 +673,7 @@ router.post("/:id/analyze", analysisLimiter, async (req, res, next) => {
       label: `${site.label} (automatically scanned)`,
       url: site.finalUrl,
     }));
-    const socialSources = socialResearch.sources.map((source) => ({
+    const socialSources = [...socialResearch.sources, ...(apifyInstagramMetric.source ? [apifyInstagramMetric.source] : [])].map((source) => ({
       label: source.label,
       url: source.url,
     }));

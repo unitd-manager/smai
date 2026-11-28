@@ -3,19 +3,19 @@ import { MarketingPage } from "@/components/public-site";
 
 export const metadata: Metadata = {
   title: "Data Deletion",
-  description: "How to delete your account and data.",
+  description: "How to disconnect social accounts and request deletion of data held by Social Media Marketing.",
+  alternates: { canonical: "https://smai.unitdtechnologies.com/data-deletion" },
   robots: { index: true, follow: true },
 };
 
 const legalSections = [
-  { id: "account-deletion", label: "01 Delete your account" },
-  { id: "workspace-data", label: "02 Workspace data" },
-  { id: "before-deleting", label: "03 Before you delete" },
-  { id: "disconnect-social", label: "04 Disconnect a social account" },
-  { id: "platform-access", label: "05 Remove our app on Instagram or Facebook" },
-  { id: "email-request", label: "06 Ask about workspace-data deletion" },
-  { id: "retained-data", label: "07 Data that may remain" },
-  { id: "contact", label: "08 Contact" },
+  { id: "overview", label: "01 Overview" },
+  { id: "dashboard", label: "02 Delete from the dashboard" },
+  { id: "email-request", label: "03 Request deletion by email" },
+  { id: "remove-app", label: "04 Remove our app in platform settings" },
+  { id: "deleted-data", label: "05 What is deleted and when" },
+  { id: "retained-data", label: "06 What may be retained" },
+  { id: "contact", label: "07 Contact" },
 ];
 
 export default function DataDeletionPage() {
@@ -24,43 +24,55 @@ export default function DataDeletionPage() {
       legal
       eyebrow="Legal"
       title="Data Deletion"
-      description="How to delete your account and data."
+      description="How to disconnect social accounts and request deletion of data held by Social Media Marketing."
       effectiveDate="26 November 2026"
       legalPath="/data-deletion"
       legalSections={legalSections}
     >
       <article className="public-legal-document">
-        <section id="account-deletion"><h2><span className="legal-section-index">01</span><span>Delete your account</span></h2>
-          <p>In Settings, open Account settings and choose Delete account. You must enter your current password and type DELETE to confirm.</p>
-          <p>When deletion succeeds, we delete your sign-in account, workspace memberships, notifications and active refresh tokens. The account deletion process does not delete workspace data.</p>
+        <section id="overview">
+          <h2><span className="legal-section-index">01</span><span>Overview</span></h2>
+          <p>Social Media Marketing may store account IDs, usernames, profile names and pictures, Facebook Pages and Instagram business accounts, encrypted OAuth tokens, posts and media you create, comments and messages where you grant permission, analytics metrics, account email, and usage logs.</p>
         </section>
 
-        <section id="workspace-data"><h2><span className="legal-section-index">02</span><span>Workspace data</span></h2>
-          <p>Deleting your sign-in account does not delete workspaces or their data. Connected social-account records and access tokens, posts, and media remain in the workspace for its other members. Media files remain in the workspace, although their personal owner assignment is cleared when your account is deleted.</p>
+        <section id="dashboard">
+          <h2><span className="legal-section-index">02</span><span>Option 1: Delete from the dashboard</span></h2>
+          <ol>
+            <li>To disconnect a social account, open Dashboard &gt; Social Accounts and choose Disconnect. This clears the stored access token and disconnects the account. Workspace posts and media are not deleted by disconnecting.</li>
+            <li>To delete your sign-in account, open Settings &gt; Account and choose Delete account. Account deletion does not automatically delete shared workspace content; contact us if you need that content reviewed for deletion.</li>
+          </ol>
         </section>
 
-        <section id="before-deleting"><h2><span className="legal-section-index">03</span><span>Before you delete</span></h2>
-          <p>Every workspace you own must have another owner before you can delete your account. Transfer ownership in Team settings or add another owner first. If you own a reseller organization, contact support to transfer that ownership before deleting your account.</p>
+        <section id="email-request">
+          <h2><span className="legal-section-index">03</span><span>Option 2: Request deletion by email</span></h2>
+          <p>Email the privacy contact with the subject <strong>Data Deletion Request</strong>, from the email address registered to your account. Include your account email and the connected account username(s) or workspace data you want deleted. We will verify the request and confirm by email. We aim to respond within 30 days.</p>
+          <p><strong>TODO:</strong> Confirm the dedicated privacy contact email. The existing site lists <a href="mailto:utsappcreate@gmail.com">utsappcreate@gmail.com</a>; use it only if it is approved for privacy requests.</p>
         </section>
 
-        <section id="disconnect-social"><h2><span className="legal-section-index">04</span><span>Disconnect a social account</span></h2>
-          <p>In the dashboard, open Social Accounts, choose the connected Instagram account or Facebook Page, and select Disconnect. This marks the connection as disconnected and clears the access token stored by the Service. The social-account record remains in the workspace, and this action does not delete workspace posts or media.</p>
+        <section id="remove-app">
+          <h2><span className="legal-section-index">04</span><span>Option 3: Remove our app in platform settings</span></h2>
+          <p>You can remove or revoke the app in the platform&apos;s settings. For Instagram, use Settings &gt; Apps and websites. For Facebook, use Settings &gt; Apps and Websites. When Meta sends a valid deauthorization or data-deletion callback, the Service removes matched connected-account records and associated platform data. If the callback does not complete, also use Option 1 or Option 2.</p>
+          <p>A completed Meta data-deletion callback provides a confirmation code and a public <a href="/data-deletion/status">deletion status page</a>. A valid code is needed to view its status.</p>
         </section>
 
-        <section id="platform-access"><h2><span className="legal-section-index">05</span><span>Remove our app on Instagram or Facebook</span></h2>
-          <p>You can also remove the app in Instagram (Settings &gt; Apps and websites) or Facebook (Settings &gt; Apps and Websites) to revoke its platform authorization. To clear the access token stored by the Service, use the Disconnect action described above. Removing the app does not delete workspace data.</p>
+        <section id="deleted-data">
+          <h2><span className="legal-section-index">05</span><span>What is deleted and when</span></h2>
+          <p>When a Meta callback is successfully processed, the Service deletes the matched account connection and stored tokens, clears linked publishing identifiers, cancels queued publishing jobs for that account, and deletes associated inbox items, comments, and analytics records. The callback completes this processing before returning a successful response.</p>
+          <p>Disconnecting in the dashboard clears the token and marks the connection disconnected, but leaves the connection record in the workspace. Deleting your sign-in account also does not delete shared workspace posts or media.</p>
+          <p><strong>TODO:</strong> Confirm the timeframe for email deletion requests and the deletion/retention periods for logs, backups, and billing or legal records.</p>
         </section>
 
-        <section id="email-request"><h2><span className="legal-section-index">06</span><span>Ask about workspace-data deletion</span></h2>
-          <p>Account deletion does not remove workspace content or connected social-account records. To ask about deletion of data retained in a workspace, email <a href="mailto:utsappcreate@gmail.com?subject=Data%20Deletion%20Request">utsappcreate@gmail.com</a> from your registered email address. Include your account email, workspace name, and the social accounts or content involved. Email requests are separate from the self-service account deletion flow.</p>
+        <section id="retained-data">
+          <h2><span className="legal-section-index">06</span><span>What may be retained and why</span></h2>
+          <p>Posts and media created in a shared workspace may remain available to other workspace members after an account is disconnected or deleted. Records needed for legal, tax, billing, or fraud-prevention purposes, and backups until they expire, may also remain where permitted by law.</p>
+          <p><strong>TODO:</strong> Confirm the exact retention periods and whether any other categories are retained.</p>
         </section>
 
-        <section id="retained-data"><h2><span className="legal-section-index">07</span><span>Data that may remain</span></h2>
-          <p>Workspace data remains available to its members after your sign-in account is deleted. Records we must keep for legal, tax or billing reasons, and backups until they expire, may also remain. These records are not used for any other purpose.</p>
-        </section>
-
-        <section id="contact"><h2><span className="legal-section-index">08</span><span>Contact</span></h2>
-          <p>United Technologies Solutions, Chennai, India. Email: <a href="mailto:utsappcreate@gmail.com">utsappcreate@gmail.com</a></p>
+        <section id="contact">
+          <h2><span className="legal-section-index">07</span><span>Contact</span></h2>
+          <p>United Technologies Solutions, 36, Balaji Nagar 2nd Street, Royapettah, Chennai - 600014, Tamil Nadu, India.</p>
+          <p>Email: <a href="mailto:utsappcreate@gmail.com">utsappcreate@gmail.com</a></p>
+          <p><strong>TODO:</strong> Confirm the exact registered legal name, current mailing address, and privacy contact email.</p>
         </section>
       </article>
     </MarketingPage>

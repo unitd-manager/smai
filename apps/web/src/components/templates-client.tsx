@@ -1,13 +1,12 @@
 "use client";
 
-import Image from "next/image";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
-import { createDesignDocument, renderDesignPageSvg } from "@united-technologies/shared/design-document";
+import { Search } from "lucide-react";
+import { createDesignDocument } from "@united-technologies/shared/design-document";
 import { apiRequest } from "@/lib/api";
 import { CompactSelect } from "@/components/compact-select";
+import { DesignDocumentPreview } from "@/components/design-document-preview";
 
 type Template = {
   id: string;
@@ -67,15 +66,7 @@ function templatePreviewContent(template: Template, overrides?: { headline?: str
     "offer-sale": { caption: "A little something extra to help you take the next step." },
   };
   const sample = examples[format] ?? examples.post!;
-  const headlineByFormat: Record<string, string> = {
-    post: "Good ideas grow here", story: "A closer look", carousel: "Small steps. Real progress.",
-    poster: "Ideas worth sharing", brochure: "A better way forward", flyer: "Come find your next idea",
-    thumbnail: "A practical guide", video: "See how it works", "linkedin-banner": "Make room to grow",
-    "pinterest-pin": "Keep this idea close", "facebook-cover": "Good things happen together",
-    "business-card": "Let us make it happen", "festival-greeting": "A season of bright beginnings",
-    "offer-sale": "A little extra, just for you",
-  };
-  const headline = overrides?.headline?.trim() || headlineByFormat[format] || "Good ideas grow here";
+  const headline = overrides?.headline?.trim() || concept;
   const supportingLine = overrides?.supportingLine?.trim() || sample.caption;
   const callToAction = overrides?.callToAction?.trim() || sample.posterText?.callToAction || "DISCOVER MORE";
   return {
@@ -85,6 +76,19 @@ function templatePreviewContent(template: Template, overrides?: { headline?: str
     ...(sample.sections ? { sections: sample.sections } : {}),
     posterText: { headline, supportingLine, callToAction },
   };
+}
+
+function templateDesignDocument(template: Template, copy?: { headline?: string; supportingLine?: string; callToAction?: string }) {
+  return createDesignDocument({
+    id: `template-${template.id}`,
+    title: copy?.headline?.trim() || template.name,
+    format: template.format,
+    colors: templatePalette(template),
+    variant: templateVariant(template),
+    templateId: template.id,
+    template: template.templateJson,
+    content: templatePreviewContent(template, copy),
+  });
 }
 
 export function TemplatesClient() {
@@ -108,15 +112,6 @@ export function TemplatesClient() {
       .catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Could not load templates."))
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (!previewTemplate) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setPreviewTemplate(null);
-    }
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [previewTemplate]);
 
   const formats = useMemo(() => [...new Set(templates.map((template) => template.format))].sort(), [templates]);
   const categories = useMemo(() => [...new Set(templates.map(templateCategory))].sort(), [templates]);
@@ -166,31 +161,34 @@ export function TemplatesClient() {
   }
 
   function renderTemplateCard(template: Template) {
+    const current = previewTemplate?.id === template.id;
+    const sample = templatePreviewContent(template);
     return (
       <article className="template-card" key={template.id} onClick={(event) => {
         if (!(event.target instanceof Element) || !event.target.closest("button, a, input, select, textarea")) openTemplatePreview(template);
       }}>
-        <button type="button" className="template-preview-trigger" onClick={() => openTemplatePreview(template)} aria-label={`Preview ${template.name}`}>
         <div className={`template-document-preview template-document-preview-${template.format}`}>
-          <Image
-            src={renderDesignPageSvg(createDesignDocument({
-              id: template.id,
-              title: template.name,
-              format: template.format,
-              colors: templatePalette(template),
-              variant: templateVariant(template),
-              templateId: template.id,
-              template: template.templateJson,
-              content: templatePreviewContent(template),
-            }))}
-            alt=""
-            width={600}
-            height={600}
-            unoptimized
+          <DesignDocumentPreview
+            document={templateDesignDocument(template, current ? { headline: previewHeadline, supportingLine: previewSupportingLine, callToAction: previewCallToAction } : undefined)}
+            title={template.name}
+            subtitle={`${template.format.replaceAll("-", " ")} · ${templateLayout(template)} layout`}
+            compact
+            open={current}
+            onOpenChange={(open) => { if (open) openTemplatePreview(template); else setPreviewTemplate(null); }}
+            modalDetails={<>
+              <p className="template-preview-meta">{templateCategory(template)} · {template.format.replaceAll("-", " ")} · {templateLayout(template)} layout</p>
+              <form className="template-preview-editor" onSubmit={(event) => { event.preventDefault(); applyTemplateFromPreview(); }}>
+                <label>Headline<input value={current ? previewHeadline : sample.posterText?.headline ?? template.name} onChange={(event) => { if (!current) openTemplatePreview(template); setPreviewHeadline(event.target.value); }} maxLength={100} /></label>
+                <label>Supporting line<textarea value={current ? previewSupportingLine : sample.posterText?.supportingLine ?? sample.caption} onChange={(event) => { if (!current) openTemplatePreview(template); setPreviewSupportingLine(event.target.value); }} maxLength={240} rows={3} /></label>
+                <label>Call to action<input value={current ? previewCallToAction : sample.posterText?.callToAction ?? "DISCOVER MORE"} onChange={(event) => { if (!current) openTemplatePreview(template); setPreviewCallToAction(event.target.value); }} maxLength={70} /></label>
+                <label>What should the post be about?<textarea value={current ? previewBrief : ""} onChange={(event) => { if (!current) openTemplatePreview(template); setPreviewBrief(event.target.value); }} maxLength={1200} rows={3} placeholder="Add product details or audience context. Keep it factual." /></label>
+                <p className="template-preview-note">The layout and palette carry into Create. Review the generated copy and artwork before scheduling.</p>
+                <button type="submit" className="button button-gold">Use this template</button>
+              </form>
+            </>}
           />
           <span>{template.format.replaceAll("-", " ")}</span>
         </div>
-        </button>
         <div className="template-card-body">
           <div><h2>{template.name}</h2><span>{template.workspaceId ? "Workspace" : "Starter"}</span></div>
           <p>{templateCategory(template)} Â· {templateLayout(template)} layout</p>
@@ -278,43 +276,6 @@ export function TemplatesClient() {
             })}
         </div>
       )}
-      {previewTemplate && typeof document !== "undefined" && createPortal(<div className="template-preview-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewTemplate(null); }}>
-        <section className="template-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="template-preview-title">
-          <header className="template-preview-dialog-header">
-            <div><p className="eyebrow">{templateCategory(previewTemplate)}</p><h2 id="template-preview-title">{previewTemplate.name}</h2><p>{previewTemplate.format.replaceAll("-", " ")} · {templateLayout(previewTemplate)} layout</p></div>
-            <button type="button" className="template-preview-close" aria-label="Close template preview" onClick={() => setPreviewTemplate(null)}>×</button>
-          </header>
-          <div className="template-preview-dialog-body">
-            <div className={`template-preview-large template-document-preview-${previewTemplate.format}`}>
-              <Image
-                src={renderDesignPageSvg(createDesignDocument({
-                  id: `preview-${previewTemplate.id}`,
-                  title: previewHeadline,
-                  format: previewTemplate.format,
-                  colors: templatePalette(previewTemplate),
-                  variant: templateVariant(previewTemplate),
-                  templateId: previewTemplate.id,
-                  template: previewTemplate.templateJson,
-                  content: templatePreviewContent(previewTemplate, { headline: previewHeadline, supportingLine: previewSupportingLine, callToAction: previewCallToAction }),
-                }))}
-                alt={`${previewTemplate.name} editable preview`}
-                width={1000}
-                height={800}
-                unoptimized
-              />
-            </div>
-            <form className="template-preview-editor" onSubmit={(event) => { event.preventDefault(); applyTemplateFromPreview(); }}>
-              <p className="eyebrow">EDIT THIS TEMPLATE</p>
-              <label>Headline<input value={previewHeadline} onChange={(event) => setPreviewHeadline(event.target.value)} maxLength={100} /></label>
-              <label>Supporting line<textarea value={previewSupportingLine} onChange={(event) => setPreviewSupportingLine(event.target.value)} maxLength={240} rows={3} /></label>
-              <label>Call to action<input value={previewCallToAction} onChange={(event) => setPreviewCallToAction(event.target.value)} maxLength={70} /></label>
-              <label>What should the post be about?<textarea value={previewBrief} onChange={(event) => setPreviewBrief(event.target.value)} maxLength={1200} rows={3} placeholder="Add product details or audience context. Keep it factual." /></label>
-              <p className="template-preview-note">The layout and palette carry into Create. Review the generated copy and artwork before scheduling.</p>
-              <button type="submit" className="button button-gold">Use this template</button>
-            </form>
-          </div>
-        </section>
-      </div>, document.body)}
     </section>
   );
 }

@@ -1,7 +1,7 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import type { DesignDocument, DesignLayer } from "@united-technologies/shared/design-document";
-import { env } from "../env.js";
+import { getReadableDesignTextColor, type DesignDocument, type DesignLayer } from "@united-technologies/shared/design-document";
+import { cloudflareAiConfigured, env } from "../env.js";
+import { cloudflareChatCompletion } from "./cloudflare-ai.js";
 
 const planSchema = z.object({
   pages: z.array(z.object({
@@ -26,6 +26,44 @@ const planSchema = z.object({
 type Plan = z.infer<typeof planSchema>;
 type Placement = Plan["pages"][number]["placements"][number];
 
+function textBackgroundColor(
+  text: Extract<DesignLayer, { type: "text" }>,
+  layers: DesignLayer[],
+  placements: Map<string, Placement>,
+  pageWidth: number,
+  pageHeight: number,
+  fallback: string,
+  layerOrder: Map<string, number>,
+) {
+  const textPlacement = placements.get(text.id);
+  if (!textPlacement) return fallback;
+  const textX = textPlacement.x * pageWidth;
+  const textY = textPlacement.y * pageHeight;
+  const textWidth = textPlacement.width * pageWidth;
+  const textHeight = textPlacement.height * pageHeight;
+  let background = fallback;
+  let backgroundOrder = -1;
+  for (const layer of layers) {
+    if (layer.type !== "shape" || layer.shape !== "rectangle" || (layer.opacity ?? 1) < 0.9) continue;
+    const order = layerOrder.get(layer.id) ?? -1;
+    if (order >= (layerOrder.get(text.id) ?? Number.MAX_SAFE_INTEGER) || order < backgroundOrder) continue;
+    const placement = placements.get(layer.id);
+    if (!placement) continue;
+    const x = placement.x * pageWidth;
+    const y = placement.y * pageHeight;
+    const width = placement.width * pageWidth;
+    const height = placement.height * pageHeight;
+    const overlapWidth = Math.max(0, Math.min(textX + textWidth, x + width) - Math.max(textX, x));
+    const overlapHeight = Math.max(0, Math.min(textY + textHeight, y + height) - Math.max(textY, y));
+    if (overlapWidth * overlapHeight / Math.max(1, textWidth * textHeight) < 0.9) continue;
+    const fill = placement.color ?? placement.fill ?? layer.fill;
+    if (!fill || !/^#[\da-f]{6}$/i.test(fill)) continue;
+    background = fill;
+    backgroundOrder = order;
+  }
+  return background;
+}
+
 function flatten(layers: DesignLayer[]): DesignLayer[] {
   return layers.flatMap((layer) => layer.type === "group" ? flatten(layer.children) : [layer]);
 }
@@ -48,44 +86,68 @@ function buildPrompt(document: DesignDocument, format: string, title: string, co
 }
 
 async function askPlanner(prompt: string): Promise<string> {
-  if (env.GOOGLE_AI_STUDIO_API_KEY) {
+  const failures: string[] = [];
+  if (cloudflareAiConfigured) {
     try {
-      const client = new GoogleGenAI({ apiKey: env.GOOGLE_AI_STUDIO_API_KEY });
-      const response = await client.models.generateContent({
-        model: env.GOOGLE_AI_STUDIO_MODEL,
-        contents: prompt,
-        config: { responseMimeType: "application/json", temperature: 0.8 },
+      return await cloudflareChatCompletion({
+        accountId: env.CLOUDFLARE_ACCOUNT_ID!,
+        apiToken: env.CLOUDFLARE_API_TOKEN!,
+        model: env.CLOUDFLARE_TEXT_MODEL,
+        messages: [
+          { role: "system", content: "You are a professional graphic designer. Return valid JSON only." },
+          { role: "user", content: prompt },
+        ],
+        responseFormat: { type: "json_object" },
+        temperature: 0.8,
+        maxTokens: 4096,
+        timeoutMs: 45_000,
       });
-      if (response.text) return response.text;
-    } catch {
-      // Try another configured text provider before keeping the built-in layout.
+    } catch (error) {
+      failures.push(`Cloudflare Workers AI: ${error instanceof Error ? error.message : "request failed"}`);
     }
   }
-  const endpoint = env.GROQ_API_KEY
-    ? "https://api.groq.com/openai/v1/chat/completions"
-    : env.OPENAI_API_KEY ? "https://api.openai.com/v1/chat/completions" : null;
-  const apiKey = env.GROQ_API_KEY ?? env.OPENAI_API_KEY;
-  if (!endpoint || !apiKey) throw new Error("No AI provider is configured for design layout planning.");
-  const model = env.GROQ_API_KEY ? env.GROQ_MODEL : env.OPENAI_MODEL;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      temperature: 0.8,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: "You are a professional graphic designer. Return valid JSON only." },
-        { role: "user", content: prompt },
-      ],
-    }),
-    signal: AbortSignal.timeout(45_000),
-  });
-  if (!response.ok) throw new Error(`Layout planner provider returned HTTP ${response.status}.`);
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
-  const content = payload.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("Layout planner returned no JSON content.");
-  return content;
+
+  const providers = [
+    ...(env.GROQ_API_KEY ? [{
+      name: "Groq",
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey: env.GROQ_API_KEY,
+      model: env.GROQ_MODEL,
+    }] : []),
+    ...(env.OPENAI_API_KEY ? [{
+      name: "OpenAI",
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      apiKey: env.OPENAI_API_KEY,
+      model: env.OPENAI_MODEL,
+    }] : []),
+  ];
+  for (const provider of providers) {
+    try {
+      const response = await fetch(provider.endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${provider.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: provider.model,
+          temperature: 0.8,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You are a professional graphic designer. Return valid JSON only." },
+            { role: "user", content: prompt },
+          ],
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
+      const content = payload.choices?.[0]?.message?.content;
+      if (typeof content !== "string") throw new Error("returned no JSON content");
+      return content;
+    } catch (error) {
+      failures.push(`${provider.name}: ${error instanceof Error ? error.message : "request failed"}`);
+    }
+  }
+  if (!failures.length) throw new Error("No AI provider is configured for design layout planning.");
+  throw new Error(`Design layout planning failed for all configured providers. ${failures.join(" | ")}`);
 }
 
 function applyPlacements(document: DesignDocument, plan: Plan, brandColors: string[], brandFonts: string[]) {
@@ -113,7 +175,9 @@ function applyPlacements(document: DesignDocument, plan: Plan, brandColors: stri
       if (layer.type === "shape") return { ...layer, ...common, ...(position.fill ? { fill: position.fill } : {}), ...(position.color ? { fill: position.color } : {}) };
       if (layer.type === "text") {
         const styleFont = position.typeStyle === "display" ? brandFonts[0] ?? "Georgia" : position.typeStyle === "body" ? brandFonts[1] ?? "Arial" : brandFonts[0] ?? layer.fontFamily ?? "Arial";
-        return { ...layer, ...common, fontFamily: styleFont, fontSize: Math.max(12, Math.round(position.fontScale ? position.fontScale * page.height : layer.fontSize ?? 24)), fontWeight: position.weight ?? layer.fontWeight, align: position.align ?? layer.align, ...(position.color ? { color: position.color } : {}) };
+        const plannedColor = position.color ?? layer.color ?? "#172531";
+        const background = textBackgroundColor(layer, layers, placements, page.width, page.height, pagePlan.background, layerOrder);
+        return { ...layer, ...common, fontFamily: styleFont, fontSize: Math.max(12, Math.round(position.fontScale ? position.fontScale * page.height : layer.fontSize ?? 24)), fontWeight: position.weight ?? layer.fontWeight, align: position.align ?? layer.align, color: getReadableDesignTextColor(background, plannedColor) };
       }
       return { ...layer, ...common };
     }).sort((first, second) => (layerOrder.get(first.id) ?? 0) - (layerOrder.get(second.id) ?? 0));

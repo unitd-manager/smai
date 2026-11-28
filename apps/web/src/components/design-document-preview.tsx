@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Download, MoreHorizontal, X } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { renderDesignPageSvg, type DesignDocument } from "@united-technologies/shared/design-document";
 import { downloadDesign, downloadDesignPages, type DesignDownloadFormat } from "@/lib/download-design";
 
@@ -61,7 +61,9 @@ export function DesignImagePreview({
                 </div>
                 <div className="media-post-preview-menu-wrap">
                   <button type="button" className="media-post-preview-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
-                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options">
+                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options" onClick={(event) => {
+                    if (event.target instanceof Element && event.target.closest('[role="menuitem"]')) setMenuOpen(false);
+                  }}>
                       <strong>Download</strong>
                       <button type="button" role="menuitem" onClick={() => void download("png")}>PNG</button>
                       <button type="button" role="menuitem" onClick={() => void download("jpg")}>JPEG</button>
@@ -95,6 +97,8 @@ export function DesignDocumentPreview({
   subtitle,
   modalDetails,
   modalActions,
+  open,
+  onOpenChange,
 }: {
   document: DesignDocument;
   title: string;
@@ -102,12 +106,20 @@ export function DesignDocumentPreview({
   subtitle?: string;
   modalDetails?: ReactNode;
   modalActions?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [activePage, setActivePage] = useState(0);
   const [error, setError] = useState("");
-  const [viewerOpen, setViewerOpen] = useState(false);
+  const [localViewerOpen, setLocalViewerOpen] = useState(false);
+  const viewerOpen = open ?? localViewerOpen;
+  const setViewerOpen = useCallback((next: boolean) => {
+    setLocalViewerOpen(next);
+    onOpenChange?.(next);
+  }, [onOpenChange]);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const captionRef = useRef<HTMLDivElement>(null);
   const pageIndex = Math.min(activePage, document.pages.length - 1);
   const page = document.pages[pageIndex];
 
@@ -120,7 +132,10 @@ export function DesignDocumentPreview({
     }
     window.addEventListener("keydown", handleViewerKeys);
     return () => window.removeEventListener("keydown", handleViewerKeys);
-  }, [document.pages.length, viewerOpen]);
+  }, [document.pages.length, setViewerOpen, viewerOpen]);
+  useEffect(() => {
+    if (viewerOpen) captionRef.current?.scrollTo({ top: 0 });
+  }, [document.id, pageIndex, viewerOpen]);
   if (!page) return null;
 
   async function downloadPage(format: DesignDownloadFormat) {
@@ -200,7 +215,9 @@ export function DesignDocumentPreview({
                 </div>
                 <div className="media-post-preview-menu-wrap">
                   <button type="button" className="media-post-preview-menu-trigger" aria-label="Post options" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><MoreHorizontal size={22} /></button>
-                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options">
+                  {menuOpen && <div className="media-post-preview-menu" role="menu" aria-label="Post options" onClick={(event) => {
+                    if (event.target instanceof Element && event.target.closest('[role="menuitem"]')) setMenuOpen(false);
+                  }}>
                       <strong>Download current page</strong>
                       <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("png"); }}>PNG</button>
                       <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); void downloadPage("jpg"); }}>JPEG</button>
@@ -211,7 +228,7 @@ export function DesignDocumentPreview({
                   </div>}
                 </div>
               </header>
-              <div className="media-post-preview-caption">
+              <div className="media-post-preview-caption" ref={captionRef}>
                 <span className="media-post-preview-avatar media-post-preview-avatar-small" aria-hidden="true">{(subtitle || title).trim().charAt(0).toUpperCase()}</span>
                 <div>
                   <p><strong>{subtitle?.split(" · ")[0] || title}</strong> {title}</p>

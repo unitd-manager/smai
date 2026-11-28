@@ -1,6 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { env } from "../env.js";
+import { cloudflareChatCompletion } from "./cloudflare-ai.js";
 import type { ContentProvider } from "./content-generator.js";
 
 export const availableVideoProps = [
@@ -136,7 +136,6 @@ export function normalizeGeneratedVideoOutline(value: unknown, fallbackIndustry?
     candidate && typeof candidate === "object" && !Array.isArray(candidate)) as Record<string, unknown> | undefined;
   const outline = nestedOutline ? { ...outer, ...nestedOutline } : outer;
   const rawScenes = Array.isArray(outline.scenes) ? outline.scenes : [];
-  if (rawScenes.length === 0) return value;
   const text = (...candidates: unknown[]) => candidates.find((candidate): candidate is string =>
     typeof candidate === "string" && candidate.trim().length > 0)?.trim();
   const sceneText = (scene: unknown) => {
@@ -430,10 +429,11 @@ async function providerHttpError(response: Response, providerName: string) {
   return new Error(`${providerName} returned HTTP ${response.status}${suffix}.`) as Error & { status: number };
 }
 
-export type PlanProvider = Pick<ContentProvider, "name" | "model"> & { apiKey?: string; fallback?: PlanProvider };
+export type PlanProvider = Pick<ContentProvider, "name" | "model"> & { apiKey?: string; accountId?: string; fallback?: PlanProvider };
 type VideoPlanProviderSettings = {
-  googleAiStudioApiKey?: string;
-  googleAiStudioModel?: string;
+  cloudflareApiToken?: string;
+  cloudflareAccountId?: string;
+  cloudflareModel?: string;
   groqApiKey?: string;
   groqModel?: string;
   openAiApiKey?: string;
@@ -453,19 +453,21 @@ export function selectVideoPlanProvider(settings: VideoPlanProviderSettings): Pl
       }
     : undefined;
   const fallbackProvider = groqProvider ?? openAiProvider;
-  if (!settings.googleAiStudioApiKey && fallbackProvider) return fallbackProvider;
+  if ((!settings.cloudflareApiToken || !settings.cloudflareAccountId) && fallbackProvider) return fallbackProvider;
   return {
-    name: "google-ai-studio",
-    model: settings.googleAiStudioModel ?? null,
-    ...(settings.googleAiStudioApiKey ? { apiKey: settings.googleAiStudioApiKey } : {}),
+    name: "cloudflare",
+    model: settings.cloudflareModel ?? "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    ...(settings.cloudflareApiToken ? { apiKey: settings.cloudflareApiToken } : {}),
+    ...(settings.cloudflareAccountId ? { accountId: settings.cloudflareAccountId } : {}),
     ...(fallbackProvider ? { fallback: fallbackProvider } : {}),
   };
 }
 
 function providerFromEnv() {
   return selectVideoPlanProvider({
-    googleAiStudioApiKey: env.GOOGLE_AI_STUDIO_API_KEY,
-    googleAiStudioModel: env.GOOGLE_AI_STUDIO_MODEL,
+    cloudflareApiToken: env.CLOUDFLARE_API_TOKEN,
+    cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID,
+    cloudflareModel: env.CLOUDFLARE_TEXT_MODEL,
     groqApiKey: env.GROQ_API_KEY,
     groqModel: env.GROQ_MODEL,
     openAiApiKey: env.OPENAI_API_KEY,
@@ -479,7 +481,7 @@ export function activeVideoPlanProvider() {
 
 async function providerText(provider: PlanProvider, system: string, prompt: string, responseSchema: unknown) {
   if (!provider.apiKey) {
-    throw new VideoPlanGenerationError(503, "No AI provider is configured. Add GOOGLE_AI_STUDIO_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env, then restart the API.");
+    throw new VideoPlanGenerationError(503, "No AI provider is configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env, then restart the API.");
   }
   let transientAttempts = 0;
   const schemaInstruction = `Return only valid JSON matching this exact schema. Do not wrap the result in any other key and do not add fields not listed here: ${JSON.stringify(providerResponseSchema(responseSchema))}`;
@@ -541,19 +543,20 @@ async function providerText(provider: PlanProvider, system: string, prompt: stri
         return text;
       }
 
-      const ai = new GoogleGenAI({ apiKey: provider.apiKey });
-      const response = await ai.models.generateContent({
-        model: provider.model ?? env.GOOGLE_AI_STUDIO_MODEL,
-        contents: prompt,
-        config: {
-          systemInstruction: system,
-          responseMimeType: "application/json",
-          maxOutputTokens: 8192,
-          abortSignal: AbortSignal.timeout(90_000),
-        },
+      if (!provider.accountId) throw new VideoPlanGenerationError(503, "Cloudflare Workers AI requires CLOUDFLARE_ACCOUNT_ID.");
+      return await cloudflareChatCompletion({
+        accountId: provider.accountId,
+        apiToken: provider.apiKey,
+        model: provider.model ?? env.CLOUDFLARE_TEXT_MODEL,
+        messages: [
+          { role: "system", content: `${system} ${schemaInstruction}` },
+          { role: "user", content: prompt },
+        ],
+        responseFormat: { type: "json_object" },
+        temperature: 0.6,
+        maxTokens: 8192,
+        timeoutMs: 90_000,
       });
-      if (!response.text) throw new VideoPlanGenerationError(502, "Gemini returned an empty video plan response.");
-      return response.text;
     } catch (error) {
       if (error instanceof VideoPlanGenerationError) throw error;
       const status = error && typeof error === "object" && "status" in error && typeof error.status === "number"
@@ -566,7 +569,7 @@ async function providerText(provider: PlanProvider, system: string, prompt: stri
         transientAttempts += 1;
         continue;
       }
-      const providerLabel = provider.name === "groq" ? "Groq" : provider.name === "openai" ? "OpenAI" : "Gemini";
+      const providerLabel = provider.name === "groq" ? "Groq" : provider.name === "openai" ? "OpenAI" : "Cloudflare Workers AI";
       const message = status === 429
         ? `${providerLabel} rate limit or quota reached after 3 attempts. Check provider usage and try again.`
         : status === 503

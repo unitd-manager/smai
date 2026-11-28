@@ -1,6 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { platformSpecs } from "@united-technologies/shared/platform-specs";
+import { cloudflareChatCompletion } from "./cloudflare-ai.js";
 
 export const contentFormats = [
   "post",
@@ -127,7 +127,7 @@ export type ContentRequest = {
 };
 
 export type ContentProvider = {
-  name: "google-ai-studio" | "groq" | "openai";
+  name: "cloudflare" | "groq" | "openai";
   model: string | null;
   generate(request: ContentRequest): Promise<GeneratedAsset[]>;
 };
@@ -208,77 +208,6 @@ function requestContent(request: ContentRequest) {
     ...(request.videoBrief ? { videoBrief: request.videoBrief } : {}),
     ...(request.businessContext ? { businessContext: request.businessContext } : {}),
   });
-}
-
-function googleResponseSchema(request: ContentRequest) {
-  const stringArray = { type: "ARRAY", items: { type: "STRING" } };
-  return {
-    type: "OBJECT",
-    properties: {
-      items: {
-        type: "ARRAY",
-        items: {
-          type: "OBJECT",
-          properties: {
-            format: { type: "STRING", enum: request.formats },
-            title: { type: "STRING" },
-            caption: { type: "STRING" },
-            hashtags: stringArray,
-            idea: { type: "STRING" },
-            pillar: { type: "STRING" },
-            firstComment: { type: "STRING" },
-            platformCaptions: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  platform: { type: "STRING", enum: request.platforms },
-                  caption: { type: "STRING" },
-                  hashtags: stringArray,
-                  hook: { type: "STRING" },
-                  title: { type: "STRING" },
-                  description: { type: "STRING" },
-                  callToAction: { type: "STRING" },
-                  altText: { type: "STRING" },
-                  bestFormat: { type: "STRING" },
-                  formatReason: { type: "STRING" },
-                  imageRatio: { type: "STRING" },
-                  recommendedTemplate: { type: "STRING" },
-                  firstComment: { type: "STRING" },
-                },
-                required: ["platform", "caption", "hashtags"],
-              },
-            },
-            posterText: {
-              type: "OBJECT",
-              properties: {
-                headline: { type: "STRING" },
-                supportingLine: { type: "STRING" },
-                callToAction: { type: "STRING" },
-              },
-              required: ["headline", "supportingLine", "callToAction"],
-            },
-            slides: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  headline: { type: "STRING" },
-                  subheading: { type: "STRING" },
-                  body: { type: "STRING" },
-                },
-                required: ["headline", "subheading", "body"],
-              },
-            },
-            sections: stringArray,
-            scenes: stringArray,
-          },
-          required: ["format", "title", "caption", "hashtags", "idea", "pillar", "firstComment", "platformCaptions"],
-        },
-      },
-    },
-    required: ["items"],
-  };
 }
 
 function groqResponseSchema(request: ContentRequest) {
@@ -378,18 +307,19 @@ function groqResponseSchema(request: ContentRequest) {
   };
 }
 
-export class GoogleAiStudioContentProvider implements ContentProvider {
-  name: ContentProvider["name"] = "google-ai-studio";
+export class CloudflareContentProvider implements ContentProvider {
+  name: ContentProvider["name"] = "cloudflare";
 
   constructor(
-    private readonly apiKey: string,
+    private readonly accountId: string,
+    private readonly apiToken: string,
     public model: string,
     private readonly fallback?: ContentProvider,
   ) {}
 
   async generate(request: ContentRequest) {
     try {
-      return await this.generateWithGemini(request);
+      return await this.generateWithCloudflare(request);
     } catch (error) {
       if (!this.fallback) throw error;
       const generated = await this.fallback.generate(request);
@@ -399,52 +329,51 @@ export class GoogleAiStudioContentProvider implements ContentProvider {
     }
   }
 
-  private async generateWithGemini(request: ContentRequest) {
-    const ai = new GoogleGenAI({ apiKey: this.apiKey });
+  private async generateWithCloudflare(request: ContentRequest) {
     let lastValidationError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      let response;
       let transientAttempts = 0;
+      let text: string | undefined;
       while (true) {
         try {
-          response = await ai.models.generateContent({
+          text = await cloudflareChatCompletion({
+            accountId: this.accountId,
+            apiToken: this.apiToken,
             model: this.model,
-            contents: `${requestContent(request)}${attempt === 0 ? "" : `\n\nCorrect the previous response so it satisfies the required JSON schema. Validation issue: ${lastValidationError instanceof Error ? lastValidationError.message : "invalid JSON"}. Return only the corrected JSON.`}`,
-            config: {
-              systemInstruction: generationSystemPrompt,
-              responseMimeType: "application/json",
-              responseJsonSchema: googleResponseSchema(request),
-              maxOutputTokens: 8192,
-              abortSignal: AbortSignal.timeout(45_000),
-            },
+            messages: [
+              { role: "system", content: `${generationSystemPrompt} Return a JSON object with the required items array.` },
+              {
+                role: "user",
+                content: `${requestContent(request)}${attempt === 0 ? "" : `\n\nCorrect the previous response so it satisfies the required JSON schema. Validation issue: ${lastValidationError instanceof Error ? lastValidationError.message : "invalid JSON"}. Return only the corrected JSON.`}`,
+              },
+            ],
+            responseFormat: { type: "json_object" },
+            temperature: 0.7,
+            maxTokens: 8192,
+            timeoutMs: 45_000,
           });
           break;
         } catch (error) {
-          const status = error && typeof error === "object" && "status" in error && typeof error.status === "number"
-            ? error.status
-            : error && typeof error === "object" && "statusCode" in error && typeof error.statusCode === "number"
-              ? error.statusCode
-              : 502;
+          const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 502;
           if ((status === 429 || status === 503) && transientAttempts < 2) {
             await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** transientAttempts));
             transientAttempts += 1;
             continue;
           }
           const message = status === 503
-            ? "Gemini is temporarily overloaded (HTTP 503). The request was attempted 3 times; try again shortly."
+            ? "Cloudflare Workers AI is temporarily overloaded (HTTP 503). The request was attempted 3 times; try again shortly."
             : status === 429
-              ? "Gemini rate limit or quota reached (HTTP 429). The request was attempted 3 times; check Google AI Studio usage and try again."
+              ? "Cloudflare Workers AI rate limit or quota reached (HTTP 429). The request was attempted 3 times; check Workers AI usage and try again."
               : status === 401 || status === 403
-                ? `Gemini rejected the API key or project access (HTTP ${status}). Verify GOOGLE_AI_STUDIO_API_KEY and its project permissions.`
+                ? `Cloudflare Workers AI rejected the API token or account permissions (HTTP ${status}). Verify CLOUDFLARE_API_TOKEN and Workers AI permissions.`
                 : status === 404
-                  ? `The configured Gemini model was not found (HTTP 404). Check GOOGLE_AI_STUDIO_MODEL.`
-                  : `Gemini could not generate content (HTTP ${status}).`;
-          throw new ContentProviderError("google-ai-studio", status, message, { cause: error });
+                  ? `The configured Cloudflare Workers AI model was not found (HTTP 404). Check CLOUDFLARE_TEXT_MODEL.`
+                  : `Cloudflare Workers AI could not generate content (HTTP ${status}).`;
+          throw new ContentProviderError("cloudflare", status, message, { cause: error });
         }
       }
-      const text = response.text?.trim();
-      if (!text) {
-        lastValidationError = new Error("Gemini returned an empty response.");
+      if (!text?.trim()) {
+        lastValidationError = new Error("Cloudflare Workers AI returned an empty response.");
         continue;
       }
       try {
@@ -454,9 +383,9 @@ export class GoogleAiStudioContentProvider implements ContentProvider {
       }
     }
     throw new ContentProviderError(
-      "google-ai-studio",
+      "cloudflare",
       502,
-      `Gemini returned invalid content twice (${lastValidationError instanceof Error ? lastValidationError.message : "invalid JSON"}). Try generating again.`,
+      `Cloudflare Workers AI returned invalid content twice (${lastValidationError instanceof Error ? lastValidationError.message : "invalid JSON"}). Try generating again.`,
       { cause: lastValidationError },
     );
   }
@@ -640,23 +569,35 @@ export class OpenAiContentProvider implements ContentProvider {
 }
 
 export function selectContentProvider(
-  googleAiStudioApiKey: string | undefined,
-  googleAiStudioModel = "gemini-3.5-flash-lite",
-  groqApiKey?: string,
-  groqModel = "openai/gpt-oss-120b",
-  openAiApiKey?: string,
-  openAiModel = "gpt-4o-mini",
+  settings: {
+    cloudflareAccountId?: string;
+    cloudflareApiToken?: string;
+    cloudflareModel?: string;
+    groqApiKey?: string;
+    groqModel?: string;
+    openAiApiKey?: string;
+    openAiModel?: string;
+  },
 ): ContentProvider {
-  const openAiProvider = openAiApiKey ? new OpenAiContentProvider(openAiApiKey, openAiModel) : undefined;
-  const groqProvider = groqApiKey ? new GroqContentProvider(groqApiKey, groqModel, openAiProvider) : undefined;
-  if (googleAiStudioApiKey) {
-    return new GoogleAiStudioContentProvider(googleAiStudioApiKey, googleAiStudioModel, groqProvider ?? openAiProvider);
+  const openAiProvider = settings.openAiApiKey
+    ? new OpenAiContentProvider(settings.openAiApiKey, settings.openAiModel ?? "gpt-4o-mini")
+    : undefined;
+  const groqProvider = settings.groqApiKey
+    ? new GroqContentProvider(settings.groqApiKey, settings.groqModel ?? "openai/gpt-oss-120b", openAiProvider)
+    : undefined;
+  if (settings.cloudflareAccountId && settings.cloudflareApiToken) {
+    return new CloudflareContentProvider(
+      settings.cloudflareAccountId,
+      settings.cloudflareApiToken,
+      settings.cloudflareModel ?? "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      groqProvider ?? openAiProvider,
+    );
   }
   if (groqProvider) return groqProvider;
   if (openAiProvider) return openAiProvider;
   throw new ContentProviderError(
-    "google-ai-studio",
+    "cloudflare",
     503,
-    "No text AI provider is configured. Add GOOGLE_AI_STUDIO_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env, then restart the API.",
+    "No text AI provider is configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env, then restart the API.",
   );
 }

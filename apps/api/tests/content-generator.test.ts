@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CloudflareContentProvider,
   ContentProviderError,
-  GoogleAiStudioContentProvider,
   generatedAssetSchema,
   GroqContentProvider,
   OpenAiContentProvider,
@@ -43,44 +43,47 @@ const validAsset = {
   }],
 };
 
-function geminiResponse(text: string) {
+const cloudflareAccountId = "a".repeat(32);
+const cloudflareModel = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+
+function cloudflareResponse(text: string) {
   return new Response(JSON.stringify({
-    candidates: [{ content: { parts: [{ text }] } }],
+    choices: [{ message: { content: text } }],
   }), { status: 200 });
 }
 
-test("native Gemini SDK is called with strict JSON generation and business context", async () => {
-  const provider = new GoogleAiStudioContentProvider("AQ.test-key", "gemini-test");
+test("Cloudflare Workers AI uses chat completions with JSON output and business context", async () => {
+  const provider = new CloudflareContentProvider(cloudflareAccountId, "cf-test-token", cloudflareModel);
   const originalFetch = globalThis.fetch;
   let url = "";
   let body: Record<string, unknown> | undefined;
   globalThis.fetch = async (input, init) => {
     url = String(input);
-    assert.equal(new Headers(init?.headers).get("x-goog-api-key"), "AQ.test-key");
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer cf-test-token");
     body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-    return geminiResponse(JSON.stringify({ items: [validAsset] }));
+    return cloudflareResponse(JSON.stringify({ items: [validAsset] }));
   };
 
   try {
     const generated = await provider.generate(request);
-    assert.equal(new URL(url).pathname, "/v1beta/models/gemini-test:generateContent");
+    assert.equal(new URL(url).pathname, `/client/v4/accounts/${cloudflareAccountId}/ai/v1/chat/completions`);
     assert.equal(new URL(url).search, "");
     assert.equal(generated[0]?.title, validAsset.title);
     assert.deepEqual(generatedAssetSchema.safeParse(generated[0]).success, true);
-    assert.equal(body?.generationConfig && (body.generationConfig as Record<string, unknown>).responseMimeType, "application/json");
+    assert.deepEqual(body?.response_format, { type: "json_object" });
     assert.equal(JSON.stringify(body).includes(request.brand.name), true);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("Gemini retries invalid JSON once and then returns validated output", async () => {
-  const provider = new GoogleAiStudioContentProvider("AQ.test-key", "gemini-test");
+test("Cloudflare Workers AI retries invalid JSON once and then returns validated output", async () => {
+  const provider = new CloudflareContentProvider(cloudflareAccountId, "cf-test-token", cloudflareModel);
   const originalFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async () => {
     calls += 1;
-    return geminiResponse(calls === 1 ? "{not-json" : JSON.stringify({ items: [validAsset] }));
+    return cloudflareResponse(calls === 1 ? "{not-json" : JSON.stringify({ items: [validAsset] }));
   };
 
   try {
@@ -92,8 +95,8 @@ test("Gemini retries invalid JSON once and then returns validated output", async
   }
 });
 
-test("Gemini retries temporary overload with backoff and returns a clear error without fallback content", async () => {
-  const provider = new GoogleAiStudioContentProvider("AQ.test-key", "gemini-test");
+test("Cloudflare Workers AI retries temporary overload and reports failure without fallback content", async () => {
+  const provider = new CloudflareContentProvider(cloudflareAccountId, "cf-test-token", cloudflareModel);
   const originalFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async () => {
@@ -105,7 +108,7 @@ test("Gemini retries temporary overload with backoff and returns a clear error w
     await assert.rejects(
       provider.generate(request),
       (error: unknown) => error instanceof ContentProviderError
-        && error.provider === "google-ai-studio"
+        && error.provider === "cloudflare"
         && error.status === 503
         && error.message.includes("attempted 3 times"),
     );
@@ -115,15 +118,15 @@ test("Gemini retries temporary overload with backoff and returns a clear error w
   }
 });
 
-test("Gemini recovers when a temporary overload clears during retry", async () => {
-  const provider = new GoogleAiStudioContentProvider("AQ.test-key", "gemini-test");
+test("Cloudflare Workers AI recovers when a temporary overload clears during retry", async () => {
+  const provider = new CloudflareContentProvider(cloudflareAccountId, "cf-test-token", cloudflareModel);
   const originalFetch = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async () => {
     calls += 1;
     return calls < 3
       ? new Response(JSON.stringify({ error: { code: 503, status: "UNAVAILABLE" } }), { status: 503 })
-      : geminiResponse(JSON.stringify({ items: [validAsset] }));
+      : cloudflareResponse(JSON.stringify({ items: [validAsset] }));
   };
 
   try {
@@ -135,14 +138,20 @@ test("Gemini recovers when a temporary overload clears during retry", async () =
   }
 });
 
-test("social content automatically falls back to Groq after Gemini remains overloaded", async () => {
-  const provider = selectContentProvider("AQ.test-key", "gemini-test", "gsk-test", "llama-test");
+test("social content automatically falls back to Groq after Cloudflare remains overloaded", async () => {
+  const provider = selectContentProvider({
+    cloudflareAccountId,
+    cloudflareApiToken: "cf-test-token",
+    cloudflareModel,
+    groqApiKey: "gsk-test",
+    groqModel: "llama-test",
+  });
   const originalFetch = globalThis.fetch;
-  let geminiCalls = 0;
+  let cloudflareCalls = 0;
   let groqCalls = 0;
   globalThis.fetch = async (input, init) => {
-    if (String(input).includes("generativelanguage.googleapis.com")) {
-      geminiCalls += 1;
+    if (String(input).includes("api.cloudflare.com")) {
+      cloudflareCalls += 1;
       return new Response(JSON.stringify({ error: { code: 503, status: "UNAVAILABLE" } }), { status: 503 });
     }
     assert.equal(String(input), "https://api.groq.com/openai/v1/chat/completions");
@@ -155,7 +164,7 @@ test("social content automatically falls back to Groq after Gemini remains overl
 
   try {
     const generated = await provider.generate(request);
-    assert.equal(geminiCalls, 3);
+    assert.equal(cloudflareCalls, 3);
     assert.equal(groqCalls, 1);
     assert.equal(provider.name, "groq");
     assert.equal(generated[0]?.title, validAsset.title);
@@ -164,14 +173,21 @@ test("social content automatically falls back to Groq after Gemini remains overl
   }
 });
 
-test("social content falls through Gemini and Groq to optional OpenAI", async () => {
-  const provider = selectContentProvider("AQ.test-key", "gemini-test", "gsk-test", "llama-test", "sk-openai-test");
+test("social content falls through Cloudflare and Groq to optional OpenAI", async () => {
+  const provider = selectContentProvider({
+    cloudflareAccountId,
+    cloudflareApiToken: "cf-test-token",
+    cloudflareModel,
+    groqApiKey: "gsk-test",
+    groqModel: "llama-test",
+    openAiApiKey: "sk-openai-test",
+  });
   const originalFetch = globalThis.fetch;
   const calls: string[] = [];
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     calls.push(url);
-    if (url.includes("generativelanguage.googleapis.com")) {
+    if (url.includes("api.cloudflare.com")) {
       return new Response(JSON.stringify({ error: { code: 401, status: "UNAUTHENTICATED" } }), { status: 401 });
     }
     if (url.includes("api.groq.com")) {
@@ -190,7 +206,7 @@ test("social content falls through Gemini and Groq to optional OpenAI", async ()
     assert.equal(generated[0]?.title, validAsset.title);
     assert.equal(provider.name, "openai");
     assert.deepEqual(calls, [
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent",
+      `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/ai/v1/chat/completions`,
       "https://api.groq.com/openai/v1/chat/completions",
       "https://api.openai.com/v1/chat/completions",
     ]);
@@ -200,14 +216,14 @@ test("social content falls through Gemini and Groq to optional OpenAI", async ()
 });
 
 test("OpenAI can be selected as the sole configured text provider", () => {
-  const provider = selectContentProvider(undefined, undefined, undefined, undefined, "sk-openai-test");
+  const provider = selectContentProvider({ openAiApiKey: "sk-openai-test" });
   assert.ok(provider instanceof OpenAiContentProvider);
   assert.equal(provider.name, "openai");
   assert.equal(provider.model, "gpt-4o-mini");
 });
 
 test("Groq can be selected as the sole configured text provider", () => {
-  const provider = selectContentProvider(undefined, "gemini-test", "gsk-test", "llama-test");
+  const provider = selectContentProvider({ groqApiKey: "gsk-test", groqModel: "llama-test" });
   assert.ok(provider instanceof GroqContentProvider);
   assert.equal(provider.name, "groq");
 });
@@ -261,7 +277,7 @@ test("Groq retries a carousel missing slides and requests the exact carousel sch
 });
 
 test("Groq uses the supported default model and reports unavailable model IDs clearly", async () => {
-  const defaultProvider = selectContentProvider(undefined, undefined, "gsk-test");
+  const defaultProvider = selectContentProvider({ groqApiKey: "gsk-test" });
   assert.ok(defaultProvider instanceof GroqContentProvider);
   assert.equal(defaultProvider.model, "openai/gpt-oss-120b");
 
@@ -284,9 +300,9 @@ test("Groq uses the supported default model and reports unavailable model IDs cl
 });
 
 test("unresolved template placeholders are rejected and never returned as generated content", async () => {
-  const provider = new GoogleAiStudioContentProvider("AQ.test-key", "gemini-test");
+  const provider = new CloudflareContentProvider(cloudflareAccountId, "cf-test-token", cloudflareModel);
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => geminiResponse(JSON.stringify({
+  globalThis.fetch = async () => cloudflareResponse(JSON.stringify({
     items: [{ ...validAsset, caption: "A better experience for [Your Brand] customers." }],
   }));
 
@@ -303,14 +319,14 @@ test("unresolved template placeholders are rejected and never returned as genera
 });
 
 test("generic-sounding but complete copy is not treated as an unresolved placeholder", async () => {
-  const provider = new GoogleAiStudioContentProvider("AQ.test-key", "gemini-test");
+  const provider = new CloudflareContentProvider(cloudflareAccountId, "cf-test-token", cloudflareModel);
   const originalFetch = globalThis.fetch;
   const contextualAsset = {
     ...validAsset,
     caption: "A better everyday experience starts with our spring tasting menu, made with seasonal ingredients.",
     firstComment: "Our social media page shares the latest seasonal menu details.",
   };
-  globalThis.fetch = async () => geminiResponse(JSON.stringify({ items: [contextualAsset] }));
+  globalThis.fetch = async () => cloudflareResponse(JSON.stringify({ items: [contextualAsset] }));
 
   try {
     const generated = await provider.generate(request);
@@ -320,11 +336,14 @@ test("generic-sounding but complete copy is not treated as an unresolved placeho
   }
 });
 
-test("content provider selection requires Gemini and accepts AQ-prefixed keys", () => {
-  assert.equal(selectContentProvider("AQ.test-key", "gemini-test").name, "google-ai-studio");
+test("Cloudflare provider selection requires both account ID and API token", () => {
+  assert.equal(selectContentProvider({
+    cloudflareAccountId,
+    cloudflareApiToken: "cf-test-token",
+  }).name, "cloudflare");
   assert.throws(
-    () => selectContentProvider(undefined, "gemini-test"),
+    () => selectContentProvider({ cloudflareAccountId }),
     (error: unknown) => error instanceof ContentProviderError
-      && error.message.includes("GOOGLE_AI_STUDIO_API_KEY"),
+      && error.message.includes("CLOUDFLARE_API_TOKEN"),
   );
 });

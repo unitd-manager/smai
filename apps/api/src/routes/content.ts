@@ -2,7 +2,7 @@ import { Router } from "express";
 import { createDesignDocument, renderDesignPageSvg } from "@united-technologies/shared/design-document";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { env } from "../env.js";
+import { cloudflareAiConfigured, env } from "../env.js";
 import { prisma } from "../db.js";
 import { requireAuth, requireCompleteBrandProfile, requireWritableWorkspace, requireWorkspace } from "../middleware/auth.js";
 import {
@@ -88,12 +88,12 @@ router.use(requireAuth, requireWorkspace, requireCompleteBrandProfile);
 router.get("/configuration", (_req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.json({
-    provider: env.GOOGLE_AI_STUDIO_API_KEY ? "google-ai-studio" : env.GROQ_API_KEY ? "groq" : env.OPENAI_API_KEY ? "openai" : null,
-    configured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY || env.GROQ_API_KEY || env.OPENAI_API_KEY),
-    geminiConfigured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
+    provider: cloudflareAiConfigured ? "cloudflare" : env.GROQ_API_KEY ? "groq" : env.OPENAI_API_KEY ? "openai" : null,
+    configured: Boolean(cloudflareAiConfigured || env.GROQ_API_KEY || env.OPENAI_API_KEY),
+    cloudflareConfigured: cloudflareAiConfigured,
     groqConfigured: Boolean(env.GROQ_API_KEY),
     openaiConfigured: Boolean(env.OPENAI_API_KEY),
-    setup: "Add GOOGLE_AI_STUDIO_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env and restart the API.",
+    setup: "Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env and restart the API.",
   });
 });
 
@@ -252,14 +252,15 @@ router.post("/generate", requireWritableWorkspace, async (req, res, next) => {
     let provider: ContentProvider;
     let generated: GeneratedAsset[];
     try {
-      provider = selectContentProvider(
-        env.GOOGLE_AI_STUDIO_API_KEY,
-        env.GOOGLE_AI_STUDIO_MODEL,
-        env.GROQ_API_KEY,
-        env.GROQ_MODEL,
-        env.OPENAI_API_KEY,
-        env.OPENAI_MODEL,
-      );
+      provider = selectContentProvider({
+        cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID,
+        cloudflareApiToken: env.CLOUDFLARE_API_TOKEN,
+        cloudflareModel: env.CLOUDFLARE_TEXT_MODEL,
+        groqApiKey: env.GROQ_API_KEY,
+        groqModel: env.GROQ_MODEL,
+        openAiApiKey: env.OPENAI_API_KEY,
+        openAiModel: env.OPENAI_MODEL,
+      });
       const businessContext = await getBusinessContext(req.workspace!.id, brand.id, input.idea);
       const defaultTemplate = requestedTemplate ?? preferredTemplates.get(input.formats[0]!);
       generated = await provider.generate({
@@ -477,10 +478,10 @@ router.post("/generate", requireWritableWorkspace, async (req, res, next) => {
 
     res.status(201).json({
       provider: provider.name,
-      geminiConfigured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
+      cloudflareConfigured: cloudflareAiConfigured,
       groqConfigured: Boolean(env.GROQ_API_KEY),
       openaiConfigured: Boolean(env.OPENAI_API_KEY),
-      configured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY || env.GROQ_API_KEY || env.OPENAI_API_KEY),
+      configured: Boolean(cloudflareAiConfigured || env.GROQ_API_KEY || env.OPENAI_API_KEY),
       renderer: "built-in-svg",
       ...(designWarnings.length ? { designWarnings } : {}),
       generatedCount: generated.length,
@@ -528,10 +529,10 @@ router.get("/", async (req, res, next) => {
     });
     res.json({
       items: filteredRows.filter((row) => row.provider !== "platform-regeneration"),
-      geminiConfigured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
+      cloudflareConfigured: cloudflareAiConfigured,
       groqConfigured: Boolean(env.GROQ_API_KEY),
       openaiConfigured: Boolean(env.OPENAI_API_KEY),
-      configured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY || env.GROQ_API_KEY || env.OPENAI_API_KEY),
+      configured: Boolean(cloudflareAiConfigured || env.GROQ_API_KEY || env.OPENAI_API_KEY),
     });
   } catch (error) {
     next(error);
@@ -743,14 +744,15 @@ router.post("/:id/regenerate-platform", requireWritableWorkspace, async (req, re
       : [];
     let regenerated;
     try {
-      provider = selectContentProvider(
-        env.GOOGLE_AI_STUDIO_API_KEY,
-        env.GOOGLE_AI_STUDIO_MODEL,
-        env.GROQ_API_KEY,
-        env.GROQ_MODEL,
-        env.OPENAI_API_KEY,
-        env.OPENAI_MODEL,
-      );
+      provider = selectContentProvider({
+        cloudflareAccountId: env.CLOUDFLARE_ACCOUNT_ID,
+        cloudflareApiToken: env.CLOUDFLARE_API_TOKEN,
+        cloudflareModel: env.CLOUDFLARE_TEXT_MODEL,
+        groqApiKey: env.GROQ_API_KEY,
+        groqModel: env.GROQ_MODEL,
+        openAiApiKey: env.OPENAI_API_KEY,
+        openAiModel: env.OPENAI_MODEL,
+      });
       const businessContext = await getBusinessContext(req.workspace!.id, brand.id, current.request ?? "");
       const result = await provider.generate({
         idea: current.request ?? (typeof content.idea === "string" ? content.idea : current.id),
@@ -832,10 +834,10 @@ router.post("/:id/regenerate-platform", requireWritableWorkspace, async (req, re
     }
     res.json({
       provider: provider.name,
-      geminiConfigured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
+      cloudflareConfigured: cloudflareAiConfigured,
       groqConfigured: Boolean(env.GROQ_API_KEY),
       openaiConfigured: Boolean(env.OPENAI_API_KEY),
-      configured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY || env.GROQ_API_KEY || env.OPENAI_API_KEY),
+      configured: Boolean(cloudflareAiConfigured || env.GROQ_API_KEY || env.OPENAI_API_KEY),
       platformCaption: regenerated,
       usage: { used: saved, limit: generationLimit },
     });

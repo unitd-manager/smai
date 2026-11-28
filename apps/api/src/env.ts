@@ -20,6 +20,10 @@ const envSchema = z.object({
     },
     z.string().url(),
   ),
+  WEB_ORIGIN_LOCAL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().url().optional(),
+  ),
   PUBLIC_API_URL: z.preprocess(
     (value) => (value === "" ? undefined : value),
     z.string().url().optional(),
@@ -30,10 +34,18 @@ const envSchema = z.object({
     (value) => (value === "" ? undefined : value),
     z.string().url().optional(),
   ),
+  INSTAGRAM_REDIRECT_URI_LOCAL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().url().optional(),
+  ),
   FACEBOOK_APP_ID: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   FACEBOOK_APP_SECRET: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   FACEBOOK_REDIRECT_URI: z.preprocess(
     (value) => (value === "" ? undefined : value),
+    z.string().url().optional(),
+  ),
+  FACEBOOK_REDIRECT_URI_LOCAL: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
     z.string().url().optional(),
   ),
   FACEBOOK_GRAPH_API_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v26.0"),
@@ -46,13 +58,28 @@ const envSchema = z.object({
   FFPROBE_PATH: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   PRODUCT_NAME: z.string().min(1).default(brand.productName),
   TAVILY_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
+  APIFY_API_TOKEN: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
+  // Optional JSON overrides keyed by Instagram, Facebook, TikTok, YouTube, and X.
+  // Actor-specific input shapes stay configurable because Apify Actors differ.
+  APIFY_COMPETITOR_ACTORS: z.preprocess((value) => {
+    if (typeof value !== "string" || value.trim() === "") return undefined;
+    try { return JSON.parse(value); } catch { return value; }
+  }, z.record(z.string(), z.unknown()).optional()),
   YOUTUBE_DATA_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
   X_API_BEARER_TOKEN: z.preprocess((value) => (value === "" ? undefined : value), z.string().trim().min(1).optional()),
-  GOOGLE_AI_STUDIO_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
-  GOOGLE_AI_STUDIO_MODEL: z.string().min(1).default("gemini-3.5-flash-lite"),
+  CLOUDFLARE_ACCOUNT_ID: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().trim().regex(/^[a-f\d]{32}$/i).optional(),
+  ),
+  CLOUDFLARE_API_TOKEN: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+    z.string().trim().min(1).optional(),
+  ),
+  CLOUDFLARE_TEXT_MODEL: z.string().min(1).default("@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
+  CLOUDFLARE_IMAGE_MODEL: z.string().min(1).default("@cf/black-forest-labs/flux-1-schnell"),
+  CLOUDFLARE_REFERENCE_IMAGE_MODEL: z.string().min(1).default("@cf/runwayml/stable-diffusion-v1-5-img2img"),
   OPENAI_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   OPENAI_MODEL: z.string().min(1).default("gpt-4o-mini"),
-  DESIGN_IMAGE_MODEL: z.string().min(1).default("gemini-3.1-flash-image"),
   GROQ_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
   GROQ_MODEL: z.string().min(1).default("openai/gpt-oss-120b"),
   RESEND_API_KEY: z.preprocess((value) => (value === "" ? undefined : value), z.string().optional()),
@@ -91,6 +118,7 @@ export const env = envSchema.parse({
   PUBLIC_API_URL: process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL,
 });
 
+export const cloudflareAiConfigured = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
 export const smtpApprovalEmailConfigured = Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD && (env.SMTP_FROM || env.SMTP_USER));
 export const resendApprovalEmailConfigured = Boolean(env.RESEND_API_KEY && env.EMAIL_FROM);
 export const approvalEmailConfigured = smtpApprovalEmailConfigured || resendApprovalEmailConfigured;

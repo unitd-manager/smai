@@ -1,6 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { env } from "../env.js";
+import { cloudflareAiConfigured, env } from "../env.js";
+import { cloudflareChatCompletion } from "./cloudflare-ai.js";
 
 export const campaignObjectives = [
   "Brand Awareness",
@@ -235,21 +235,21 @@ function parseStrategy(text: string, request: CampaignStrategyRequest) {
   return strategy;
 }
 
-async function generateWithGemini(prompt: string) {
-  if (!env.GOOGLE_AI_STUDIO_API_KEY) throw new Error("Gemini is not configured.");
-  const ai = new GoogleGenAI({ apiKey: env.GOOGLE_AI_STUDIO_API_KEY });
-  const response = await ai.models.generateContent({
-    model: env.GOOGLE_AI_STUDIO_MODEL,
-    contents: prompt,
-    config: {
-      systemInstruction: "You are a careful marketing strategist. Follow the requested JSON contract. Separate supplied facts from hypotheses.",
-      responseMimeType: "application/json",
-      maxOutputTokens: 8192,
-      abortSignal: AbortSignal.timeout(60_000),
-    },
+async function generateWithCloudflare(prompt: string) {
+  if (!cloudflareAiConfigured) throw new Error("Cloudflare Workers AI is not configured.");
+  return cloudflareChatCompletion({
+    accountId: env.CLOUDFLARE_ACCOUNT_ID!,
+    apiToken: env.CLOUDFLARE_API_TOKEN!,
+    model: env.CLOUDFLARE_TEXT_MODEL,
+    messages: [
+      { role: "system", content: "You are a careful marketing strategist. Follow the requested JSON contract. Separate supplied facts from hypotheses." },
+      { role: "user", content: prompt },
+    ],
+    responseFormat: { type: "json_object" },
+    temperature: 0.6,
+    maxTokens: 8192,
+    timeoutMs: 60_000,
   });
-  if (!response.text?.trim()) throw new Error("Gemini returned an empty strategy.");
-  return response.text;
 }
 
 async function generateWithOpenAiCompatible(
@@ -284,8 +284,8 @@ async function generateWithOpenAiCompatible(
 
 export async function generateCampaignStrategy(request: CampaignStrategyRequest) {
   const providers: Array<{ name: string; generate: (prompt: string) => Promise<string> }> = [];
-  if (env.GOOGLE_AI_STUDIO_API_KEY) {
-    providers.push({ name: "google-ai-studio", generate: generateWithGemini });
+  if (cloudflareAiConfigured) {
+    providers.push({ name: "cloudflare", generate: generateWithCloudflare });
   }
   if (env.GROQ_API_KEY) {
     providers.push({
@@ -300,7 +300,7 @@ export async function generateCampaignStrategy(request: CampaignStrategyRequest)
     });
   }
   if (!providers.length) {
-    throw new Error("Configure GOOGLE_AI_STUDIO_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY to generate campaign strategy.");
+    throw new Error("Configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, GROQ_API_KEY, or OPENAI_API_KEY to generate campaign strategy.");
   }
 
   const failures: string[] = [];

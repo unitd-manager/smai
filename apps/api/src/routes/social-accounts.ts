@@ -23,10 +23,76 @@ import { fromObjectStorageKey, getStoredObject } from "../services/object-storag
 const router = Router();
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-function socialAccountsPage(platform: "instagram" | "facebook", status: "connected" | "cancelled" | "failed") {
-  const url = new URL("/dashboard/social-accounts", env.WEB_ORIGIN);
+type SocialPlatform = "instagram" | "facebook";
+type OAuthContext = { returnOrigin: string; redirectUri: string };
+
+function socialAccountsPage(platform: SocialPlatform, status: "connected" | "cancelled" | "failed", returnOrigin = env.WEB_ORIGIN) {
+  const url = new URL("/dashboard/social-accounts", returnOrigin);
   url.searchParams.set(platform, status);
   return url.toString();
+}
+
+function isLoopbackOrigin(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function getRequestWebOrigin(originHeader: string | undefined, refererHeader: string | undefined) {
+  const source = originHeader?.trim() || refererHeader?.trim();
+  if (!source) return undefined;
+  try {
+    return new URL(source).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function isLocalWebOrigin(origin: string | undefined) {
+  return Boolean(origin && (
+    origin === env.WEB_ORIGIN_LOCAL ||
+    (env.NODE_ENV !== "production" && isLoopbackOrigin(origin))
+  ));
+}
+
+function getOAuthContext(originHeader: string | undefined, platform: SocialPlatform): OAuthContext {
+  const productionRedirect = platform === "instagram" ? env.INSTAGRAM_REDIRECT_URI : env.FACEBOOK_REDIRECT_URI;
+  const localRedirect = platform === "instagram" ? env.INSTAGRAM_REDIRECT_URI_LOCAL : env.FACEBOOK_REDIRECT_URI_LOCAL;
+  const requestedOrigin = originHeader?.trim();
+  const isLocal = isLocalWebOrigin(requestedOrigin);
+  if (requestedOrigin && !isLocal && requestedOrigin !== env.WEB_ORIGIN) {
+    throw new Error("The requesting website is not an allowed OAuth origin.");
+  }
+  if (isLocal) {
+    if (!localRedirect) {
+      throw new Error(`Local ${platform} sign-in needs an HTTPS tunnel callback. Set ${platform === "instagram" ? "INSTAGRAM" : "FACEBOOK"}_REDIRECT_URI_LOCAL and add that exact callback URL to the Meta app settings.`);
+    }
+    return { returnOrigin: requestedOrigin!, redirectUri: localRedirect };
+  }
+  if (!productionRedirect) throw new Error(`${platform} OAuth callback URL is not configured.`);
+  return { returnOrigin: env.WEB_ORIGIN, redirectUri: productionRedirect };
+}
+
+function getCallbackContext(state: string, platform: SocialPlatform) {
+  const issuer = platform === "instagram" ? "united-technologies-instagram" : "united-technologies-facebook";
+  const payload = jwt.verify(state, env.JWT_ACCESS_SECRET, { issuer }) as JwtPayload;
+  const returnOrigin = typeof payload.returnOrigin === "string" ? payload.returnOrigin : env.WEB_ORIGIN;
+  const redirectUri = typeof payload.redirectUri === "string"
+    ? payload.redirectUri
+    : platform === "instagram" ? env.INSTAGRAM_REDIRECT_URI : env.FACEBOOK_REDIRECT_URI;
+  const allowedOrigins = [env.WEB_ORIGIN, env.WEB_ORIGIN_LOCAL].filter((value): value is string => Boolean(value));
+  const allowedRedirects = platform === "instagram"
+    ? [env.INSTAGRAM_REDIRECT_URI, env.INSTAGRAM_REDIRECT_URI_LOCAL]
+    : [env.FACEBOOK_REDIRECT_URI, env.FACEBOOK_REDIRECT_URI_LOCAL];
+  const localOriginAllowed = env.NODE_ENV !== "production" && isLoopbackOrigin(returnOrigin);
+  if ((!allowedOrigins.includes(returnOrigin) && !localOriginAllowed) ||
+    typeof redirectUri !== "string" || !allowedRedirects.includes(redirectUri)) {
+    throw new Error("The OAuth callback does not match a configured application origin.");
+  }
+  return { payload, returnOrigin, redirectUri };
 }
 
 router.get("/instagram-media/:targetId", async (req, res, next) => {
@@ -160,23 +226,36 @@ router.get("/instagram-media/:targetId", async (req, res, next) => {
 });
 
 router.get("/instagram/callback", async (req, res) => {
+  const state = req.query.state;
+  let returnOrigin = env.WEB_ORIGIN;
+  let redirectUri = env.INSTAGRAM_REDIRECT_URI;
+  let oauthPayload: JwtPayload;
+  try {
+    if (typeof state !== "string") throw new Error("Instagram OAuth state is missing.");
+    const context = getCallbackContext(state, "instagram");
+    returnOrigin = context.returnOrigin;
+    redirectUri = context.redirectUri;
+    oauthPayload = context.payload;
+  } catch {
+    res.redirect(socialAccountsPage("instagram", "failed", returnOrigin));
+    return;
+  }
   const error = req.query.error;
   if (typeof error === "string" && error) {
-    res.redirect(socialAccountsPage("instagram", "cancelled"));
+    res.redirect(socialAccountsPage("instagram", "cancelled", returnOrigin));
     return;
   }
   const code = req.query.code;
-  const state = req.query.state;
   if (typeof code !== "string" || typeof state !== "string") {
-    res.redirect(socialAccountsPage("instagram", "failed"));
+    res.redirect(socialAccountsPage("instagram", "failed", returnOrigin));
     return;
   }
 
   try {
-    const payload = jwt.verify(state, env.JWT_ACCESS_SECRET, { issuer: "united-technologies-instagram" }) as JwtPayload;
+    const payload = oauthPayload;
     const workspaceId = payload.workspaceId;
     if (typeof payload.sub !== "string" || typeof workspaceId !== "string" || payload.purpose !== "instagram-connect") {
-      res.redirect(socialAccountsPage("instagram", "failed"));
+      res.redirect(socialAccountsPage("instagram", "failed", returnOrigin));
       return;
     }
     const membership = await prisma.membership.findFirst({
@@ -188,17 +267,17 @@ router.get("/instagram/callback", async (req, res) => {
       select: { workspace: { select: { id: true, resellerId: true } } },
     });
     if (!membership) {
-      res.redirect(socialAccountsPage("instagram", "failed"));
+      res.redirect(socialAccountsPage("instagram", "failed", returnOrigin));
       return;
     }
-    const account = await exchangeInstagramCode(code);
+    const account = await exchangeInstagramCode(code, redirectUri);
     const existing = await prisma.socialAccount.findUnique({
       where: { provider_providerAccountId: { provider: "instagram", providerAccountId: account.providerAccountId } },
       select: { id: true, workspaceId: true },
     });
     if (existing && existing.workspaceId !== membership.workspace.id) {
       console.error("Instagram account is already connected to a different workspace.");
-      res.redirect(socialAccountsPage("instagram", "failed"));
+      res.redirect(socialAccountsPage("instagram", "failed", returnOrigin));
       return;
     }
     await prisma.socialAccount.upsert({
@@ -206,6 +285,7 @@ router.get("/instagram/callback", async (req, res) => {
       create: {
         ...account,
         provider: "instagram",
+        providerUserId: account.providerAccountId,
         workspaceId: membership.workspace.id,
         resellerId: membership.workspace.resellerId,
         displayName: account.displayName,
@@ -214,34 +294,48 @@ router.get("/instagram/callback", async (req, res) => {
         encryptedTokens: account.encryptedTokens,
         tokenExpiresAt: account.tokenExpiresAt,
         displayName: account.displayName,
+        providerUserId: account.providerAccountId,
         status: "CONNECTED",
       },
     });
-    res.redirect(socialAccountsPage("instagram", "connected"));
+    res.redirect(socialAccountsPage("instagram", "connected", returnOrigin));
   } catch (callbackError) {
     console.error("Instagram account connection failed.", callbackError);
-    res.redirect(socialAccountsPage("instagram", "failed"));
+    res.redirect(socialAccountsPage("instagram", "failed", returnOrigin));
   }
 });
 
 router.get("/facebook/callback", async (req, res) => {
+  const state = req.query.state;
+  let returnOrigin = env.WEB_ORIGIN;
+  let redirectUri = env.FACEBOOK_REDIRECT_URI;
+  let oauthPayload: JwtPayload;
+  try {
+    if (typeof state !== "string") throw new Error("Facebook OAuth state is missing.");
+    const context = getCallbackContext(state, "facebook");
+    returnOrigin = context.returnOrigin;
+    redirectUri = context.redirectUri;
+    oauthPayload = context.payload;
+  } catch {
+    res.redirect(socialAccountsPage("facebook", "failed"));
+    return;
+  }
   const error = req.query.error;
   if (typeof error === "string" && error) {
-    res.redirect(socialAccountsPage("facebook", "cancelled"));
+    res.redirect(socialAccountsPage("facebook", "cancelled", returnOrigin));
     return;
   }
   const code = req.query.code;
-  const state = req.query.state;
   if (typeof code !== "string" || typeof state !== "string") {
-    res.redirect(socialAccountsPage("facebook", "failed"));
+    res.redirect(socialAccountsPage("facebook", "failed", returnOrigin));
     return;
   }
 
   try {
-    const payload = jwt.verify(state, env.JWT_ACCESS_SECRET, { issuer: "united-technologies-facebook" }) as JwtPayload;
+    const payload = oauthPayload;
     const workspaceId = payload.workspaceId;
     if (typeof payload.sub !== "string" || typeof workspaceId !== "string" || payload.purpose !== "facebook-connect") {
-      res.redirect(socialAccountsPage("facebook", "failed"));
+      res.redirect(socialAccountsPage("facebook", "failed", returnOrigin));
       return;
     }
     const membership = await prisma.membership.findFirst({
@@ -253,11 +347,11 @@ router.get("/facebook/callback", async (req, res) => {
       select: { workspace: { select: { id: true, resellerId: true } } },
     });
     if (!membership) {
-      res.redirect(socialAccountsPage("facebook", "failed"));
+      res.redirect(socialAccountsPage("facebook", "failed", returnOrigin));
       return;
     }
 
-    const connection = await exchangeFacebookCode(code);
+    const connection = await exchangeFacebookCode(code, redirectUri);
     const pages = connection.pages;
     const existing = await prisma.socialAccount.findMany({
       where: {
@@ -268,7 +362,7 @@ router.get("/facebook/callback", async (req, res) => {
     });
     if (existing.some((account) => account.workspaceId !== membership.workspace.id)) {
       console.error("A Facebook Page is already connected to a different workspace.");
-      res.redirect(socialAccountsPage("facebook", "failed"));
+      res.redirect(socialAccountsPage("facebook", "failed", returnOrigin));
       return;
     }
 
@@ -278,6 +372,7 @@ router.get("/facebook/callback", async (req, res) => {
         create: {
           provider: "facebook",
           providerAccountId: page.id,
+          providerUserId: connection.user.id,
           displayName: page.name,
           encryptedTokens: page.encryptedTokens,
           workspaceId: membership.workspace.id,
@@ -287,6 +382,7 @@ router.get("/facebook/callback", async (req, res) => {
           displayName: page.name,
           encryptedTokens: page.encryptedTokens,
           tokenExpiresAt: null,
+          providerUserId: connection.user.id,
           status: "CONNECTED",
         },
       })),
@@ -300,6 +396,7 @@ router.get("/facebook/callback", async (req, res) => {
         create: {
           provider: "facebook-user",
           providerAccountId: membership.workspace.id,
+          providerUserId: connection.user.id,
           displayName: `Meta API access · ${connection.user.name}`,
           encryptedTokens: connection.user.encryptedTokens,
           tokenExpiresAt: connection.user.tokenExpiresAt,
@@ -310,14 +407,15 @@ router.get("/facebook/callback", async (req, res) => {
           displayName: `Meta API access · ${connection.user.name}`,
           encryptedTokens: connection.user.encryptedTokens,
           tokenExpiresAt: connection.user.tokenExpiresAt,
+          providerUserId: connection.user.id,
           status: "CONNECTED",
         },
       }),
     ]);
-    res.redirect(socialAccountsPage("facebook", "connected"));
+    res.redirect(socialAccountsPage("facebook", "connected", returnOrigin));
   } catch (callbackError) {
     console.error("Facebook Page connection failed.", callbackError instanceof Error ? callbackError.message : "Unknown error.");
-    res.redirect(socialAccountsPage("facebook", "failed"));
+    res.redirect(socialAccountsPage("facebook", "failed", returnOrigin));
   }
 });
 
@@ -338,12 +436,14 @@ router.get("/", async (req, res, next) => {
       mediaPublishingConfigured = false;
       mediaPublishingMessage = error instanceof Error ? error.message : "Instagram media hosting could not be verified.";
     }
+    const requestOrigin = getRequestWebOrigin(req.get("origin"), req.get("referer"));
+    const localRequest = isLocalWebOrigin(requestOrigin);
     res.json({
       accounts,
       instagramConfigured: isInstagramConfigured(),
       facebookConfigured: isFacebookConfigured(),
-      instagramRedirectUri: env.INSTAGRAM_REDIRECT_URI ?? null,
-      facebookRedirectUri: env.FACEBOOK_REDIRECT_URI ?? null,
+      instagramRedirectUri: (localRequest ? env.INSTAGRAM_REDIRECT_URI_LOCAL : env.INSTAGRAM_REDIRECT_URI) ?? null,
+      facebookRedirectUri: (localRequest ? env.FACEBOOK_REDIRECT_URI_LOCAL : env.FACEBOOK_REDIRECT_URI) ?? null,
       mediaPublishingConfigured,
       mediaPublishingMessage,
     });
@@ -358,12 +458,24 @@ router.post("/instagram/connect", requireWritableWorkspace, async (req, res, nex
       res.status(503).json({ error: "Instagram OAuth credentials and token encryption key are not configured." });
       return;
     }
+    let oauthContext: OAuthContext;
+    try {
+      oauthContext = getOAuthContext(getRequestWebOrigin(req.get("origin"), req.get("referer")), "instagram");
+    } catch (error) {
+      res.status(503).json({ error: error instanceof Error ? error.message : "Instagram OAuth callback is not configured." });
+      return;
+    }
     const state = jwt.sign(
-      { workspaceId: req.workspace!.id, purpose: "instagram-connect" },
+      {
+        workspaceId: req.workspace!.id,
+        purpose: "instagram-connect",
+        returnOrigin: oauthContext.returnOrigin,
+        redirectUri: oauthContext.redirectUri,
+      },
       env.JWT_ACCESS_SECRET,
       { subject: req.auth!.userId, issuer: "united-technologies-instagram", expiresIn: "10m" },
     );
-    res.json({ authorizationUrl: makeInstagramAuthorizationUrl(state) });
+    res.json({ authorizationUrl: makeInstagramAuthorizationUrl(state, oauthContext.redirectUri) });
   } catch (error) {
     next(error);
   }
@@ -375,12 +487,24 @@ router.post("/facebook/connect", requireWritableWorkspace, async (req, res, next
       res.status(503).json({ error: "Facebook App ID, App Secret, callback URL, and social token encryption key are not configured." });
       return;
     }
+    let oauthContext: OAuthContext;
+    try {
+      oauthContext = getOAuthContext(getRequestWebOrigin(req.get("origin"), req.get("referer")), "facebook");
+    } catch (error) {
+      res.status(503).json({ error: error instanceof Error ? error.message : "Facebook OAuth callback is not configured." });
+      return;
+    }
     const state = jwt.sign(
-      { workspaceId: req.workspace!.id, purpose: "facebook-connect" },
+      {
+        workspaceId: req.workspace!.id,
+        purpose: "facebook-connect",
+        returnOrigin: oauthContext.returnOrigin,
+        redirectUri: oauthContext.redirectUri,
+      },
       env.JWT_ACCESS_SECRET,
       { subject: req.auth!.userId, issuer: "united-technologies-facebook", expiresIn: "10m" },
     );
-    res.json({ authorizationUrl: makeFacebookAuthorizationUrl(state) });
+    res.json({ authorizationUrl: makeFacebookAuthorizationUrl(state, oauthContext.redirectUri) });
   } catch (error) {
     next(error);
   }

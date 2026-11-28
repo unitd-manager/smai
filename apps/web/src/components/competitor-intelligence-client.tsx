@@ -103,8 +103,12 @@ type CompetitorSnapshot = {
 type CompetitorResponse = {
   brand: { id: string; name: string; industry: string | null; location: string; website: string | null; products: string | null; audience: string | null; tone: string | null; description: string | null };
   competitors: CompetitorProfile[];
+  researchJobs?: Array<{ id: string; status: "QUEUED" | "RUNNING" | "COMPLETED" | "PARTIAL" | "FAILED"; stage: string; progress: number; error: string | null; warnings: string[] | null; createdAt: string; completedAt: string | null }>;
   dataCollection: {
     automaticMonitoring: boolean;
+    weeklyRefreshAvailable?: boolean;
+    publicPostCollectionAvailable?: boolean;
+    apifyConfiguredPlatforms?: string[];
     connectedCompetitorPlatforms: string[];
     websiteSearchAvailable: boolean;
     websiteSearchProvider: string | null;
@@ -292,7 +296,6 @@ function HorizontalBars({ rows, emptyText }: { rows: Array<{ label: string; valu
 export function CompetitorIntelligenceClient() {
   const profileFormRef = useRef<HTMLFormElement>(null);
   const selectedProfileRef = useRef<HTMLDetailsElement>(null);
-  const automaticDiscoveryStarted = useRef(false);
   const logoScansStarted = useRef(new Set<string>());
   const [data, setData] = useState<CompetitorResponse | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -307,7 +310,6 @@ export function CompetitorIntelligenceClient() {
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [retryDiscovery, setRetryDiscovery] = useState(false);
   const [notice, setNotice] = useState("");
   const [tab, setTab] = useState<"overview" | "evidence" | "analysis" | "compare" | "posts">("analysis");
   const [sourceLabel, setSourceLabel] = useState("");
@@ -341,22 +343,50 @@ export function CompetitorIntelligenceClient() {
       const response = await apiRequest<CompetitorResponse>("/api/competitors");
       setData(response);
       setError("");
-      setRetryDiscovery(false);
       setSelectedId((current) => keepSelected && response.competitors.some((competitor) => competitor.id === current)
         ? current
         : "");
     } catch (requestError) {
-      setRetryDiscovery(false);
       setError(requestError instanceof Error ? requestError.message : "Could not load competitor intelligence.");
     } finally {
       setLoading(false);
     }
   }, []);
+  const latestResearchJobId = data?.researchJobs?.[0]?.id;
+  const latestResearchJob = data?.researchJobs?.[0];
+  const latestResearchStatus = latestResearchJob?.status;
+
+  async function refreshResearch() {
+    setBusy("research");
+    setError("");
+    setNotice("");
+    try {
+      await apiRequest("/api/competitors/research", { method: "POST", body: JSON.stringify({}) });
+      await load();
+      setNotice("Competitor research queued. Public activity will appear as collection completes.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not queue competitor research.");
+    } finally {
+      setBusy("");
+    }
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(false), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!latestResearchJobId || !latestResearchStatus || !["QUEUED", "RUNNING"].includes(latestResearchStatus)) return;
+    const timer = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(timer);
+  }, [latestResearchJobId, latestResearchStatus, load]);
+
+  useEffect(() => {
+    if (latestResearchStatus && !["QUEUED", "RUNNING"].includes(latestResearchStatus)) {
+      setNotice((current) => current.startsWith("Competitor research queued.") ? "" : current);
+    }
+  }, [latestResearchJobId, latestResearchStatus]);
 
   useEffect(() => {
     if (loading || !data) return;
@@ -415,16 +445,21 @@ export function CompetitorIntelligenceClient() {
     .sort((left, right) => (right.post.metrics.views ?? 0) - (left.post.metrics.views ?? 0)).slice(0, 3);
   const topInteractedPosts = [...allCompetitorPosts].filter(({ interactions }) => interactions !== null)
     .sort((left, right) => (right.interactions ?? 0) - (left.interactions ?? 0)).slice(0, 3);
-  const tacticGroups = new Map<string, { interactions: number; count: number }>();
+  const tacticGroups = new Map<string, { interactions: number; count: number; viewsTotal: number; viewsCount: number; likesTotal: number; likesCount: number }>();
   for (const { post, interactions } of allCompetitorPosts) {
     const format = post.format.trim() || "Unspecified format";
-    const current = tacticGroups.get(format) ?? { interactions: 0, count: 0 };
+    const current = tacticGroups.get(format) ?? { interactions: 0, count: 0, viewsTotal: 0, viewsCount: 0, likesTotal: 0, likesCount: 0 };
     current.interactions += interactions ?? 0;
     current.count += 1;
+    if (typeof post.metrics.views === "number") { current.viewsTotal += post.metrics.views; current.viewsCount += 1; }
+    if (typeof post.metrics.likes === "number") { current.likesTotal += post.metrics.likes; current.likesCount += 1; }
     tacticGroups.set(format, current);
   }
   const topTactics = [...tacticGroups].map(([format, values]) => ({ format, ...values }))
-    .sort((left, right) => right.interactions - left.interactions || right.count - left.count).slice(0, 5);
+    .sort((left, right) => (right.viewsCount ? right.viewsTotal / right.viewsCount : -1) - (left.viewsCount ? left.viewsTotal / left.viewsCount : -1)
+      || (right.likesCount ? right.likesTotal / right.likesCount : -1) - (left.likesCount ? left.likesTotal / left.likesCount : -1)
+      || right.interactions - left.interactions).slice(0, 5);
+  const tacticMetric = topTactics.some((item) => item.viewsCount > 0) ? "views" : "likes";
   const postsWithInteractions = observedPosts
     .map((post) => ({ post, interactions: postInteractions(post) }))
     .filter((entry): entry is { post: ObservedPost; interactions: number } => entry.interactions !== null)
@@ -447,13 +482,17 @@ export function CompetitorIntelligenceClient() {
     const platformMetrics = snapshot?.observations.platformMetrics.filter((item) => comparisonPlatform === "all" || item.platform === comparisonPlatform) ?? [];
     const posts = snapshot?.observations.posts.filter((post) => comparisonPlatform === "all" || post.platform === comparisonPlatform) ?? [];
     const sum = (key: "likes" | "comments") => posts.reduce((total, post) => total + (post.metrics[key] ?? 0), 0);
-    const followerTotal = platformMetrics.reduce((total, item) => total + (item.metrics.followers ?? 0), 0);
+    // Rank by the largest individual platform audience. Adding audiences across
+    // platforms would double-count people who follow the brand in more than one place.
+    const followerTotal = platformMetrics.reduce((largest, item) => Math.max(largest, item.metrics.followers ?? 0), 0);
     const hasFollowers = platformMetrics.some((item) => item.metrics.followers !== undefined);
     const byPlatform = (key: "followers" | "following" | "totalPosts") => platformMetrics
       .filter((item) => item.metrics[key] !== undefined)
       .map((item) => `${item.platform}: ${metricNumber(item.metrics[key])}`).join(" · ") || "Not captured";
     return { competitor, snapshot, platformMetrics, posts, sum, byPlatform, followerTotal, hasFollowers };
-  });
+  }).sort((left, right) => Number(right.hasFollowers) - Number(left.hasFollowers)
+    || right.followerTotal - left.followerTotal
+    || left.competitor.name.localeCompare(right.competitor.name));
   const followerBars = comparisonRows.filter((row) => row.hasFollowers).map((row, index) => ({
     label: row.competitor.name,
     value: row.followerTotal,
@@ -516,7 +555,6 @@ export function CompetitorIntelligenceClient() {
     event.preventDefault();
     setBusy("profile");
     setError("");
-    setRetryDiscovery(false);
     setNotice("");
     const socialProfiles = Object.fromEntries(Object.entries(form.socialProfiles).filter(([, value]) => value.trim()));
     const payload = {
@@ -579,7 +617,6 @@ export function CompetitorIntelligenceClient() {
     if (!window.confirm(`Remove ${competitor.name} and its saved observations from this workspace?`)) return;
     setBusy("remove");
     setError("");
-    setRetryDiscovery(false);
     setNotice("");
     try {
       await apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}`, { method: "DELETE" });
@@ -599,7 +636,6 @@ export function CompetitorIntelligenceClient() {
     if (!target) return;
     setBusy("snapshot");
     setError("");
-    setRetryDiscovery(false);
     setNotice("");
     const profileMetrics = captureMetrics(metricValues, postUrl.trim() ? profileMetricFields : numberFields);
     const postMetrics = captureMetrics(metricValues, postMetricFields);
@@ -653,7 +689,6 @@ export function CompetitorIntelligenceClient() {
     if (!target) return;
     setBusy("analysis");
     setError("");
-    setRetryDiscovery(false);
     setNotice("");
     try {
       const response = await apiRequest<{
@@ -702,96 +737,6 @@ export function CompetitorIntelligenceClient() {
       setBusy("");
     }
   }
-
-  const discoverAndAnalyze = useCallback(async () => {
-    setBusy("discovery");
-    setError("");
-    setRetryDiscovery(false);
-    setNotice("");
-    try {
-      const response = await apiRequest<{
-        discovered: Array<{ id: string; name: string; websiteUrl: string | null }>;
-        analysisQueue: Array<{ id: string; name: string }>;
-        message: string;
-        searchWarnings: string[];
-      }>("/api/competitors/discover", {
-        method: "POST",
-        body: JSON.stringify({ maxCandidates: 3 }),
-      });
-      if (!response.analysisQueue.length) {
-        await load();
-        setNotice(response.discovered.length ? "Competitor snapshots are up to date." : "No new competitor profiles found. Try a narrower market or location.");
-        return true;
-      }
-
-      const analyzed: string[] = [];
-      const failures: string[] = [];
-      for (const competitor of response.analysisQueue) {
-        try {
-          await apiRequest(`/api/competitors/${encodeURIComponent(competitor.id)}/analyze`, {
-            method: "POST",
-            body: JSON.stringify({}),
-          });
-          analyzed.push(competitor.name);
-        } catch (requestError) {
-          failures.push(`${competitor.name}: ${requestError instanceof Error ? requestError.message : "Analysis failed."}`);
-        }
-      }
-
-      await load(false);
-      setSelectedId(response.analysisQueue[0]!.id);
-      setTab("analysis");
-      setNotice(response.discovered.length
-        ? `${response.discovered.length} competitor snapshot${response.discovered.length === 1 ? "" : "s"} added. Open a card to review profile, channel, and post research.`
-        : `${analyzed.length} competitor snapshot${analyzed.length === 1 ? "" : "s"} refreshed.`);
-      if (failures.length) {
-        setRetryDiscovery(true);
-        setError(`Some analyses could not finish: ${failures.join(" ")}`);
-      }
-      return failures.length === 0;
-    } catch (requestError) {
-      setRetryDiscovery(true);
-      setError(requestError instanceof Error ? requestError.message : "Automatic competitor discovery failed.");
-      return false;
-    } finally {
-      setBusy("");
-    }
-  }, [load]);
-
-  useEffect(() => {
-    if (loading || !data || !data.dataCollection.websiteSearchAvailable || automaticDiscoveryStarted.current) return;
-    const hasBrandContext = Boolean(data.brand.industry || data.brand.products || data.brand.description);
-    if (!hasBrandContext) return;
-
-    const storageKey = `competitor-auto-discovery:${data.brand.id}`;
-    const profileSignature = JSON.stringify([
-      data.brand.industry,
-      data.brand.location,
-      data.brand.products,
-      data.brand.audience,
-      data.brand.description,
-      data.brand.website,
-    ]);
-    try {
-      if (window.localStorage.getItem(storageKey) === profileSignature) return;
-      window.localStorage.setItem(storageKey, profileSignature);
-    } catch {
-      window.setTimeout(() => setError("Automatic discovery could not start because this browser could not save its run marker. Use Auto-discover & analyze to retry."), 0);
-      return;
-    }
-
-    automaticDiscoveryStarted.current = true;
-    window.setTimeout(() => {
-      void discoverAndAnalyze().then((success) => {
-        if (success) return;
-        try {
-          if (window.localStorage.getItem(storageKey) === profileSignature) window.localStorage.removeItem(storageKey);
-        } catch {
-          setError("Automatic discovery failed, and this browser could not reset its retry marker. Use Auto-discover & analyze to retry.");
-        }
-      });
-    }, 0);
-  }, [data, discoverAndAnalyze, loading]);
 
   const searchQueries = data ? [
     {
@@ -2196,6 +2141,23 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-c
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics article > strong { color: var(--accent-500); font-size: 11px; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-channel-analytics article b { color: var(--foreground); font-weight: 650; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-analytics-empty { margin: 0 0 14px; border-radius: 10px; padding: 10px 12px; background: color-mix(in srgb, var(--accent-500) 5%, var(--studio-panel)); color: var(--navy-600); font-size: 10px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-performance { display: grid; gap: 9px; margin: 0 0 14px; border: 1px solid var(--studio-line, var(--ivory-300)); border-radius: 11px; padding: 12px; background: color-mix(in srgb, var(--accent-500) 4%, var(--studio-panel-raised, var(--ivory-50))); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-performance > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-performance > header strong { color: var(--foreground); font-size: 11px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-performance > header span,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-performance > small { color: var(--navy-600); font-size: 10px; line-height: 1.5; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights article { display: grid; gap: 4px; min-width: 0; border-radius: 8px; padding: 10px; background: var(--studio-panel, var(--ivory-50)); }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights article > span,
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights article > small { color: var(--navy-600); font-size: 9px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights article > strong { overflow: hidden; color: var(--foreground); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights article > b { color: var(--accent-500); font-size: 11px; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-table { display: grid; overflow-x: auto; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-row { display: grid; grid-template-columns: minmax(100px, 1.4fr) repeat(3, minmax(64px, .75fr)); align-items: center; gap: 8px; min-width: 360px; border-top: 1px solid var(--studio-line, var(--ivory-300)); padding: 8px 2px; color: var(--studio-text, var(--foreground)); font-size: 10px; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-row > :not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-row > strong { color: var(--foreground); font-weight: 650; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-row.is-heading { border-top: 0; color: var(--navy-600); font-size: 9px; font-weight: 700; }
+html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-row.is-heading > span:first-child { text-transform: uppercase; letter-spacing: .04em; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-keyword-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-keyword-query { display: inline-flex; align-items: center; gap: 6px; }
 html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-search-error { margin: 0; color: var(--danger, #df6b75); font-size: 11px; }
@@ -2211,6 +2173,8 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-comparison-card > .ci-card-head { align-items: stretch; flex-direction: column; }
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-platform-filter { flex-basis: auto; }
   html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-section .ci-company-facts { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-performance > header { align-items: flex-start; flex-direction: column; gap: 3px; }
+  html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-profile-format-highlights { grid-template-columns: minmax(0, 1fr); }
 }
 
 `}</style>
@@ -2218,18 +2182,36 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
       <div className="ci-head">
         <div><h1>Competitor intelligence</h1><p>Profile the market, find standout posts, and export the strategy.</p></div>
         <div className="ci-head-actions">
-          {data?.dataCollection.websiteSearchAvailable && <button className="button button-outline" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Finding and analyzing…" : "Find top 3 & analyze"}</button>}
+          {data?.competitors?.length ? <button className="button button-outline" type="button" onClick={() => void refreshResearch()} disabled={busy === "research" || Boolean(latestResearchJob && ["QUEUED", "RUNNING"].includes(latestResearchJob.status))}>{busy === "research" ? "Queueing…" : "Refresh research"}</button> : null}
           <button className="button button-gold" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add competitor</button>
         </div>
       </div>
 
+      {latestResearchJob && (() => {
+        const job = latestResearchJob;
+        const active = job.status === "QUEUED" || job.status === "RUNNING";
+        const hasNotes = Boolean(job.warnings?.length);
+        const label = active ? job.stage : job.status === "PARTIAL" ? "Research needs attention" : job.status === "FAILED" ? "Research failed" : hasNotes ? "Research completed with limitations" : "Research completed";
+        const detail = active ? "Competitor research runs in the background. You can leave this page." : job.error || (hasNotes ? `${job.warnings?.length ?? 0} source notes. Available public posts and profile analysis were saved; unavailable platform data is listed below.` : "Results and collection times are shown in each competitor profile.");
+        const setupHint = !active && (job.status === "PARTIAL" || hasNotes) && !data.dataCollection.weeklyRefreshAvailable
+          ? " Add TAVILY_API_KEY to enable public web discovery and weekly refreshes."
+          : !active && (job.status === "PARTIAL" || hasNotes) && !data.dataCollection.publicPostCollectionAvailable
+            ? " Configure APIFY_API_TOKEN or a supported official platform API to collect recent posts."
+            : "";
+        return <section className={`ci-research-status ${active ? "is-active" : job.status === "FAILED" || job.status === "PARTIAL" ? "is-error" : ""}`} role="status" aria-live="polite">
+          <div><strong>{label}</strong><span>{detail}{setupHint}</span></div>
+          {active && <><progress value={job.progress} max={100} aria-label={`${job.progress}% complete`} /><small>{job.progress}%</small></>}
+          {job.warnings?.length ? <details><summary>Research notes · {job.warnings.length}</summary><ul>{job.warnings.slice(0, 8).map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}</ul></details> : null}
+        </section>;
+      })()}
+
       {data && <div className="ci-access-strip" aria-label="Post research access">
-        <span className={data.dataCollection.instagramCompetitorInsightsAvailable ? "is-ready" : ""}>Instagram {data.dataCollection.instagramCompetitorInsightsAvailable ? "API ready" : "Meta access needed"}</span>
-        <span className={data.dataCollection.youtubeApiAvailable ? "is-ready" : ""}>YouTube {data.dataCollection.youtubeApiAvailable ? "API ready" : "API key needed"}</span>
-        <span className={data.dataCollection.xApiAvailable ? "is-ready" : ""}>X {data.dataCollection.xApiAvailable ? "API ready" : "API token needed"}</span>
+        <span className={data.dataCollection.instagramCompetitorInsightsAvailable || data.dataCollection.apifyConfiguredPlatforms?.includes("Instagram") ? "is-ready" : ""}>Instagram {data.dataCollection.instagramCompetitorInsightsAvailable ? "Meta API ready" : data.dataCollection.apifyConfiguredPlatforms?.includes("Instagram") ? "Public collection ready" : "Meta access needed"}</span>
+        <span className={data.dataCollection.youtubeApiAvailable || data.dataCollection.apifyConfiguredPlatforms?.includes("YouTube") ? "is-ready" : ""}>YouTube {data.dataCollection.youtubeApiAvailable ? "API ready" : data.dataCollection.apifyConfiguredPlatforms?.includes("YouTube") ? "Public collection ready" : "API key needed"}</span>
+        <span className={data.dataCollection.xApiAvailable || data.dataCollection.apifyConfiguredPlatforms?.includes("X") ? "is-ready" : ""}>X {data.dataCollection.xApiAvailable ? "API ready" : data.dataCollection.apifyConfiguredPlatforms?.includes("X") ? "Public collection ready" : "API token needed"}</span>
         <Link href="/dashboard/system-status">Setup details <ArrowRight size={13} aria-hidden="true" /></Link>
       </div>}
-      {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void (retryDiscovery ? discoverAndAnalyze() : load())}>{retryDiscovery ? "Retry discovery" : "Try again"}</button></div>}
+      {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void load()}>Try again</button></div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       {loading && <p className="loading-label">Loading competitor research…</p>}
 
@@ -2248,7 +2230,7 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
           </header>
           {comparisonRows.length ? <div className="ci-comparison-table-wrap">
             <table className="ci-comparison-table">
-              <thead><tr><th scope="col">Business</th><th scope="col">Followers</th><th scope="col">Posts observed</th><th scope="col">Recorded interactions</th><th scope="col">Snapshot</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th scope="col">Business</th><th scope="col">Followers</th><th scope="col">Posts collected</th><th scope="col">Recorded interactions</th><th scope="col">Snapshot</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>{comparisonRows.map((row) => {
                 const interactionsByPlatform = new Map<string, { count: number; total: number }>();
                 for (const post of row.posts) {
@@ -2274,7 +2256,7 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
               })}</tbody>
             </table>
           </div> : <p className="ci-insight-empty">Add verified business profiles to compare recorded channel metrics.</p>}
-          <p className="ci-note">Interactions sum recorded likes, comments, and shares for the selected snapshot. Values across platforms are shown separately.</p>
+          <p className="ci-note">Profiles with captured follower counts are ranked from largest to smallest; accounts without a count appear last. Post counts show the collected sample; detailed post reviews cover up to 12 of the strongest captured posts. Format averages use every collected post where that metric is available. Interactions sum recorded likes, comments, and shares. “Snapshot” is when the profile data was collected.</p>
         </section>
 
         <div className="ci-research-grid">
@@ -2305,15 +2287,20 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
 
           <section className="ci-card ci-format-card" aria-labelledby="ci-format-title">
             <header className="ci-card-head"><div><p className="ci-kicker">Observed content</p><h2 id="ci-format-title">Formats in saved posts</h2></div><Activity size={18} aria-hidden="true" /></header>
-            <p className="ci-insight-caption">Recorded post counts and interactions from the leading profiles.</p>
+            <p className="ci-insight-caption">Average public views and likes across the observed posts.</p>
             {topTactics.length ? <div className="ci-tactic-chart">{topTactics.map((item, index) => {
-              const maximum = Math.max(1, ...topTactics.map((tactic) => tactic.interactions));
+              const metricCount = tacticMetric === "views" ? item.viewsCount : item.likesCount;
+              const score = tacticMetric === "views" ? (metricCount ? item.viewsTotal / metricCount : 0) : (metricCount ? item.likesTotal / metricCount : 0);
+              const maximum = Math.max(1, ...topTactics.map((tactic) => {
+                const count = tacticMetric === "views" ? tactic.viewsCount : tactic.likesCount;
+                return count ? (tacticMetric === "views" ? tactic.viewsTotal : tactic.likesTotal) / count : 0;
+              }));
               return <div key={item.format}>
-                <div><strong>{item.format}</strong><span>{item.count} {item.count === 1 ? "post" : "posts"} · {item.interactions.toLocaleString()} interactions</span></div>
-                <span className="ci-tactic-track"><i style={{ width: `${item.interactions ? Math.max(4, item.interactions / maximum * 100) : 0}%`, background: `linear-gradient(90deg, ${accentFor(index)}, ${accentFor(index)}aa)` }} /></span>
+                <div><strong>{item.format}</strong><span>{item.count} {item.count === 1 ? "post" : "posts"} · avg {item.viewsCount ? `${Math.round(item.viewsTotal / item.viewsCount).toLocaleString()} views` : "— views"} · avg {item.likesCount ? `${Math.round(item.likesTotal / item.likesCount).toLocaleString()} likes` : "— likes"}</span></div>
+                <span className="ci-tactic-track" aria-label={`Average ${tacticMetric}: ${Math.round(score).toLocaleString()}`}><i style={{ width: `${score ? Math.max(4, score / maximum * 100) : 0}%`, background: `linear-gradient(90deg, ${accentFor(index)}, ${accentFor(index)}aa)` }} /></span>
               </div>;
             })}</div> : <p className="ci-insight-empty">No observed post formats are available yet.</p>}
-            <p className="ci-note">Interactions indicate recorded activity only; they do not establish what caused a post’s performance.</p>
+            <p className="ci-note">Bars compare average {tacticMetric}; the other metric is shown separately. Averages use only posts where each metric was captured. These are observed associations, not proof that format caused performance.</p>
           </section>
         </div>
       </section>}
@@ -2321,16 +2308,27 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
       {data && <section className="ci-profile-section" aria-label="Selected competitor profile">
         {rankedCompetitors.length ? <div className="ci-snapshot-list">{rankedCompetitors.filter(({ competitor }) => competitor.id === selectedId).map(({ competitor }) => {
           const snapshot = competitor.snapshots[0] ?? null;
-          const allPosts = [...new Map(competitor.snapshots.flatMap((item) => item.observations.posts).map((post) => [post.url, post])).values()];
+          const allPosts = [...new Map([...competitor.snapshots].reverse().flatMap((item) => item.observations.posts).map((post) => [post.url, post])).values()];
           const measuredPostsList = allPosts.filter((post) => postInteractions(post) !== null || typeof post.metrics.views === "number");
-          const posts = [...(measuredPostsList.length ? measuredPostsList : allPosts)].sort((left, right) => {
-            const leftViews = left.metrics.views;
-            const rightViews = right.metrics.views;
-            if (typeof leftViews === "number" && typeof rightViews === "number") return rightViews - leftViews;
-            if (typeof leftViews === "number") return -1;
-            if (typeof rightViews === "number") return 1;
-            return (postInteractions(right) ?? -1) - (postInteractions(left) ?? -1);
-          }).slice(0, 3);
+          const posts = [...(measuredPostsList.length ? measuredPostsList : allPosts)]
+            .sort((left, right) => (right.metrics.views ?? -1) - (left.metrics.views ?? -1)
+              || (right.metrics.likes ?? -1) - (left.metrics.likes ?? -1)
+              || (postInteractions(right) ?? -1) - (postInteractions(left) ?? -1))
+            .slice(0, 12);
+          const formatPerformanceMap = new Map<string, { posts: number; views: number; viewsCount: number; likes: number; likesCount: number }>();
+          for (const post of allPosts) {
+            const format = post.format.trim() || "Unspecified format";
+            const current = formatPerformanceMap.get(format) ?? { posts: 0, views: 0, viewsCount: 0, likes: 0, likesCount: 0 };
+            current.posts += 1;
+            if (typeof post.metrics.views === "number") { current.views += post.metrics.views; current.viewsCount += 1; }
+            if (typeof post.metrics.likes === "number") { current.likes += post.metrics.likes; current.likesCount += 1; }
+            formatPerformanceMap.set(format, current);
+          }
+          const formatPerformance = [...formatPerformanceMap].map(([format, values]) => ({ format, ...values }))
+            .sort((left, right) => (right.viewsCount ? right.views / right.viewsCount : -1) - (left.viewsCount ? left.views / left.viewsCount : -1)
+              || (right.likesCount ? right.likes / right.likesCount : -1) - (left.likesCount ? left.likes / left.likesCount : -1));
+          const mostViewedFormat = [...formatPerformance].filter((item) => item.viewsCount).sort((left, right) => right.views / right.viewsCount - left.views / left.viewsCount)[0];
+          const mostLikedFormat = [...formatPerformance].filter((item) => item.likesCount).sort((left, right) => right.likes / right.likesCount - left.likes / left.likesCount)[0];
           const reverseEngineering = snapshot?.analysisJson?.content.reverseEngineering ?? [];
           const patterns = snapshot?.analysisJson?.content.patterns
             .filter((pattern) => !/^(not available|no patterns? (?:were )?available|insufficient (?:data|evidence)|not enough evidence)/i.test(pattern.trim()))
@@ -2343,9 +2341,10 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
           const websiteReport = snapshot?.observations.websiteResearch?.competitorWebsite;
           const websiteDescription = websiteReport?.description && websiteReport.description !== competitor.overview ? websiteReport.description : null;
           const postAccessLimits = socialLinks.flatMap(([platform]) => {
-            if (platform === "Instagram" && !data.dataCollection.instagramCompetitorInsightsAvailable) return ["Instagram post metrics need an eligible professional account, Facebook Login, and Meta Business Discovery permissions."];
-            if (platform === "YouTube" && !data.dataCollection.youtubeApiAvailable) return ["YouTube post metrics need the YouTube Data API key in the API environment."];
-            if ((platform === "X" || platform === "Twitter") && !data.dataCollection.xApiAvailable) return ["X post metrics need the X API bearer token in the API environment."];
+            if (data.dataCollection.apifyConfiguredPlatforms?.includes(platform)) return [];
+            if (platform === "Instagram" && !data.dataCollection.instagramCompetitorInsightsAvailable) return ["Instagram post metrics need an eligible professional account, Facebook Login, and Meta Business Discovery permissions, or configured public Apify collection."];
+            if (platform === "YouTube" && !data.dataCollection.youtubeApiAvailable) return ["YouTube post metrics need the YouTube Data API key or configured public Apify collection."];
+            if ((platform === "X" || platform === "Twitter") && !data.dataCollection.xApiAvailable) return ["X post metrics need the X API bearer token or configured public Apify collection."];
             if (["Facebook", "LinkedIn", "TikTok", "Pinterest"].includes(platform)) return [`${platform} profiles are linked; post analytics are not connected for this platform.`];
             return [];
           });
@@ -2394,12 +2393,22 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
                   <span><b>{metricNumber(item.metrics.totalPosts)}</b> profile posts</span>
                 </article>)}</div>
               </section> : <p className="ci-profile-analytics-empty">No channel-level metrics have been saved for this profile yet. Add dated public post evidence below to track available figures.</p>}
-              {posts.length ? <><div className="ci-post-ranking-note">Top posts ranked by recorded views and interactions.</div><div className="ci-leader-posts">{posts.map((post, postIndex) => {
+              {formatPerformance.length > 0 && <section className="ci-profile-format-performance" aria-label="Post performance by format">
+                <header><strong>Performance by post format</strong><span>Observed public post metrics</span></header>
+                <div className="ci-profile-format-highlights">
+                  <article><span>Most viewed format</span><strong>{mostViewedFormat?.format ?? "Not captured"}</strong><b>{mostViewedFormat ? `${Math.round(mostViewedFormat.views / mostViewedFormat.viewsCount).toLocaleString()} avg views` : "No public view counts"}</b>{mostViewedFormat && <small>{mostViewedFormat.viewsCount} post{mostViewedFormat.viewsCount === 1 ? "" : "s"} with views</small>}</article>
+                  <article><span>Most liked format</span><strong>{mostLikedFormat?.format ?? "Not captured"}</strong><b>{mostLikedFormat ? `${Math.round(mostLikedFormat.likes / mostLikedFormat.likesCount).toLocaleString()} avg likes` : "No public like counts"}</b>{mostLikedFormat && <small>{mostLikedFormat.likesCount} post{mostLikedFormat.likesCount === 1 ? "" : "s"} with likes</small>}</article>
+                </div>
+                <div className="ci-profile-format-table"><div className="ci-profile-format-row is-heading"><span>Format</span><span>Posts</span><span>Avg views</span><span>Avg likes</span></div>
+                  {formatPerformance.map((item) => <div className="ci-profile-format-row" key={item.format}><strong>{item.format}</strong><span>{item.posts}</span><span>{item.viewsCount ? `${Math.round(item.views / item.viewsCount).toLocaleString()} (${item.viewsCount})` : "—"}</span><span>{item.likesCount ? `${Math.round(item.likes / item.likesCount).toLocaleString()} (${item.likesCount})` : "—"}</span></div>)}
+                </div><small>Parentheses show the number of posts with that metric. Averages describe this observed sample, not guaranteed results.</small>
+              </section>}
+              {posts.length ? <><div className="ci-post-ranking-note">Posts are ranked by recorded views, then likes and other interactions. Missing public metrics are left blank.</div><div className="ci-leader-posts">{posts.map((post, postIndex) => {
                 const interactions = postInteractions(post);
                 const postRef = `${post.url} ${post.topic} ${post.hook}`.toLowerCase();
                 const reverse = reverseEngineering.find((item) => item.postReference && (postRef.includes(item.postReference.toLowerCase()) || item.postReference.toLowerCase().includes(post.url.toLowerCase()) || (post.topic.length > 12 && item.postReference.toLowerCase().includes(post.topic.slice(0, 40).toLowerCase()))));
                 return <article className="ci-leader-post" key={`${post.url}-${postIndex}`}>
-                  <div className="ci-post-topline"><span className="ci-post-rank">{typeof post.metrics.views === "number" ? `TOP VIEWS #${postIndex + 1}` : `POST #${postIndex + 1}`}</span><span>{post.platform} · {post.format || "Format not recorded"}</span></div>
+                  <div className="ci-post-topline"><span className="ci-post-rank">{post.metrics.views !== undefined ? "VIEWS CAPTURED" : post.metrics.likes !== undefined ? "LIKES CAPTURED" : interactions !== null ? "INTERACTIONS CAPTURED" : "POST EVIDENCE"}</span><span>{post.platform} · {post.format || "Format not recorded"}</span></div>
                   <h4>{post.topic || "Post topic not recorded"}</h4>
                   {post.hook && <p className="ci-post-hook">“{post.hook}”</p>}
                   <div className="ci-post-metrics">{post.metrics.views !== undefined && <span><strong>{post.metrics.views.toLocaleString()}</strong> views</span>}{post.metrics.likes !== undefined && <span><strong>{post.metrics.likes.toLocaleString()}</strong> likes</span>}{post.metrics.comments !== undefined && <span><strong>{post.metrics.comments.toLocaleString()}</strong> comments</span>}{post.metrics.shares !== undefined && <span><strong>{post.metrics.shares.toLocaleString()}</strong> shares</span>}{interactions === null && post.metrics.views === undefined && <span>Performance counts unavailable</span>}</div>
@@ -2430,11 +2439,11 @@ html[data-theme-preset] body .app-shell .dashboard-content.ci-page .ci-tactic-tr
             </div>
           </details>;
         })}</div> : null}
-        {!rankedCompetitors.length && <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Set your industry and location in Brand Profile, then discover individual businesses with a homepage logo.</p><div className="ci-empty-actions">{data.dataCollection.websiteSearchAvailable && <button className="button button-gold" type="button" onClick={() => void discoverAndAnalyze()} disabled={busy === "discovery"}>{busy === "discovery" ? "Searching…" : "Discover competitors"}</button>}<button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
+        {!rankedCompetitors.length && <div className="ci-empty ci-card"><h3>No verified business profiles yet</h3><p>Save your industry, products, and location in Brand Kit. Competitor discovery then runs automatically in the background.</p><div className="ci-empty-actions"><Link className="button button-outline" href="/onboarding">Open Brand Kit</Link><button className="button button-outline" type="button" onClick={() => startNewProfile()}><Plus size={15} aria-hidden="true" /> Add a profile</button></div></div>}
       </section>}
       {showProfileForm && renderProfileForm()}
       {notice && <p className="form-success" role="status">{notice}</p>}
-      {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void (retryDiscovery ? discoverAndAnalyze() : load())}>{retryDiscovery ? "Retry" : "Try again"}</button></div>}
+      {error && <div className="notice notice-error ci-error-alert" role="alert"><div className="ci-error-summary"><p>{error.length > 260 ? `${error.slice(0, 260).trimEnd()}…` : error}</p>{error.length > 260 && <details><summary>Show full error details</summary><pre>{error}</pre></details>}</div><button className="button button-outline" type="button" onClick={() => void load()}>Try again</button></div>}
       {loading && <p className="loading-label">Loading competitor intelligence…</p>}    </section>
   );
 }

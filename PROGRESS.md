@@ -134,16 +134,16 @@ The requested logged-in tool is being built in batches. This tracker distinguish
 - [x] Keep the public How it works page and use theme-aware dark-mode surfaces and text for its navigation, headings, cards, and callouts.
 - Gallery is a workspace collection, not a mirror of the browser's download folder. Browser downloads continue to use the browser's normal download location.
 
-## Gemini-only generation and avatar upgrade
+## Cloudflare Workers AI generation and avatar upgrade
 
 This section supersedes earlier provider/fallback notes below.
 
 1. **Audit and remove fake generated copy — complete for the runtime path.** Removed the social-content demo generator and the Idea to MP4 demo-plan generator. The seed no longer creates a fictitious sample company profile. Existing workspace records are preserved; visual composition templates remain because they provide layout metadata, not generated copy.
-2. **Gemini-first text generation with optional Groq and OpenAI fallbacks.** Create, Campaigns, platform-caption regeneration, and Video Studio try Google's native `@google/genai` SDK, then configured Groq, then configured OpenAI. Providers validate output and failed requests never save fallback drafts. OpenAI usage may be billable. Fallback does not bypass workspace trial/subscription or generation limits, and this chain does not provide image-generation or publishing fallback. Marketing Brain recommendations and the seasonal calendar remain deterministic planning metadata, not generated captions or scripts. AI-generated replies and image generation are separate integrations.
+2. **Cloudflare Workers AI-first text generation with optional Groq and OpenAI fallbacks.** Create, Campaigns, platform-caption regeneration, competitor analysis, layout planning, and Video Studio use the account-scoped Workers AI API, then configured Groq and OpenAI fallbacks. Providers validate output and failed requests never save fallback drafts. OpenAI usage may be billable. Fallback does not bypass workspace trial/subscription or generation limits, and this chain does not provide publishing fallback. Marketing Brain recommendations and the seasonal calendar remain deterministic planning metadata, not generated captions or scripts. AI-generated replies are separate integrations.
 3. **Text auto-fit — partial.** Shared SVG text now wraps long tokens and scales to fit its layer dimensions; a long-headline regression test was added. Video scene headlines are validated at six words maximum. Browser-wide overflow testing across every format and aspect ratio remains open.
-4. **3D avatar — procedural renderer implemented and MP4-smoke-tested.** Added original, distinct cartoon people with skin tones, hairstyles, outfits, faces, blinking, body movement, gestures, and syllable-timed mouth movement during measured dialogue intervals. Gemini casts two or three characters for each new Idea to MP4 plan; an illustrated compatibility option remains. Text-only renders now time dialogue for visible subtitles and speaking animation. These are stylized procedural characters, not photorealistic footage or phoneme-accurate lip sync.
+4. **3D avatar — procedural renderer implemented and MP4-smoke-tested.** Added original, distinct cartoon people with skin tones, hairstyles, outfits, faces, blinking, body movement, gestures, and syllable-timed mouth movement during measured dialogue intervals. Cloudflare Workers AI casts two or three characters for each new Idea to MP4 plan; an illustrated compatibility option remains. Text-only renders now time dialogue for visible subtitles and speaking animation. These are stylized procedural characters, not photorealistic footage or phoneme-accurate lip sync.
 5. **Voice, subtitles, and MP4 — existing local workflow retained.** Piper, measured dialogue clips, burned-in captions, background rendering, progress, preview/download, music mixing, silence checks, and duration checks exist. Paid TTS providers, cost estimates, per-character tone previews, and a full audio acceptance suite remain incomplete.
-6. **Avatar dialogue — implemented for Idea to MP4.** Gemini plans a two- or three-character cast with alternating dialogue; the render API routes each speaker to a separately selectable Piper voice. Users can choose 3D or illustrated animation. Avatar Studio, saved character selection, and phoneme-accurate lip sync are not implemented.
+6. **Avatar dialogue — implemented for Idea to MP4.** Cloudflare Workers AI plans a two- or three-character cast with alternating dialogue; the render API routes each speaker to a separately selectable Piper voice. Users can choose 3D or illustrated animation. Avatar Studio, saved character selection, and phoneme-accurate lip sync are not implemented.
 - Existing videos from the classic scene workflow do not acquire the new characters when retried; Video Studio now labels these older renders and links to the Idea to MP4 flow for creating a new cast video.
 
 ## Professional video batches
@@ -161,7 +161,7 @@ This section supersedes earlier provider/fallback notes below.
 ### Batch 2 — Natural conversation and voice tone (partial)
 
 - [x] Add screenplay direction fields and local Piper pacing controls.
-- [ ] Add Google Gemini, OpenAI, and ElevenLabs speech providers, per-character tone/voice previews, cost estimates, loudness normalization, and richer sound mixing.
+- [ ] Add OpenAI and ElevenLabs speech providers, per-character tone/voice previews, cost estimates, loudness normalization, and richer sound mixing.
 - [ ] Validate natural English, Indian English, and Hinglish dialogue against representative scripts.
 
 ### Batch 3 — Avatar Studio (not started)
@@ -214,7 +214,7 @@ This section supersedes earlier provider/fallback notes below.
 - [x] Authenticated workspace selection and shared shell for the dashboard and brand profile.
 
 ### Batch 2 — Create
-- [x] Gemini-only content-provider interface with strict response validation; other text-provider implementations were removed after confirming there are no callers.
+- [x] Cloudflare Workers AI content-provider interface with strict response validation and Groq/OpenAI fallback providers.
 - [x] Generate post, carousel, story, poster, brochure, flyer, thumbnail, video script, and additional template formats in multiple languages.
 - [x] Create three distinct style directions for flexible designs; selected-template generation creates one matching design. Refine/regenerate and inspect platform previews.
 - [x] SVG, PNG, JPG, and browser print-to-PDF export; generated content counts against the plan limit.
@@ -245,7 +245,7 @@ This section supersedes earlier provider/fallback notes below.
 
 ### Batch 5 — Videos
 - [x] Add an Idea to MP4 workflow with a short business brief, duration, language, format, selectable conversation treatment, provider indicator, editable plan review, profile branding, and explicit render action; never auto-post.
-- [x] Generate strict industry-aware scene plans in an outline and five-scene chunks, validate/retry JSON and timing, retry provider rate limits, and use a Gemini → Groq → optional OpenAI text-provider chain.
+- [x] Generate strict industry-aware scene plans in an outline and five-scene chunks, validate/retry JSON and timing, retry provider rate limits, and use a Cloudflare Workers AI → Groq → optional OpenAI text-provider chain.
 - [x] Generate a two-character conversation with an editable original cast, alternating lines, separate Piper voice choices, and per-line subtitle/talking states.
 - [x] Draw conversational scenes as original local sphere-character vector rigs with mouth movement, gestures, listener reactions, props, varied settings, and exact-length background MP4 rendering.
 - [ ] Full cinematic 3D animation and phoneme-accurate lip sync are not supported by this free local Remotion/SVG renderer; Blender is not installed.
@@ -307,11 +307,11 @@ This section supersedes earlier provider/fallback notes below.
 - Follow-up from the local Video Studio screenshot: successful Instagram deletion-sync polls now clear a prior transient API error even when no posts were deleted, and a failed poll retries after 15 seconds (in addition to the five-minute poll). Duration controls and saved script values now clamp to the valid 15-second-to-5-minute range, preventing a zero-second target. API readiness currently returns HTTP 200; authenticated browser validation remains unavailable in this session.
 - Added a dedicated **Import files** item to the left navigation. It opens the existing upload and imported-assets workflow, prefiltered to imported files, with a link back to the full Media Library. The import action and supported file handling are reused; no duplicate upload flow or storage behavior was introduced.
 - Gallery and Media Library now maintain separate per-asset locations. Moving an asset between them does not duplicate or delete its workspace record.
-- Create, Campaigns, platform regeneration, and Idea to MP4 now try Gemini first through the native Google SDK and use Groq when its key is configured and Gemini fails. Both keys stay server-side; missing providers and exhausted retries fail visibly without demo drafts.
+- Create, Campaigns, platform regeneration, and Idea to MP4 use Cloudflare Workers AI first through its account-scoped API and use configured Groq/OpenAI providers when it fails. Credentials stay server-side; missing providers and exhausted retries fail visibly without demo drafts.
 
 ## Known limitations
 
-- Gemini is the default text-generation provider with an optional Groq fallback. Historical records created by earlier demo/provider paths are preserved and are not represented as newly generated content.
+- Cloudflare Workers AI is the default text-generation provider with optional Groq and OpenAI fallbacks. Historical records created by earlier demo/provider paths are preserved and are not represented as newly generated content.
 - Preview layouts and image exports are rendered by the built-in SVG engine. PDF export uses the browser print dialog; carousel sets support multi-page PDF, while server-generated print files and full editor-level export parity remain incomplete.
 - Social platform approvals, OAuth credentials, payment keys, and media services were not supplied. Those features are not presented as live integrations.
 - Replace the documented `example.com` support/domain placeholders before launch.
@@ -354,9 +354,9 @@ This section supersedes earlier provider/fallback notes below.
 
 ### Batch 5 — Campaign generation (basic workflow implemented)
 
-- [x] Add a Campaign Builder that uses Gemini for a multi-format, multi-platform draft set and saves it to Content Plans.
+- [x] Add a Campaign Builder that uses the configured AI provider for a multi-format, multi-platform draft set and saves it to Content Plans.
 - [x] Keep generation and plan creation separate from scheduling or publishing; generation never schedules or publishes automatically.
-- [x] Retry temporary Gemini HTTP 429/503 responses once; return a clear error with no fallback drafts if Gemini remains unavailable.
+- [x] Retry temporary provider HTTP 429/503 responses; return a clear error with no fallback drafts if all configured providers remain unavailable.
 - [ ] Campaign records/phases/assets, per-format regeneration, tracked links, campaign editing, ZIP export, approval/scheduling end-to-end, and strategic calendar automation remain incomplete. Auto-scheduling is not enabled.
 
 ### Batch 6 — Social feed previews (illustrative preview only)
@@ -366,7 +366,7 @@ This section supersedes earlier provider/fallback notes below.
 
 ### Verification for Marketing workflow batches
 
-- Earlier baseline: 83 API tests passed before the Gemini-only refactor. The current Gemini-only validation result is recorded in the section at the top of this file.
+- Earlier baseline: 83 API tests passed before the primary-provider refactor. The current provider validation result is recorded in the section at the top of this file.
 - API/web lint, strict typechecks, and production builds passed; `git diff --check` is clean.
 - Prisma Client was regenerated; the two additive Content Sets/brand-voice migrations were applied with `migrate deploy` without resetting the local database. Prisma reports the schema up to date.
 - Local API `/health/ready` and web `/` returned HTTP 200. The browser workspace is signed out and protected API requests return the expected 401, so populated-page visual review and authenticated create/plan/content-set flows remain unverified.
@@ -402,7 +402,7 @@ This section supersedes earlier provider/fallback notes below.
 
 ### Batch 10 — Cross-page polish and video outline recovery (implemented; visual review pending)
 
-- [x] Normalize Gemini/Groq character cast variants into the strict video outline schema, preserving supplied appearance/personality while deriving missing values from model-specific appearance fields; add a focused regression test.
+- [x] Normalize AI-provider character cast variants into the strict video outline schema, preserving supplied appearance/personality while deriving missing values from model-specific appearance fields; add a focused regression test.
 - [x] Remove the redundant dashboard approval-card “View all” action and redundant video plan retry action; the primary submit action remains available after an error.
 - [x] Clarify the notification bell purpose accessibly and standardize notification badges, account-menu hover surfaces, sidebar active color, primary/secondary controls, and select arrows with theme tokens.
 - [x] Align Templates, Video Studio, Analytics, Marketing Brain, onboarding country fields, and dedicated page title cues with the shared dashboard surface and typography system.
@@ -436,11 +436,11 @@ This section supersedes earlier provider/fallback notes below.
 ### Batch 13 - Prompt-driven AI artwork (implemented; live provider generation pending)
 
 - [x] Add a dedicated Create with AI artwork builder to Templates with format selection, a detailed visual prompt, and an optional compressed image reference; route the dashboard Create with AI action to this builder.
-- [x] Add a tenant-scoped image generation endpoint using the configured Gemini image model, brand colors/profile context, image aspect-ratio choices, request validation, reference-image validation, rate limiting, and the workspace monthly AI generation quota.
+- [x] Add a tenant-scoped image generation endpoint using Cloudflare Workers AI text-to-image and image-to-image models, brand colors/profile context, request validation, reference-image validation, rate limiting, and the workspace monthly AI generation quota.
 - [x] Save generated artwork in the existing Design/Generated Content version history and Gallery; keep generated headline, supporting copy, CTA, and brochure panel copy as separate text layers.
 - [x] Add image-backed portrait flyer/social artwork and a two-sided landscape brochure with tri-fold panel proportions; add saved text-layer editing in Designs.
-- [x] Add `DESIGN_IMAGE_MODEL` configuration (defaults to `gemini-3.1-flash-image`); a Google AI Studio key is present in the local API configuration. The user's live attempt reached Google and returned HTTP 429, confirming the configured project currently lacks available image-generation quota.
-- [x] Distinguish local request throttling from provider 429 quota/rate errors in the API; show Gemini pricing and rate-limit documentation links for provider quota errors.
+- [x] Configure Cloudflare Workers AI text, image, and reference-image model IDs in the API environment; model generation now reports Cloudflare errors explicitly.
+- [x] Distinguish local request throttling from provider 429 quota/rate errors in the API and provide provider-specific recovery guidance.
 - [x] API/web typechecks and lint pass; API build and web production build pass; theme palette guard passes; direct runtime smoke check verified the flyer canvas, two-sided brochure canvas, prompt content, and artwork layer.
 - [ ] The focused Node/tsx unit test is blocked before discovery by Node 24 `uv_os_get_passwd returned ENOMEM`; no additional live image-generation request was sent. Authenticated browser review of generated artwork remains pending until provider quota is available.
 - [x] Restarted the local API/web services after final changes; `/health/ready` and `/dashboard/templates` return HTTP 200, and the compiled web bundle includes the AI artwork builder and text editor.

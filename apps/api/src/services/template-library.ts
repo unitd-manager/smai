@@ -15,7 +15,7 @@ const formatGroups = [
 ] as const;
 
 const layouts = ["editorial", "split", "bold", "collage", "framed", "magazine", "type-led", "triptych", "spotlight", "grid", "sparkle", "radiant"] as const;
-const variantTreatments = ["Editorial", "Minimal", "Modern", "Photo-led", "Split", "Refined", "Magazine", "Corporate", "Clean", "Premium"] as const;
+const variantTreatments = ["Editorial", "Split", "Bold", "Collage", "Framed", "Magazine", "Type-led", "Triptych", "Spotlight", "Grid"] as const;
 const palettes = [
   ["#24364B", "#B69A6A", "#F5F3EE"],
   ["#303A46", "#73869A", "#F2F4F5"],
@@ -32,7 +32,7 @@ export const starterTemplates = formatGroups.flatMap((group, formatIndex) =>
   group.names.flatMap((name, conceptIndex) =>
     variantTreatments.map((treatment, treatmentIndex) => {
       const variant = conceptIndex * variantTreatments.length + treatmentIndex;
-      const layout = layouts[(formatIndex + variant) % layouts.length]!;
+      const layout = layouts[treatmentIndex]!;
       const palette = palettes[(formatIndex + Math.floor(variant / 2)) % palettes.length]!;
       return {
         id: `starter-${group.format}-${variant + 1}`,

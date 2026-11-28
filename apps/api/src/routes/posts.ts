@@ -5,7 +5,7 @@ import { renderDesignPageSvg } from "@united-technologies/shared/design-document
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { requireAuth, requireCompleteBrandProfile, requireWritableWorkspace, requireWorkspace, requireWorkspaceRole } from "../middleware/auth.js";
-import { assertInstagramMediaHostingAvailable, listInstagramMediaIds } from "../services/instagram.js";
+import { assertInstagramMediaHostingAvailable, listInstagramMediaIds, makeInstagramMediaUrl } from "../services/instagram.js";
 import { publishDueJobs } from "../services/publishing.js";
 import { checkPostQuality } from "../services/post-quality.js";
 
@@ -396,6 +396,7 @@ router.get("/", async (req, res, next) => {
       select: {
         id: true,
         brandId: true,
+        designId: true,
         title: true,
         caption: true,
         hashtags: true,
@@ -413,6 +414,8 @@ router.get("/", async (req, res, next) => {
             error: true,
             socialAccountId: true,
             publishedAt: true,
+            media: true,
+            mediaAssetId: true,
           },
         },
         brand: { select: { name: true } },
@@ -426,20 +429,52 @@ router.get("/", async (req, res, next) => {
           where: {
             id: { in: accountIds },
             workspaceId: req.workspace!.id,
-            provider: { in: ["instagram", "facebook"] },
-            status: "CONNECTED",
           },
-          select: { id: true },
+          select: { id: true, displayName: true, provider: true, status: true },
         })
       : [];
-    const connectedAccountIds = new Set(connectedAccounts.map((account) => account.id));
+    const connectedAccountIds = new Set(connectedAccounts.filter((account) => account.status === "CONNECTED").map((account) => account.id));
+    const accountById = new Map(connectedAccounts.map((account) => [account.id, account]));
+    const designIds = [...new Set(storedPosts.flatMap((post) => post.designId ? [post.designId] : []))];
+    const designs = designIds.length > 0
+      ? await prisma.design.findMany({
+          where: { id: { in: designIds }, workspaceId: req.workspace!.id },
+          select: { id: true, previewUrl: true },
+        })
+      : [];
+    const previewByDesignId = new Map(designs.map((design) => [design.id, design.previewUrl]));
     const posts = storedPosts.map((post) => ({
       ...post,
-      targets: post.targets.map((target) => ({
-        ...target,
-        publishingMode: ["Instagram", "Facebook"].includes(target.platform) && target.socialAccountId &&
-          connectedAccountIds.has(target.socialAccountId) ? "live" : "demo",
-      })),
+      hashtags: Array.isArray(post.hashtags) ? post.hashtags.filter((tag): tag is string => typeof tag === "string") : [],
+      designPreviewUrl: post.designId ? previewByDesignId.get(post.designId) ?? null : null,
+      targets: post.targets.map((target) => {
+        const sourceMedia = Array.isArray(target.media) ? target.media : target.media === null ? [] : [target.media];
+        const media = sourceMedia.flatMap((item, index) => {
+          if (typeof item === "string") return [{ type: "image", url: item, index }];
+          if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+          const mediaItem = item as Record<string, unknown>;
+          const type = mediaItem.type === "video" ? "video" : "image";
+          if (typeof mediaItem.mediaAssetId === "string") {
+            return [{ type, url: `/api/media/uploads/${encodeURIComponent(mediaItem.mediaAssetId)}/file`, index }];
+          }
+          if (typeof mediaItem.storageKey === "string") {
+            try {
+              return [{ type, url: makeInstagramMediaUrl(target.id, index, type), index }];
+            } catch {
+              return [];
+            }
+          }
+          return typeof mediaItem.url === "string" ? [{ type, url: mediaItem.url, index }] : [];
+        });
+        const account = target.socialAccountId ? accountById.get(target.socialAccountId) : null;
+        return {
+          ...target,
+          media,
+          account: account ? { displayName: account.displayName, provider: account.provider } : null,
+          publishingMode: ["Instagram", "Facebook"].includes(target.platform) && target.socialAccountId &&
+            connectedAccountIds.has(target.socialAccountId) ? "live" : "demo",
+        };
+      }),
       demoMode: post.targets.some((target) => !["Instagram", "Facebook"].includes(target.platform) || !target.socialAccountId ||
         !connectedAccountIds.has(target.socialAccountId)),
     }));

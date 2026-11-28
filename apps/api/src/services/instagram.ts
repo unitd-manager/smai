@@ -15,24 +15,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function getInstagramConfig() {
-  const { INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_REDIRECT_URI } = env;
-  if (!INSTAGRAM_APP_ID || !INSTAGRAM_APP_SECRET || !INSTAGRAM_REDIRECT_URI || !env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
+function getInstagramConfig(redirectUri = env.INSTAGRAM_REDIRECT_URI) {
+  const { INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET } = env;
+  if (!INSTAGRAM_APP_ID || !INSTAGRAM_APP_SECRET || !redirectUri || !env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
     return null;
   }
   return {
     appId: INSTAGRAM_APP_ID,
     appSecret: INSTAGRAM_APP_SECRET,
-    redirectUri: INSTAGRAM_REDIRECT_URI,
+    redirectUri,
   };
 }
 
 export function isInstagramConfigured() {
-  return getInstagramConfig() !== null;
+  return getInstagramConfig(env.INSTAGRAM_REDIRECT_URI ?? env.INSTAGRAM_REDIRECT_URI_LOCAL) !== null;
 }
 
-export function makeInstagramAuthorizationUrl(state: string) {
-  const config = getInstagramConfig();
+export function makeInstagramAuthorizationUrl(state: string, redirectUri?: string) {
+  const config = getInstagramConfig(redirectUri);
   if (!config) throw new Error("Instagram connection is not configured on this server.");
   const url = new URL("https://www.instagram.com/oauth/authorize");
   url.searchParams.set("client_id", config.appId);
@@ -93,8 +93,8 @@ async function responseJson(response: Response) {
   return body;
 }
 
-export async function exchangeInstagramCode(code: string) {
-  const config = getInstagramConfig();
+export async function exchangeInstagramCode(code: string, redirectUri?: string) {
+  const config = getInstagramConfig(redirectUri);
   if (!config) throw new Error("Instagram connection is not configured on this server.");
   const form = new FormData();
   form.set("client_id", config.appId);

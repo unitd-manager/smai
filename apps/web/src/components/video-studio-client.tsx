@@ -38,11 +38,11 @@ type MusicTrack = { id: string; title: string; mood: string; durationSeconds: nu
 type StudioConfig = {
   tools: { ffmpeg: boolean; ffprobe: boolean; message: string };
   tts: { defaultProvider: string; providers: { piper: boolean }; piperExecutable: string; voices: Array<{ id: string; label: string; description: string }> };
-  scriptProvider: "google-ai-studio" | "groq" | "openai";
-  geminiConfigured: boolean;
+  scriptProvider: "cloudflare" | "groq" | "openai";
+  cloudflareConfigured: boolean;
   groqConfigured: boolean;
   openaiConfigured: boolean;
-  activeWritingProvider: "google-ai-studio" | "groq" | "openai";
+  activeWritingProvider: "cloudflare" | "groq" | "openai";
   pexelsConfigured: boolean;
   music: MusicTrack[];
   musicStyles: Array<{ id: string; label: string; description: string }>;
@@ -83,7 +83,11 @@ type PublishingReadiness = {
 
 type MagicHourConfig = { configured?: boolean; credits?: number | null; accounts?: Array<{ slot: number; credits: number | null; status: "available" | "unavailable"; error?: string }>; voices?: Array<{ id: string; name: string; avatarUrl: string | null }>; voicesUnavailable?: boolean; error?: string };
 
-function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
+function MagicHourCreator({ onCreated, musicTracks, musicStyles }: {
+  onCreated: () => void;
+  musicTracks: MusicTrack[];
+  musicStyles: StudioConfig["musicStyles"];
+}) {
   const [config, setConfig] = useState<MagicHourConfig | null>(null);
   const [category, setCategory] = useState<"product" | "avatar-realistic" | "avatar-animated">("product");
   const [workflow, setWorkflow] = useState("product-image");
@@ -101,7 +105,13 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
   const [voiceSampleFile, setVoiceSampleFile] = useState<File | null>(null);
   const [selectedVoiceSampleAssetId, setSelectedVoiceSampleAssetId] = useState("");
   const [voiceConsent, setVoiceConsent] = useState(false);
+  const [voiceoverEnabled, setVoiceoverEnabled] = useState(false);
+  const [voiceoverScript, setVoiceoverScript] = useState("");
   const [language, setLanguage] = useState("english");
+  const [musicId, setMusicId] = useState("");
+  const [musicStyle, setMusicStyle] = useState("balanced");
+  const [musicVolume, setMusicVolume] = useState(0.12);
+  const [musicDucking, setMusicDucking] = useState(0.25);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [galleryAssets, setGalleryAssets] = useState<Array<{ id: string; fileName: string; mimeType: string; canUseMagicHour?: boolean }>>([]);
   const [galleryError, setGalleryError] = useState("");
@@ -198,7 +208,14 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const balance = config?.credits;
-    const stages = workflow === "talking-photo" ? " This Talking Photo workflow makes a speech-generation request and a separate portrait-animation request." : "";
+    const productVoiceover = category === "product" && voiceoverEnabled;
+    if (productVoiceover && !voiceoverScript.trim()) {
+      setError("Enter the voiceover script before generating the product video.");
+      return;
+    }
+    const stages = workflow === "talking-photo" || productVoiceover
+      ? " This workflow makes a speech-generation request as well as a video request."
+      : "";
     const balanceText = typeof balance === "number" ? `The account currently shows ${balance} credits.` : "The current credit balance is unavailable.";
     if (!window.confirm(`This starts a real Magic Hour generation and uses credits.${stages} ${balanceText} The app cannot get a guaranteed price quote before generation. Continue?`)) return;
     setBusy(true); setError(""); setFeedback("");
@@ -218,7 +235,7 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
         setSourceFile(null);
       }
       let voiceSampleAssetId: string | undefined;
-      if (workflow === "talking-photo" && voiceMode === "custom") {
+      if ((workflow === "talking-photo" || productVoiceover) && voiceMode === "custom") {
         if (!voiceSampleFile && !selectedVoiceSampleAssetId) throw new Error("Choose or upload a short MP3 or WAV sample of a voice you own or have permission to use.");
         if (!voiceConsent) throw new Error("Confirm you have permission to use this voice sample.");
         if (voiceSampleFile) {
@@ -233,8 +250,11 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
         } else voiceSampleAssetId = selectedVoiceSampleAssetId;
       }
       const data: Record<string, unknown> = {
-        generationType: workflow, title: title.trim() || productName.trim() || (script.trim().split(/\s+/).slice(0, 6).join(" ") || "Product video"), productName: productName.trim(), description: description.trim(), promotion: promotion.trim(),
-        style, aspectRatio, resolution, durationSeconds, script: script.trim(), voiceName, language, voiceMode: workflow === "talking-photo" ? voiceMode : "preset",
+        generationType: workflow, title: title.trim() || productName.trim() || ((category === "product" ? description : script).trim().split(/\s+/).slice(0, 6).join(" ") || "Product video"), productName: productName.trim(), description: description.trim(), promotion: promotion.trim(),
+        style, aspectRatio, resolution, durationSeconds, script: ["talking-photo", "lip-sync"].includes(workflow) ? script.trim() : "", voiceName, language, voiceMode: workflow === "talking-photo" || productVoiceover ? voiceMode : "preset",
+        narrationMode: productVoiceover ? "voiceover" : "none",
+        voiceoverScript: productVoiceover ? voiceoverScript.trim() : "",
+        musicId: musicId || null, musicStyle, musicVolume, musicDucking,
         avatarStyle: category === "avatar-animated" ? "animated" : "realistic",
         ...(voiceSampleAssetId ? { voiceSampleAssetId } : {}),
         ...(workflow === "lip-sync" ? { sourceVideoAssetId: sourceAssetId } : sourceAssetId ? { sourceAssetId } : {}),
@@ -251,19 +271,33 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
   }
 
   const isProduct = category === "product";
+  const magicHourAccounts = config?.accounts ?? [];
+  const hasAvailableMagicHourAccount = magicHourAccounts.some((account) => account.status === "available");
+  const allMagicHourAccountsHaveNetworkErrors = magicHourAccounts.length > 0 && magicHourAccounts.every((account) =>
+    account.status === "unavailable" && account.error?.includes("network_unavailable"),
+  );
   const uploadAccept = workflow === "lip-sync" ? "video/mp4" : "image/jpeg,image/png,image/webp";
   const galleryChoices = galleryAssets.filter((asset) => asset.canUseMagicHour !== false && (workflow === "lip-sync" ? asset.mimeType === "video/mp4" : asset.mimeType.startsWith("image/")));
   const voiceSampleChoices = galleryAssets.filter((asset) => asset.canUseMagicHour !== false && (asset.mimeType === "audio/mpeg" || asset.mimeType === "audio/wav"));
   const selectedSourceAsset = galleryAssets.find((asset) => asset.id === selectedGalleryAssetId);
+  const selectedMusicTrack = musicTracks.find((track) => track.id === musicId)
+    ?? (musicId === "" ? musicTracks.find((track) => track.id === "calm-horizon") : undefined);
   return <section className="video-studio-card" id="magic-hour-creator">
     <div className="video-job-heading"><div><p className="card-kicker">AI VIDEO PROVIDER</p><h2>Magic Hour</h2></div><span className="video-provider-badge">{!config ? error ? "Status unavailable" : "Checking balance…" : config.configured === false ? "Not configured" : config.credits === null || config.credits === undefined ? "Credits unavailable" : `${config.credits} combined credits`}</span></div>
     {config?.accounts && config.accounts.length > 0 && <p className="video-credit-notice" role="status">
       {config.accounts.map((account) => `Account ${account.slot}: ${account.status === "available" ? account.credits ?? "balance unavailable" : account.error ?? "unavailable"}`).join(" · ")}
-      {config.accounts.length === 1 ? " Only one API key is loaded by the server; verify MAGIC_HOUR_API_KEY_2 in apps/api/.env and restart the API." : " Available account balances are combined; unavailable accounts are excluded from the total."}
+      {config.accounts.length === 1
+        ? " Only one API key is loaded by the server; verify MAGIC_HOUR_API_KEY_2 in apps/api/.env and restart the API."
+        : hasAvailableMagicHourAccount
+          ? " Available account balances are combined; unavailable accounts are excluded from the total."
+          : allMagicHourAccountsHaveNetworkErrors
+            ? " The API server cannot reach Magic Hour. Allow outbound HTTPS to api.magichour.ai on port 443, then reload Video Studio."
+            : " No configured Magic Hour account is currently available."}
     </p>}
     {!config && !error && <p className="notice notice-gold" role="status">Checking Magic Hour configuration...</p>}
     {config?.configured === false && <p className="notice notice-gold" role="status">Add <code>MAGIC_HOUR_API_KEY</code> to <code>apps/api/.env</code> and restart the API to enable real Magic Hour generation.</p>}
-    {config?.voicesUnavailable && <p className="notice notice-gold" role="status">Magic Hour balance is available, but the voice list could not be loaded. Product video workflows remain available.</p>}
+    {config?.voicesUnavailable && hasAvailableMagicHourAccount && typeof config.credits === "number" && <p className="notice notice-gold" role="status">Magic Hour balance is available, but the voice list could not be loaded. Product video workflows remain available.</p>}
+    {config?.voicesUnavailable && hasAvailableMagicHourAccount && config.credits == null && <p className="notice notice-gold" role="status">A Magic Hour account responded, but no credit balance or voice list was returned. Check the account access and retry.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}{galleryError && <p className="notice notice-gold" role="status">Saved media could not be loaded. You can still upload a file directly.</p>}{feedback && <p className="form-success" role="status">{feedback}</p>}
     <form className="video-script-form" onSubmit={(event) => void submit(event)}>
       <div className="video-mode-picker" role="radiogroup" aria-label="Video mode">
@@ -285,7 +319,27 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
           {(sourceFile || selectedSourceAsset) && <div className="video-selected-source"><p>Selected photo: {sourceFile?.name ?? selectedSourceAsset?.fileName}</p><div><button className="button button-secondary" type="button" onClick={clearSourceSelection}>Clear photo</button>{selectedSourceAsset && <button className="button button-outline" type="button" onClick={() => void deleteSelectedGalleryImage()}>Delete from Gallery</button>}</div></div>}
         </>}
         <label>Product or service<input maxLength={120} value={productName} onChange={(event) => setProductName(event.target.value)} placeholder="What are you promoting?" /></label>
-        <label>What should viewers see?<textarea maxLength={1800} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the product and its main benefit. Keep claims accurate." /></label>
+        <label>What should viewers see?<textarea maxLength={1800} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the experience or main benefit, such as a hotel stay, fragrance, food item, or software workflow. Keep claims accurate." /></label>
+        <label className="video-consent"><input type="checkbox" checked={voiceoverEnabled} onChange={(event) => setVoiceoverEnabled(event.target.checked)} /><span><strong>Add a spoken voiceover</strong><small>Use a Magic Hour voice or a voice sample you have permission to use.</small></span></label>
+        {voiceoverEnabled && <>
+          <label>Voiceover script<textarea required maxLength={4000} rows={3} value={voiceoverScript} onChange={(event) => setVoiceoverScript(event.target.value)} placeholder="Write the words the narrator should speak. Keep them short enough for the video length." /></label>
+          <label>Voice
+            <CompactSelect aria-label="Voiceover voice" value={voiceName} options={config?.voices?.length
+              ? config.voices.map((voice) => ({ value: voice.id, label: voice.name }))
+              : [{ value: "", label: "Configure Magic Hour to load voices" }]} onValueChange={setVoiceName} />
+          </label>
+          <label>Voice source
+            <CompactSelect aria-label="Voiceover source" value={voiceMode} options={[{ value: "preset", label: "Magic Hour voice" }, { value: "custom", label: "Use my own voice sample" }]} onValueChange={(value) => setVoiceMode(value as "preset" | "custom")} />
+          </label>
+          {voiceMode === "custom" && <>
+            {voiceSampleChoices.length > 0 && <label>Saved voice sample
+              <CompactSelect aria-label="Saved voice sample" value={selectedVoiceSampleAssetId} options={[{ value: "", label: "Upload a new sample" }, ...voiceSampleChoices.map((asset) => ({ value: asset.id, label: asset.fileName }))]} onValueChange={(value) => { setSelectedVoiceSampleAssetId(value); setVoiceSampleFile(null); }} />
+            </label>}
+            {!selectedVoiceSampleAssetId && <label>Your voice sample (MP3 or WAV)<input required type="file" accept="audio/mpeg,audio/wav,.mp3,.wav" onChange={(event) => { setSelectedVoiceSampleAssetId(""); setVoiceSampleFile(event.target.files?.[0] ?? null); }} /></label>}
+            <label className="video-consent"><input type="checkbox" checked={voiceConsent} onChange={(event) => setVoiceConsent(event.target.checked)} /><span>I own this voice or have permission to use it for generated speech.</span></label>
+          </>}
+          <p className="video-credit-notice">Voice generation uses additional Magic Hour credits. Review the displayed balance before starting.</p>
+        </>}
         <details className="video-advanced-workflows"><summary>Add an offer or change visual style</summary>
           <label>Offer (optional)<input maxLength={500} value={promotion} onChange={(event) => setPromotion(event.target.value)} placeholder="Limited time offer" /></label>
           <label>Visual style
@@ -357,8 +411,31 @@ function MagicHourCreator({ onCreated }: { onCreated: () => void }) {
       <label>Length
         <CompactSelect aria-label="Length" value={String(durationSeconds)} options={[5, 10, 15].map((seconds) => ({ value: String(seconds), label: `${seconds} seconds` }))} onValueChange={(value) => setDurationSeconds(Number(value))} />
       </label>
+      <p className="video-music-license">Choose a soundtrack for this video. Narrated videos lower the music beneath the spoken voice.</p>
+      <label>Background music
+        <CompactSelect aria-label="Background music" value={musicId} options={[
+          { value: "", label: "Automatic soft bed" },
+          { value: "none", label: "No music" },
+          ...musicTracks.map((track) => ({ value: track.id, label: `${track.title} · ${track.mood}` })),
+        ]} onValueChange={setMusicId} />
+      </label>
+      <label>Music style
+        <CompactSelect aria-label="Music style" value={musicStyle} options={musicStyles.map((item) => ({ value: item.id, label: `${item.label} · ${item.description}` }))} onValueChange={setMusicStyle} />
+      </label>
+      {selectedMusicTrack && <>
+        <audio className="video-music-preview" controls preload="none" src={`${apiBaseUrl}/api/videos/music/${selectedMusicTrack.id}`} crossOrigin="use-credentials" />
+        <small>{selectedMusicTrack.licenseNote}</small>
+      </>}
+      {musicId !== "none" && <>
+        <label>Music volume · {Math.round(musicVolume * 100)}%
+          <input type="range" min="0" max="0.5" step="0.01" value={musicVolume} onChange={(event) => setMusicVolume(Number(event.target.value))} />
+        </label>
+        <label>Music under voice · {Math.round(musicDucking * 100)}%
+          <input type="range" min="0" max="1" step="0.05" value={musicDucking} onChange={(event) => setMusicDucking(Number(event.target.value))} />
+        </label>
+      </>}
       <p className="video-credit-notice">Generation uses Magic Hour credits. Check the displayed balance before generating.</p>
-      <button type="submit" className="button button-gold" disabled={busy || !config?.configured || (workflow !== "product-text" && !sourceFile && !selectedGalleryAssetId) || (workflow.includes("product") && !title.trim() && !productName.trim() && !description.trim())}>{busy ? "Queuing video..." : "Generate video"}</button>
+      <button type="submit" className="button button-gold" disabled={busy || !config?.configured || (workflow !== "product-text" && !sourceFile && !selectedGalleryAssetId) || (workflow.includes("product") && !title.trim() && !productName.trim() && !description.trim()) || (category === "product" && voiceoverEnabled && (!voiceoverScript.trim() || !voiceName))}>{busy ? "Queuing video..." : "Generate video"}</button>
       </Fragment>
     </form>
   </section>;
@@ -434,7 +511,7 @@ export function VideoStudioClient() {
   const [error, setError] = useState("");
   const [scriptRetryAvailable, setScriptRetryAvailable] = useState(false);
   const [notice, setNotice] = useState("");
-  const [lastWritingProvider, setLastWritingProvider] = useState<"google-ai-studio" | "groq" | "openai" | null>(null);
+  const [lastWritingProvider, setLastWritingProvider] = useState<"cloudflare" | "groq" | "openai" | null>(null);
   const [scriptPickerOpen, setScriptPickerOpen] = useState(false);
   const scriptPickerRef = useRef<HTMLDivElement>(null);
   const [ideaDuration, setIdeaDuration] = useState(60);
@@ -522,15 +599,15 @@ export function VideoStudioClient() {
   const selectedVideo = jobs.find((job) => job.id === selectedVideoId);
   const selectedVideoStatus = selectedVideo?.status;
   const musicTrack = config?.music.find((track) => track.id === musicId);
-  const aiConfigured = Boolean(config?.geminiConfigured || config?.groqConfigured || config?.openaiConfigured);
+  const aiConfigured = Boolean(config?.cloudflareConfigured || config?.groqConfigured || config?.openaiConfigured);
   const activeProviderLabel = lastWritingProvider === "groq"
     ? "Groq fallback"
     : lastWritingProvider === "openai"
       ? "OpenAI fallback"
-      : lastWritingProvider === "google-ai-studio"
-        ? "Google Gemini"
+      : lastWritingProvider === "cloudflare"
+        ? "Cloudflare Workers AI"
         : [
-            config?.geminiConfigured ? "Google Gemini" : null,
+            config?.cloudflareConfigured ? "Cloudflare Workers AI" : null,
             config?.groqConfigured ? "Groq fallback" : null,
             config?.openaiConfigured ? "OpenAI fallback" : null,
           ].filter(Boolean).join(" -> ") || "No AI provider configured";
@@ -593,7 +670,7 @@ export function VideoStudioClient() {
     setNotice("");
     setBusy(true);
     try {
-      const response = await apiRequest<{ items: VideoScript[]; provider: "google-ai-studio" | "groq" | "openai" }>("/api/content/generate", {
+      const response = await apiRequest<{ items: VideoScript[]; provider: "cloudflare" | "groq" | "openai" }>("/api/content/generate", {
         method: "POST",
         body: JSON.stringify({
           idea: topic,
@@ -633,7 +710,7 @@ export function VideoStudioClient() {
     setNotice("");
     setBusy(true);
     try {
-      const { item, provider } = await apiRequest<{ item: VideoScript; provider: "google-ai-studio" | "groq" | "openai" }>("/api/videos/idea-to-mp4/plan", {
+      const { item, provider } = await apiRequest<{ item: VideoScript; provider: "cloudflare" | "groq" | "openai" }>("/api/videos/idea-to-mp4/plan", {
         method: "POST",
         body: JSON.stringify({
           idea: topic,
@@ -653,7 +730,7 @@ export function VideoStudioClient() {
       setScriptScenes(plan.scenes.map((scene) => scene.dialogue?.map((line) => `${line.speaker}: ${line.text}`).join("\n") ?? scene.narration));
       setSelectedScriptId(item.id);
       setScripts((current) => [item, ...current.filter((script) => script.id !== item.id)]);
-      setNotice("Plan created with Gemini. Review every scene before rendering; nothing will be posted automatically.");
+      setNotice(`Plan created with ${provider === "cloudflare" ? "Cloudflare Workers AI" : provider}. Review every scene before rendering; nothing will be posted automatically.`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not create the video plan.");
     } finally {
@@ -836,7 +913,7 @@ export function VideoStudioClient() {
       </header>
       {error && <div className="video-generation-error" role="alert"><strong>We couldn&apos;t complete that step</strong><p>{error}</p></div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
-      <MagicHourCreator onCreated={() => { void loadJobs(); }} />
+      <MagicHourCreator onCreated={() => { void loadJobs(); }} musicTracks={config?.music ?? []} musicStyles={config?.musicStyles ?? []} />
       <details className="video-advanced-workflows" hidden>
       <summary>Alternative: local animated conversation video</summary>
       <section className="video-studio-card" id="idea-to-mp4">

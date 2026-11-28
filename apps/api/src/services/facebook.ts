@@ -18,24 +18,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function getFacebookConfig() {
-  const { FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, FACEBOOK_REDIRECT_URI } = env;
-  if (!FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET || !FACEBOOK_REDIRECT_URI || !env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
+function getFacebookConfig(redirectUri = env.FACEBOOK_REDIRECT_URI) {
+  const { FACEBOOK_APP_ID, FACEBOOK_APP_SECRET } = env;
+  if (!FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET || !redirectUri || !env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
     return null;
   }
   return {
     appId: FACEBOOK_APP_ID,
     appSecret: FACEBOOK_APP_SECRET,
-    redirectUri: FACEBOOK_REDIRECT_URI,
+    redirectUri,
   };
 }
 
 export function isFacebookConfigured() {
-  return getFacebookConfig() !== null;
+  return getFacebookConfig(env.FACEBOOK_REDIRECT_URI ?? env.FACEBOOK_REDIRECT_URI_LOCAL) !== null;
 }
 
-export function makeFacebookAuthorizationUrl(state: string) {
-  const config = getFacebookConfig();
+export function makeFacebookAuthorizationUrl(state: string, redirectUri?: string) {
+  const config = getFacebookConfig(redirectUri);
   if (!config) throw new Error("Facebook Page connection is not configured on this server.");
   const url = new URL(`https://www.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}/dialog/oauth`);
   url.searchParams.set("client_id", config.appId);
@@ -71,8 +71,8 @@ function accessTokenExpiry(value: unknown) {
   return new Date(Date.now() + value.expires_in * 1000);
 }
 
-export async function exchangeFacebookCode(code: string): Promise<{ pages: FacebookPage[]; user: FacebookUser }> {
-  const config = getFacebookConfig();
+export async function exchangeFacebookCode(code: string, redirectUri?: string): Promise<{ pages: FacebookPage[]; user: FacebookUser }> {
+  const config = getFacebookConfig(redirectUri);
   if (!config) throw new Error("Facebook Page connection is not configured on this server.");
 
   const tokenUrl = new URL(`https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}/oauth/access_token`);

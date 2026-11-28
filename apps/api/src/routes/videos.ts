@@ -15,7 +15,7 @@ import { activeVideoPlanProvider, generateVideoPlan, videoConversationStyles, vi
 import { getBusinessContext, summarizeBusinessContext } from "../services/business-context.js";
 import { VIDEO_SIZES } from "../video/types.js";
 import { getAiGenerationLimit } from "../services/plan-limits.js";
-import { env } from "../env.js";
+import { cloudflareAiConfigured, env } from "../env.js";
 import { deleteMagicHourAudioProject, deleteMagicHourVideoProject, getMagicHourAccount, getMagicHourVoices, magicHourAccounts, MagicHourError } from "../services/magic-hour.js";
 
 const router = Router();
@@ -89,6 +89,12 @@ const magicHourGenerateSchema = z.object({
   avatarStyle: z.enum(["realistic", "animated"]).default("realistic"),
   voiceSampleAssetId: z.string().trim().min(1).optional(),
   language: z.string().trim().min(2).max(40).default("english"),
+  narrationMode: z.enum(["none", "voiceover"]).default("none"),
+  voiceoverScript: z.string().trim().max(4000).optional(),
+  musicId: z.string().trim().max(80).nullable().default(null),
+  musicStyle: z.enum(["balanced", "warm", "bright", "calm", "cinematic"]).default("balanced"),
+  musicVolume: z.number().min(0).max(0.5).default(0.12),
+  musicDucking: z.number().min(0).max(1).default(0.25),
   automationKey: z.string().trim().min(1).max(191).optional(),
 }).superRefine((value, context) => {
   if (["product-image", "talking-photo"].includes(value.generationType) && !value.sourceAssetId) {
@@ -97,17 +103,28 @@ const magicHourGenerateSchema = z.object({
   if (value.generationType === "lip-sync" && !value.sourceVideoAssetId) {
     context.addIssue({ code: "custom", path: ["sourceVideoAssetId"], message: "Upload a source video for lip sync." });
   }
-  if (["talking-photo", "lip-sync"].includes(value.generationType) && !value.script) {
+  const hasPresenterSpeech = ["talking-photo", "lip-sync"].includes(value.generationType);
+  const hasProductVoiceover = value.generationType.startsWith("product-") && value.narrationMode === "voiceover";
+  if (hasPresenterSpeech && !value.script) {
     context.addIssue({ code: "custom", path: ["script"], message: "Enter the script to generate the voice track." });
   }
-  if (["talking-photo", "lip-sync"].includes(value.generationType) && value.voiceMode === "preset" && !value.voiceName) {
+  if (hasProductVoiceover && !value.voiceoverScript?.trim()) {
+    context.addIssue({ code: "custom", path: ["voiceoverScript"], message: "Enter the voiceover script for this product video." });
+  }
+  if (hasProductVoiceover && value.voiceoverScript && value.voiceoverScript.trim().split(/\s+/).length > value.durationSeconds * 3.2) {
+    context.addIssue({ code: "custom", path: ["voiceoverScript"], message: "Shorten the voiceover so it can fit the selected video length." });
+  }
+  if ((hasPresenterSpeech || hasProductVoiceover) && value.voiceMode === "preset" && !value.voiceName) {
     context.addIssue({ code: "custom", path: ["voiceName"], message: "Choose a Magic Hour voice." });
   }
-  if (value.generationType === "talking-photo" && value.voiceMode === "custom" && !value.voiceSampleAssetId) {
+  if ((value.generationType === "talking-photo" || hasProductVoiceover) && value.voiceMode === "custom" && !value.voiceSampleAssetId) {
     context.addIssue({ code: "custom", path: ["voiceSampleAssetId"], message: "Upload an MP3 or WAV voice sample." });
   }
-  if (value.generationType !== "talking-photo" && value.voiceMode === "custom") {
-    context.addIssue({ code: "custom", path: ["voiceMode"], message: "Custom voice samples are currently available for Talking Photo." });
+  if (!hasProductVoiceover && value.generationType !== "talking-photo" && value.voiceMode === "custom") {
+    context.addIssue({ code: "custom", path: ["voiceMode"], message: "Custom voice samples are currently available for Talking Photo and product voiceovers." });
+  }
+  if (value.narrationMode === "voiceover" && !value.generationType.startsWith("product-")) {
+    context.addIssue({ code: "custom", path: ["narrationMode"], message: "Additional voiceovers can only be added to product videos; presenter videos already use their generated speech." });
   }
 });
 const ratios = {
@@ -126,7 +143,7 @@ router.get("/configuration", async (_req, res, next) => {
       tools,
       tts: ttsConfiguration(),
       scriptProvider: activeVideoPlanProvider().name,
-      geminiConfigured: Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
+      cloudflareConfigured: cloudflareAiConfigured,
       groqConfigured: Boolean(env.GROQ_API_KEY),
       openaiConfigured: Boolean(env.OPENAI_API_KEY),
       activeWritingProvider: activeVideoPlanProvider().name,
@@ -171,7 +188,7 @@ router.get("/magic-hour/configuration", async (_req, res) => {
         credits: null,
         status: "unavailable" as const,
         error: result.reason instanceof MagicHourError
-          ? `Magic Hour rejected this account (${result.reason.status}: ${result.reason.code}).`
+          ? `Magic Hour account unavailable (${result.reason.status}: ${result.reason.code}): ${result.reason.message}`
           : "Could not retrieve this account's balance.",
       };
     });
@@ -192,7 +209,7 @@ router.get("/magic-hour/configuration", async (_req, res) => {
       credits: availableAccounts.reduce<number | null>((total, { account }) => typeof account.credits === "number" ? (total ?? 0) + account.credits : total, null),
       accounts: accountStatuses,
       voices,
-      ...(voicesResult.length === 0 || voicesResult[0]?.status === "rejected" ? { voicesUnavailable: true } : {}),
+      ...(preferredAccount && voicesResult[0]?.status === "rejected" ? { voicesUnavailable: true } : {}),
     });
   } catch (error) {
     const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 502;
@@ -208,6 +225,10 @@ router.post("/magic-hour/generate", requireWritableWorkspace, async (req, res, n
       return;
     }
     const input = magicHourGenerateSchema.parse(req.body);
+    if (input.musicId && input.musicId !== "none" && !(await listMusicTracks()).some((track) => track.id === input.musicId)) {
+      res.status(400).json({ error: "The selected music track is not available. Refresh Video Studio and choose another track." });
+      return;
+    }
     const brandId = req.header("x-brand-id");
     const brand = await prisma.brand.findFirst({
       where: { workspaceId: req.workspace!.id, ...(brandId ? { id: brandId } : {}) },
@@ -287,7 +308,7 @@ router.post("/magic-hour/generate", requireWritableWorkspace, async (req, res, n
           brand.profile?.industry,
           brand.profile?.audience ? `Target audience: ${brand.profile.audience}` : "",
           brand.profile?.offers,
-          "Show the actual product clearly, with realistic materials, attractive commercial lighting, and deliberate camera movement. Do not invent labels, claims, logos, or text; leave the upper-left corner visually calm for a brand mark.",
+          "Choose visuals that fit the described business: show the guest experience and space for hospitality, tactile product details for physical goods such as fragrance or food, and a clear interface or workflow for software. Show a plausible real use instead of forcing every business into a physical product shot. Use deliberate camera movement and credible lighting. Do not invent labels, claims, logos, or text; leave the upper-left corner visually calm for a brand mark.",
         ].filter(Boolean).join(" ").slice(0, 1800)
       : input.generationType === "talking-photo"
         ? "A natural, friendly, professional portrait performance. Keep the speaker's identity and appearance consistent; subtle head movement, expressive eyes, clear synchronized speech."
@@ -340,6 +361,12 @@ router.post("/magic-hour/generate", requireWritableWorkspace, async (req, res, n
             voiceMode: input.voiceMode,
             voiceSampleAssetId: input.voiceSampleAssetId ?? null,
             language: input.language,
+            narrationMode: input.narrationMode,
+            voiceoverScript: input.voiceoverScript ?? "",
+            musicId: input.musicId,
+            musicStyle: input.musicStyle,
+            musicVolume: input.musicVolume,
+            musicDucking: input.musicDucking,
             magicHourCreditsAtQueue: typeof account.credits === "number" ? account.credits : null,
             magicHourAccountSlot: selectedAccount.slot,
             magicHourCreditsCharged: 0,

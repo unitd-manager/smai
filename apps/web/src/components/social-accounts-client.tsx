@@ -122,7 +122,7 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
                 <p className="social-provider-status is-connected">{isFacebook ? "Connected Page" : "Workspace account"}: {account.displayName}</p>
                 <p>This connection is shared with other members of this workspace.</p>
                 {account.tokenExpiresAt && <p>Access may need renewal after {new Date(account.tokenExpiresAt).toLocaleDateString()}.</p>}
-                <div className="oauth-callback-help"><strong>Meta OAuth callback URL</strong><p>Register this exact URL in Meta before reconnecting:</p><code>{isFacebook ? facebookRedirectUri : instagramRedirectUri}</code></div>
+                <div className="oauth-callback-help"><strong>Meta OAuth callback URL</strong><p>Register this exact URL in Meta before reconnecting:</p><code>{(isFacebook ? facebookRedirectUri : instagramRedirectUri) || `Local callback not configured. Set ${isFacebook ? "FACEBOOK" : "INSTAGRAM"}_REDIRECT_URI_LOCAL after starting an HTTPS tunnel.`}</code></div>
                 {!isFacebook && <button className="social-provider-action" type="button" disabled={busy} onClick={() => void connectAccount("instagram")}>
                   {busy ? "Opening Instagram…" : "Reconnect to enable listening"}
                 </button>}
@@ -146,7 +146,7 @@ export function SocialAccountsClient({ detailPlatform }: SocialAccountsClientPro
                 <div className="oauth-callback-help">
                   <strong>Meta OAuth callback URL</strong>
                   <p>Add this exact URL to your Meta app’s redirect URI allowlist:</p>
-                  <code>{isFacebook ? facebookRedirectUri : instagramRedirectUri}</code>
+                  <code>{(isFacebook ? facebookRedirectUri : instagramRedirectUri) || `Local callback not configured. Set ${isFacebook ? "FACEBOOK" : "INSTAGRAM"}_REDIRECT_URI_LOCAL after starting an HTTPS tunnel.`}</code>
                 </div>
                 <button className="button button-gold" type="button" disabled={busy} onClick={() => void connectAccount(isFacebook ? "facebook" : "instagram")}>
                   {busy ? `Opening ${isFacebook ? "Facebook" : "Instagram"}…` : `Continue to ${isFacebook ? "Facebook" : "Instagram"}`}

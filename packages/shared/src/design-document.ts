@@ -271,6 +271,26 @@ function safeColor(value: string | undefined, fallback = "transparent") {
     : fallback;
 }
 
+function relativeLuminance(color: string) {
+  const match = color.match(/^#([\da-f]{3}|[\da-f]{6})$/i);
+  if (!match) return null;
+  const hex = match[1]!.length === 3 ? [...match[1]!].map((part) => `${part}${part}`).join("") : match[1]!;
+  const channels = [0, 2, 4].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
+  const linear = (channel: number) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  return 0.2126 * linear(channels[0]!) + 0.7152 * linear(channels[1]!) + 0.0722 * linear(channels[2]!);
+}
+
+export function getReadableDesignTextColor(background: string, preferred = "#172531") {
+  const backgroundLuminance = relativeLuminance(background);
+  const preferredLuminance = relativeLuminance(preferred);
+  if (backgroundLuminance === null) return preferred;
+  const contrast = (first: number, second: number) => (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+  if (preferredLuminance !== null && contrast(backgroundLuminance, preferredLuminance) >= 4.5) return preferred;
+  const lightLuminance = relativeLuminance("#FFFFFF")!;
+  const darkLuminance = relativeLuminance("#172531")!;
+  return contrast(backgroundLuminance, lightLuminance) >= contrast(backgroundLuminance, darkLuminance) ? "#FFFFFF" : "#172531";
+}
+
 function isLightColor(value: string) {
   const match = value.match(/^#([\da-f]{6})$/i);
   if (!match) return false;
@@ -486,8 +506,10 @@ export function createDesignDocument(input: {
     : template ? "editorial" : layouts[(input.variant ?? 0) % layouts.length]!;
   const title = input.title;
   const variant = input.variant ?? 0;
-  const isLight = isLightColor(palette.at(-1) ?? "#ffffff");
-  const foreground = isLight ? "#253746" : "#ffffff";
+  const defaultBackground = isLightColor(palette.at(-1) ?? "#ffffff") ? "#ffffff" : "#24364B";
+  const pageBackground = palette[2] ?? defaultBackground;
+  const foreground = getReadableDesignTextColor(pageBackground, palette.at(-1) ?? "#253746");
+  const brandLabelColor = layout === "bold" ? getReadableDesignTextColor(palette[0]!, pageBackground) : foreground;
   const headingX = layout === "split" || layout === "magazine" ? size.width * 0.08 : size.width * 0.1;
   const titleWidth = size.width * (layout === "split" ? 0.58 : layout === "triptych" ? 0.76 : 0.8);
   const headlineLayout: Record<string, { x: number; y: number; width: number; height: number; size: number; align?: "left" | "center" | "right"; font?: string }> = {
@@ -505,15 +527,76 @@ export function createDesignDocument(input: {
     radiant: { x: 0.08, y: 0.32, width: 0.8, height: 0.33, size: 0.08 },
   };
   const headlineStyle = headlineLayout[layout] ?? headlineLayout.editorial!;
-  const layoutDecorations: DesignLayer[] = layout === "framed"
-    ? [{ id: "layout-frame", type: "shape", shape: "rectangle", x: size.width * 0.045, y: size.height * 0.045, width: size.width * 0.91, height: size.height * 0.91, fill: "transparent", stroke: palette[0]!, strokeWidth: Math.max(2, size.width * 0.002) }]
-    : layout === "magazine"
-      ? [{ id: "layout-rule", type: "shape", shape: "rectangle", x: size.width * 0.08, y: size.height * 0.245, width: size.width * 0.84, height: Math.max(2, size.width * 0.002), fill: palette[1]! }]
-      : layout === "bold" || layout === "type-led"
-        ? [{ id: "layout-footer-band", type: "shape", shape: "rectangle", x: 0, y: size.height * 0.86, width: size.width, height: size.height * 0.14, fill: palette[0]! }]
-        : layout === "split"
-          ? [{ id: "layout-split-rule", type: "shape", shape: "rectangle", x: size.width * 0.7, y: size.height * 0.08, width: Math.max(3, size.width * 0.004), height: size.height * 0.84, fill: palette[1]! }]
-          : [];
+  const layoutDecorations: DesignLayer[] = (() => {
+    const rect = (id: string, x: number, y: number, width: number, height: number, fill: string, opacity?: number): DesignLayer => ({
+      id, type: "shape", shape: "rectangle", x: size.width * x, y: size.height * y,
+      width: size.width * width, height: size.height * height, fill, ...(opacity === undefined ? {} : { opacity }),
+    });
+    const circle = (id: string, x: number, y: number, diameter: number, fill: string, opacity?: number): DesignLayer => ({
+      id, type: "shape", shape: "circle", x: size.width * x, y: size.height * y,
+      width: size.width * diameter, height: size.width * diameter, fill, ...(opacity === undefined ? {} : { opacity }),
+    });
+    switch (layout) {
+      case "editorial":
+        return [rect("layout-editorial-mark", 0.1, 0.235, 0.055, 0.009, palette[1]!)];
+      case "split":
+        return [
+          rect("layout-split-panel", 0.73, 0.08, 0.27, 0.84, palette[1]!, 0.16),
+          rect("layout-split-rule", 0.7, 0.08, 0.004, 0.84, palette[1]!),
+        ];
+      case "bold":
+        return [rect("layout-bold-panel", 0, 0, 1, 0.16, palette[0]!), rect("layout-footer-band", 0, 0.92, 1, 0.08, palette[0]!)];
+      case "collage":
+        return [
+          rect("layout-collage-block", 0.73, 0.2, 0.2, 0.23, palette[1]!, 0.82),
+          circle("layout-collage-circle", 0.73, 0.48, 0.2, palette[0]!, 0.18),
+          rect("layout-collage-tag", 0.73, 0.76, 0.16, 0.018, palette[1]!),
+        ];
+      case "framed":
+        return [{ id: "layout-frame", type: "shape", shape: "rectangle", x: size.width * 0.045, y: size.height * 0.045, width: size.width * 0.91, height: size.height * 0.91, fill: "transparent", stroke: palette[0]!, strokeWidth: Math.max(2, size.width * 0.002) }];
+      case "magazine":
+        return [
+          rect("layout-magazine-kicker", 0.08, 0.245, 0.15, 0.012, palette[1]!),
+          rect("layout-magazine-rule", 0.08, 0.275, 0.84, 0.003, palette[0]!, 0.4),
+        ];
+      case "type-led":
+        return [rect("layout-type-rail", 0, 0, 0.035, 1, palette[1]!), rect("layout-type-footer-band", 0, 0.92, 1, 0.08, palette[0]!)];
+      case "triptych":
+        return [
+          rect("layout-triptych-panel-1", 0.12, 0.82, 0.22, 0.055, palette[0]!),
+          rect("layout-triptych-panel-2", 0.39, 0.82, 0.22, 0.055, palette[1]!),
+          rect("layout-triptych-panel-3", 0.66, 0.82, 0.22, 0.055, palette[0]!),
+        ];
+      case "spotlight":
+        return [circle("layout-spotlight-glow", 0.62, 0.2, 0.34, palette[1]!, 0.18), circle("layout-spotlight-dot", 0.82, 0.73, 0.06, palette[1]!)];
+      case "grid":
+        return [
+          ...Array.from({ length: 9 }, (_, index) => circle(
+            `layout-grid-dot-${index + 1}`,
+            0.72 + (index % 3) * 0.075,
+            0.2 + Math.floor(index / 3) * 0.075,
+            0.018,
+            palette[1]!,
+            0.75,
+          )),
+          rect("layout-grid-rule", 0.1, 0.78, 0.8, 0.004, palette[1]!, 0.65),
+        ];
+      case "sparkle":
+        return [
+          { id: "layout-sparkle-top", type: "shape", shape: "star", x: size.width * 0.82, y: size.height * 0.22, width: size.width * 0.09, height: size.height * 0.09, fill: palette[1]!, opacity: 0.8 },
+          { id: "layout-sparkle-bottom", type: "shape", shape: "star", x: size.width * 0.12, y: size.height * 0.72, width: size.width * 0.055, height: size.height * 0.055, fill: palette[1]!, opacity: 0.65 },
+        ];
+      case "radiant":
+        return [
+          circle("layout-radiant-disc", 0.36, 0.73, 0.28, palette[1]!, 0.16),
+          rect("layout-radiant-ray-left", 0.2, 0.78, 0.13, 0.006, palette[1]!, 0.7),
+          rect("layout-radiant-ray-right", 0.67, 0.78, 0.13, 0.006, palette[1]!, 0.7),
+          rect("layout-radiant-ray-top", 0.495, 0.68, 0.006, 0.08, palette[1]!, 0.7),
+        ];
+      default:
+        return [];
+    }
+  })();
   const brandName = input.content?.brandName?.trim() || "YOUR BRAND";
   const summary = input.content?.caption?.trim().split(/\r?\n/).filter(Boolean).slice(0, 2).join(" ").slice(0, 260)
     || "Built around your next business goal. A clear story, ready to share.";
@@ -538,7 +621,7 @@ export function createDesignDocument(input: {
     name: `Page ${pageIndex + 1}`,
     role,
     ...size,
-    background: { type: "color", color: palette[2] ?? (isLight ? "#ffffff" : "#24364B") },
+    background: { type: "color", color: pageBackground },
     layers: [
         ...layoutDecorations,
         {
@@ -552,7 +635,7 @@ export function createDesignDocument(input: {
           fontFamily: brandBodyFont,
           fontSize: Math.max(14, size.width * 0.022),
           fontWeight: 700,
-          color: foreground,
+          color: brandLabelColor,
           letterSpacing: 2,
         },
         {
@@ -644,6 +727,8 @@ export function createDesignDocument(input: {
     const width = size.width;
     const height = size.height;
     const panelWidth = width / 3;
+    const frontPanelTextColor = getReadableDesignTextColor(palette[0]!, palette[2] ?? "#F5F3EE");
+    const lightPanelTextColor = getReadableDesignTextColor("#FFFFFF", palette[0]!);
     const sourceSections = input.content?.sections ?? [];
     const sections = Array.from({ length: 6 }, (_, index) => sourceSections[index] ?? "");
     const getSection = (value: string) => {
@@ -656,20 +741,20 @@ export function createDesignDocument(input: {
       { id: "outside-front-panel", type: "shape", shape: "rectangle", x: panelWidth * 2, y: 0, width: panelWidth, height, fill: palette[0] ?? "#24364B" },
       { id: "outside-rule-1", type: "shape", shape: "rectangle", x: panelWidth - 2, y: height * 0.04, width: 2, height: height * 0.92, fill: palette[0] ?? "#24364B", opacity: 0.14 },
       { id: "outside-rule-2", type: "shape", shape: "rectangle", x: panelWidth * 2 - 2, y: height * 0.04, width: 2, height: height * 0.92, fill: palette[0] ?? "#24364B", opacity: 0.14 },
-      { id: "brochure-brand", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.12, width: panelWidth * 0.8, height: height * 0.045, text: brandName.toLocaleUpperCase(), fontFamily: brandBodyFont, fontSize: 36, fontWeight: 750, color: palette[2] ?? "#F5F3EE", letterSpacing: 3 },
-      { id: "brochure-title", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.29, width: panelWidth * 0.8, height: height * 0.27, text: title, fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 100, fontWeight: 760, color: "#FFFFFF", lineHeight: 1.08 },
-      { id: "brochure-support", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.61, width: panelWidth * 0.8, height: height * 0.13, text: summary.slice(0, 150), fontFamily: brandBodyFont, fontSize: 34, fontWeight: 450, color: palette[2] ?? "#F5F3EE", lineHeight: 1.35 },
+      { id: "brochure-brand", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.12, width: panelWidth * 0.8, height: height * 0.045, text: brandName.toLocaleUpperCase(), fontFamily: brandBodyFont, fontSize: 36, fontWeight: 750, color: frontPanelTextColor, letterSpacing: 3 },
+      { id: "brochure-title", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.29, width: panelWidth * 0.8, height: height * 0.27, text: title, fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 100, fontWeight: 760, color: frontPanelTextColor, lineHeight: 1.08 },
+      { id: "brochure-support", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.61, width: panelWidth * 0.8, height: height * 0.13, text: summary.slice(0, 150), fontFamily: brandBodyFont, fontSize: 34, fontWeight: 450, color: frontPanelTextColor, lineHeight: 1.35 },
       { id: "brochure-cover-accent", type: "shape", shape: "rectangle", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.81, width: panelWidth * 0.16, height: 9, fill: palette[1] ?? "#B69A6A" },
-      { id: "brochure-cta", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.86, width: panelWidth * 0.8, height: height * 0.055, text: input.content?.posterText?.callToAction ?? "LEARN MORE", fontFamily: brandBodyFont, fontSize: 30, fontWeight: 750, color: "#FFFFFF" },
+      { id: "brochure-cta", type: "text", x: panelWidth * 2 + panelWidth * 0.09, y: height * 0.86, width: panelWidth * 0.8, height: height * 0.055, text: input.content?.posterText?.callToAction ?? "LEARN MORE", fontFamily: brandBodyFont, fontSize: 30, fontWeight: 750, color: frontPanelTextColor },
     ];
     const back = getSection(sections[5]!);
     const flap = getSection(sections[4]!);
     outsideLayers.push(
-      { id: "brochure-back-brand", type: "text", x: panelWidth * 0.1, y: height * 0.1, width: panelWidth * 0.8, height: height * 0.045, text: brandName.toLocaleUpperCase(), fontFamily: brandBodyFont, fontSize: 28, fontWeight: 750, color: palette[0]!, letterSpacing: 2 },
-      { id: "brochure-back-heading", type: "text", x: panelWidth * 0.1, y: height * 0.25, width: panelWidth * 0.8, height: height * 0.14, text: back.heading || "Get in touch", fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 58, fontWeight: 750, color: palette[0]! },
-      ...(back.body ? [{ id: "brochure-back-copy", type: "text" as const, x: panelWidth * 0.1, y: height * 0.42, width: panelWidth * 0.8, height: height * 0.2, text: back.body, fontFamily: brandBodyFont, fontSize: 29, fontWeight: 450, color: palette[0]! }] : []),
-      { id: "brochure-fold-heading", type: "text", x: panelWidth * 1.1, y: height * 0.17, width: panelWidth * 0.8, height: height * 0.13, text: flap.heading || "What we do", fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 54, fontWeight: 750, color: palette[0]! },
-      ...(flap.body ? [{ id: "brochure-fold-copy", type: "text" as const, x: panelWidth * 1.1, y: height * 0.34, width: panelWidth * 0.8, height: height * 0.24, text: flap.body, fontFamily: brandBodyFont, fontSize: 28, fontWeight: 450, color: palette[0]! }] : []),
+      { id: "brochure-back-brand", type: "text", x: panelWidth * 0.1, y: height * 0.1, width: panelWidth * 0.8, height: height * 0.045, text: brandName.toLocaleUpperCase(), fontFamily: brandBodyFont, fontSize: 28, fontWeight: 750, color: lightPanelTextColor, letterSpacing: 2 },
+      { id: "brochure-back-heading", type: "text", x: panelWidth * 0.1, y: height * 0.25, width: panelWidth * 0.8, height: height * 0.14, text: back.heading || "Get in touch", fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 58, fontWeight: 750, color: lightPanelTextColor },
+      ...(back.body ? [{ id: "brochure-back-copy", type: "text" as const, x: panelWidth * 0.1, y: height * 0.42, width: panelWidth * 0.8, height: height * 0.2, text: back.body, fontFamily: brandBodyFont, fontSize: 29, fontWeight: 450, color: lightPanelTextColor }] : []),
+      { id: "brochure-fold-heading", type: "text", x: panelWidth * 1.1, y: height * 0.17, width: panelWidth * 0.8, height: height * 0.13, text: flap.heading || "What we do", fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 54, fontWeight: 750, color: lightPanelTextColor },
+      ...(flap.body ? [{ id: "brochure-fold-copy", type: "text" as const, x: panelWidth * 1.1, y: height * 0.34, width: panelWidth * 0.8, height: height * 0.24, text: flap.body, fontFamily: brandBodyFont, fontSize: 28, fontWeight: 450, color: lightPanelTextColor }] : []),
       { id: "brochure-fold-accent", type: "shape", shape: "rectangle", x: panelWidth * 1.1, y: height * 0.68, width: panelWidth * 0.15, height: 8, fill: palette[1]! },
     );
     const insideLayers: DesignLayer[] = [];
@@ -678,9 +763,9 @@ export function createDesignDocument(input: {
       const x = panelWidth * index;
       if (index > 0) insideLayers.push({ id: `inside-fold-rule-${index}`, type: "shape", shape: "rectangle", x, y: height * 0.05, width: 2, height: height * 0.9, fill: palette[0]!, opacity: 0.14 });
       insideLayers.push(
-        { id: `inside-section-${index}-number`, type: "text", x: x + panelWidth * 0.09, y: height * 0.1, width: panelWidth * 0.8, height: height * 0.05, text: `0${index + 1}`, fontFamily: brandBodyFont, fontSize: 25, fontWeight: 750, color: palette[1]! },
-        { id: `inside-section-${index}-title`, type: "text", x: x + panelWidth * 0.09, y: height * 0.21, width: panelWidth * 0.8, height: height * 0.18, text: section.heading || sections[index]!.slice(0, 58), fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 53, fontWeight: 750, color: palette[0]!, lineHeight: 1.12 },
-        ...(section.body ? [{ id: `inside-section-${index}-body`, type: "text" as const, x: x + panelWidth * 0.09, y: height * 0.44, width: panelWidth * 0.8, height: height * 0.26, text: section.body, fontFamily: brandBodyFont, fontSize: 28, fontWeight: 450, color: palette[0]!, lineHeight: 1.35 }] : []),
+        { id: `inside-section-${index}-number`, type: "text", x: x + panelWidth * 0.09, y: height * 0.1, width: panelWidth * 0.8, height: height * 0.05, text: `0${index + 1}`, fontFamily: brandBodyFont, fontSize: 25, fontWeight: 750, color: lightPanelTextColor },
+        { id: `inside-section-${index}-title`, type: "text", x: x + panelWidth * 0.09, y: height * 0.21, width: panelWidth * 0.8, height: height * 0.18, text: section.heading || sections[index]!.slice(0, 58), fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 53, fontWeight: 750, color: lightPanelTextColor, lineHeight: 1.12 },
+        ...(section.body ? [{ id: `inside-section-${index}-body`, type: "text" as const, x: x + panelWidth * 0.09, y: height * 0.44, width: panelWidth * 0.8, height: height * 0.26, text: section.body, fontFamily: brandBodyFont, fontSize: 28, fontWeight: 450, color: lightPanelTextColor, lineHeight: 1.35 }] : []),
         { id: `inside-section-${index}-rule`, type: "shape", shape: "rectangle", x: x + panelWidth * 0.09, y: height * 0.82, width: panelWidth * 0.15, height: 8, fill: palette[1]! },
       );
     });
@@ -691,14 +776,14 @@ export function createDesignDocument(input: {
   } else if (input.format === "flyer") {
     const sections = input.content?.sections?.slice(0, 3) ?? [];
     const flyerLayers: DesignLayer[] = [
-      { id: "flyer-brand", type: "text", x: size.width * 0.08, y: size.height * 0.07, width: size.width * 0.84, height: size.height * 0.04, text: brandName.toLocaleUpperCase(), fontFamily: brandBodyFont, fontSize: 44, fontWeight: 750, color: palette[1]!, letterSpacing: 3 },
-      { id: "flyer-headline", type: "text", x: size.width * 0.08, y: size.height * 0.17, width: size.width * 0.84, height: size.height * 0.21, text: input.content?.posterText?.headline ?? title, fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 118, fontWeight: 780, color: palette[0]!, lineHeight: 1.06 },
-      { id: "flyer-support", type: "text", x: size.width * 0.08, y: size.height * 0.42, width: size.width * 0.78, height: size.height * 0.11, text: input.content?.posterText?.supportingLine ?? summary.slice(0, 130), fontFamily: brandBodyFont, fontSize: 37, fontWeight: 450, color: palette[0]!, lineHeight: 1.3 },
+      { id: "flyer-brand", type: "text", x: size.width * 0.08, y: size.height * 0.07, width: size.width * 0.84, height: size.height * 0.04, text: brandName.toLocaleUpperCase(), fontFamily: brandBodyFont, fontSize: 44, fontWeight: 750, color: getReadableDesignTextColor(pageBackground, palette[1]!), letterSpacing: 3 },
+      { id: "flyer-headline", type: "text", x: size.width * 0.08, y: size.height * 0.17, width: size.width * 0.84, height: size.height * 0.21, text: input.content?.posterText?.headline ?? title, fontFamily: brandHeadingFont ?? "Inter, sans-serif", fontSize: 118, fontWeight: 780, color: getReadableDesignTextColor(pageBackground, palette[0]!), lineHeight: 1.06 },
+      { id: "flyer-support", type: "text", x: size.width * 0.08, y: size.height * 0.42, width: size.width * 0.78, height: size.height * 0.11, text: input.content?.posterText?.supportingLine ?? summary.slice(0, 130), fontFamily: brandBodyFont, fontSize: 37, fontWeight: 450, color: getReadableDesignTextColor(pageBackground, palette[0]!), lineHeight: 1.3 },
       { id: "flyer-rule", type: "shape", shape: "rectangle", x: size.width * 0.08, y: size.height * 0.57, width: size.width * 0.84, height: 3, fill: palette[1]!, opacity: 0.55 },
-      ...sections.map((section, index) => ({ id: `flyer-detail-${index + 1}`, type: "text" as const, x: size.width * 0.08, y: size.height * (0.62 + index * 0.075), width: size.width * 0.84, height: size.height * 0.055, text: section.slice(0, 90), fontFamily: brandBodyFont, fontSize: 30, fontWeight: 550, color: palette[0]! })),
-      { id: "flyer-cta", type: "text", x: size.width * 0.08, y: size.height * 0.9, width: size.width * 0.84, height: size.height * 0.045, text: input.content?.posterText?.callToAction ?? "LEARN MORE", fontFamily: brandBodyFont, fontSize: 34, fontWeight: 750, color: palette[0]! },
+      ...sections.map((section, index) => ({ id: `flyer-detail-${index + 1}`, type: "text" as const, x: size.width * 0.08, y: size.height * (0.62 + index * 0.075), width: size.width * 0.84, height: size.height * 0.055, text: section.slice(0, 90), fontFamily: brandBodyFont, fontSize: 30, fontWeight: 550, color: getReadableDesignTextColor(pageBackground, palette[0]!) })),
+      { id: "flyer-cta", type: "text", x: size.width * 0.08, y: size.height * 0.9, width: size.width * 0.84, height: size.height * 0.045, text: input.content?.posterText?.callToAction ?? "LEARN MORE", fontFamily: brandBodyFont, fontSize: 34, fontWeight: 750, color: getReadableDesignTextColor(pageBackground, palette[0]!) },
     ];
-    pages = [{ id: `${input.id}-page-1`, name: "Flyer", role: "cover", ...size, background: { type: "color", color: palette[2] ?? "#F5F3EE" }, layers: flyerLayers }];
+    pages = [{ id: `${input.id}-page-1`, name: "Flyer", role: "cover", ...size, background: { type: "color", color: pageBackground }, layers: flyerLayers }];
   } else {
     const posterText = input.content?.posterText;
     pages = [makePage(

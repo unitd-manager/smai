@@ -1,4 +1,5 @@
-import { GoogleGenAI, Modality, type Part } from "@google/genai";
+import { z } from "zod";
+import { cloudflareChatCompletion, cloudflareImageGeneration } from "./cloudflare-ai.js";
 import {
   designDocumentVersion,
   getDesignPageSize,
@@ -16,6 +17,18 @@ export type ImageDesignFormat = (typeof imageDesignFormats)[number];
 
 export type DesignReferenceImage = { mimeType: "image/jpeg" | "image/png" | "image/webp"; data: string };
 export type DesignCopy = { headline: string; supportingLine: string; callToAction: string; sections: Array<{ title: string; body: string }> };
+export type ArtworkGenerationProvider = "groq" | "cloudflare";
+
+export function selectArtworkProvider(input: {
+  photorealistic: boolean;
+  groqConfigured: boolean;
+  cloudflareConfigured: boolean;
+}): ArtworkGenerationProvider | null {
+  if (input.photorealistic) return input.cloudflareConfigured ? "cloudflare" : null;
+  if (input.groqConfigured) return "groq";
+  if (input.cloudflareConfigured) return "cloudflare";
+  return null;
+}
 
 export function imageAspectRatio(format: ImageDesignFormat) {
   if (format === "brochure") return "4:3";
@@ -191,9 +204,22 @@ export async function generateGroqSvgDesign(input: {
   };
 }
 
-export async function generateImageDesign(input: {
-  apiKey: string;
+const generatedCopySchema = z.object({
+  headline: z.string().trim().min(2).max(110),
+  supportingLine: z.string().trim().min(2).max(220),
+  callToAction: z.string().trim().min(2).max(60),
+  sections: z.array(z.object({
+    title: z.string().trim().min(2).max(70),
+    body: z.string().trim().min(2).max(220),
+  }).strict()).length(6),
+}).strict();
+
+export async function generateCloudflareImageDesign(input: {
+  accountId: string;
+  apiToken: string;
   model: string;
+  referenceImageModel?: string;
+  textModel: string;
   prompt: string;
   format: ImageDesignFormat;
   layout?: string;
@@ -202,34 +228,40 @@ export async function generateImageDesign(input: {
   colors: string[];
   referenceImage?: DesignReferenceImage;
 }) {
-  const ai = new GoogleGenAI({ apiKey: input.apiKey });
-  const parts: Part[] = [
-    ...(input.referenceImage ? [{ inlineData: { mimeType: input.referenceImage.mimeType, data: input.referenceImage.data } }] : []),
-    { text: `${buildImageDesignPrompt(input)}\n\nAlso return one short JSON object as text with the keys headline, supportingLine, callToAction, and sections. Make the headline, support line, and CTA relevant to the user's brief and brand. For sections, return six concise {"title":"...","body":"..."} entries. Do not put this copy into the generated image.` },
-  ];
-  const response = await ai.models.generateContent({
-    model: input.model,
-    contents: [{ role: "user", parts }],
-    config: {
-      responseModalities: [Modality.TEXT, Modality.IMAGE],
-      imageConfig: { aspectRatio: imageAspectRatio(input.format), imageSize: "1K" },
-      maxOutputTokens: 2048,
-      abortSignal: AbortSignal.timeout(150_000),
-    },
+  const imageModel = input.referenceImage ? input.referenceImageModel ?? input.model : input.model;
+  const image = await cloudflareImageGeneration({
+    accountId: input.accountId,
+    apiToken: input.apiToken,
+    model: imageModel,
+    prompt: buildImageDesignPrompt(input),
+    ...(input.referenceImage
+      ? { imageBase64: input.referenceImage.data, strength: 0.65, numSteps: 20, ...artworkCanvasSize(input.format) }
+      : { steps: 4 }),
   });
-  const outputParts = response.candidates?.flatMap((candidate) => candidate.content?.parts ?? []) ?? [];
-  const generatedImage = outputParts.find((part) => part.inlineData?.data && part.inlineData.mimeType?.startsWith("image/"))?.inlineData;
-  if (!generatedImage?.data || !generatedImage.mimeType) {
-    throw new Error(response.promptFeedback?.blockReason
-      ? "The image provider could not create this design from the supplied brief. Adjust the prompt and try again."
-      : "The image provider returned no artwork. Try again with a more specific visual brief.");
+  const text = await cloudflareChatCompletion({
+    accountId: input.accountId,
+    apiToken: input.apiToken,
+    model: input.textModel,
+    messages: [
+      { role: "system", content: "Return only valid JSON with headline, supportingLine, callToAction, and six concise sections. Keep all copy relevant to the user brief and brand. Do not place copy inside the generated image." },
+      { role: "user", content: `${buildImageDesignPrompt(input)}\n\nReturn one JSON object with the keys headline, supportingLine, callToAction, and sections. Each section must contain title and body.` },
+    ],
+    responseFormat: { type: "json_object" },
+    temperature: 0.7,
+    maxTokens: 2048,
+    timeoutMs: 60_000,
+  });
+  let parsedCopy: unknown;
+  try {
+    parsedCopy = JSON.parse(text);
+  } catch (error) {
+    throw new Error("Cloudflare Workers AI returned invalid artwork copy JSON.", { cause: error });
   }
-  const text = outputParts.filter((part) => part.text).map((part) => part.text).join("\n");
   return {
-    image: Buffer.from(generatedImage.data, "base64"),
-    mimeType: generatedImage.mimeType,
-    copy: parseGeneratedCopy(text, input.prompt),
-    model: response.modelVersion ?? input.model,
+    image,
+    mimeType: "image/jpeg",
+    copy: generatedCopySchema.parse(parsedCopy),
+    model: imageModel,
   };
 }
 
@@ -518,7 +550,7 @@ export function createAiDesignDocument(input: {
     palette: finalPalette,
     metadata: {
       layout: input.layout ?? "editorial",
-      provider: "google-ai-studio",
+      provider: "cloudflare",
       model: input.model,
       prompt: input.prompt.slice(0, 2200),
       ...(input.fonts[0] ? { brandFont: input.fonts[0] } : {}),

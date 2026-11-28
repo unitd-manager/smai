@@ -267,7 +267,17 @@ export async function getMarketingIntelligence(workspaceId: string, brandId: str
     !plans.length ? "Create a campaign plan for the next priority" : null,
     !analytics ? "Connect available platform analytics to measure results" : null,
   ].filter((item): item is string => Boolean(item));
-  const healthSignals = [Boolean(profile?.industry), Boolean(profile?.audience), Boolean(profile?.products || profile?.offers), goals.length > 0, platforms.length > 0, recentPosts >= 4, plans.length > 0, analytics > 0];
+  const healthSignalDetails = [
+    { key: "industry", label: "Industry defined", active: Boolean(profile?.industry) },
+    { key: "audience", label: "Target audience defined", active: Boolean(profile?.audience) },
+    { key: "offer", label: "Products or offers added", active: Boolean(profile?.products || profile?.offers) },
+    { key: "goals", label: "Marketing goals set", active: goals.length > 0 },
+    { key: "platforms", label: "Preferred platforms selected", active: platforms.length > 0 },
+    { key: "publishing", label: "At least four recent posts", active: recentPosts >= 4 },
+    { key: "campaigns", label: "Campaign plan created", active: plans.length > 0 },
+    { key: "analytics", label: "Platform analytics available", active: analytics > 0 },
+  ];
+  const healthSignals = healthSignalDetails.map((signal) => signal.active);
   const healthScore = Math.round(healthSignals.filter(Boolean).length / healthSignals.length * 100);
   const healthLabel = healthScore >= 75 ? "Strong foundation" : healthScore >= 45 ? "Building momentum" : "Needs attention";
   const strategy = [
@@ -277,7 +287,7 @@ export async function getMarketingIntelligence(workspaceId: string, brandId: str
   ];
   return {
     brand: { name: brand.name, industry: profile?.industry ?? null },
-    health: { score: healthScore, label: healthLabel, signals: healthSignals.filter(Boolean).length, totalSignals: healthSignals.length },
+    health: { score: healthScore, label: healthLabel, signals: healthSignals.filter(Boolean).length, totalSignals: healthSignals.length, checks: healthSignalDetails },
     strategy,
     metrics: { recentPosts, drafts: generated.length, plannedCampaigns: plans.length, connectedAccounts: accounts.length, analyticsAvailable: analytics > 0 },
     contextSummary: {
@@ -293,10 +303,10 @@ export async function getMarketingIntelligence(workspaceId: string, brandId: str
     competitors: {
       entries: [...new Set([...competitors, ...competitorRecords.map((competitor) => competitor.name)])],
       status: recordedCompetitors.some((competitor) => competitor.summary)
-        ? "Recent competitor analysis uses workspace-recorded public observations and labels AI interpretations as hypotheses. Automatic monitoring is not connected."
+        ? "Recent competitor analysis uses saved public observations. Brand Profile saves trigger background research, and profiles refresh weekly when public research is configured. AI interpretations are hypotheses."
         : competitorRecords.length || competitors.length
           ? "Competitor profiles are recorded, but there is no analyzed, sourced observation yet. Add evidence in Competitor Intelligence."
-          : "Add competitor profiles and dated public observations in Competitor Intelligence; no automatic public data collection is connected.",
+          : "No competitor profiles have been recorded yet. Saving a complete Brand Profile queues background discovery; weekly refreshes require TAVILY_API_KEY.",
       insights: recordedCompetitors,
     },
     performance: analytics > 0 ? { status: "Analytics snapshots are available for connected records.", evidence: "Recommendations use available workspace analytics; unavailable platform metrics are not estimated." } : { status: "No connected analytics snapshots yet.", evidence: "Performance recommendations are limited to profile and workspace activity." },

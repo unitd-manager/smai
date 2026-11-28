@@ -1,0 +1,2 @@
+ALTER TABLE `Design`
+  MODIFY `previewUrl` MEDIUMTEXT NULL;

@@ -6,6 +6,7 @@ import { pollMagicHourJobs } from "./services/magic-hour-worker.js";
 import { runStartupPreflight } from "./routes/system.js";
 import { sendDueApprovalEmails } from "./services/approval-email.js";
 import { runInstagramAutopilot } from "./services/instagram-autopilot.js";
+import { enqueueDueCompetitorRefreshes, runCompetitorResearchJobs } from "./services/competitor-research-worker.js";
 
 app.listen(env.API_PORT, () => {
   console.info(`${env.PRODUCT_NAME} API listening on http://localhost:${env.API_PORT}`);
@@ -61,4 +62,24 @@ const instagramAutopilotWorker = setInterval(() => {
 instagramAutopilotWorker.unref();
 void runInstagramAutopilot().catch((error: unknown) => {
   console.error("Instagram Autopilot startup recovery failed.", error);
+});
+
+const competitorResearchWorker = setInterval(() => {
+  void runCompetitorResearchJobs().catch((error: unknown) => {
+    console.error("Competitor research worker failed.", error);
+  });
+}, 10_000);
+competitorResearchWorker.unref();
+void runCompetitorResearchJobs().catch((error: unknown) => {
+  console.error("Competitor research startup recovery failed.", error);
+});
+
+const competitorRefreshScheduler = setInterval(() => {
+  void enqueueDueCompetitorRefreshes().catch((error: unknown) => {
+    console.error("Competitor refresh scheduler failed.", error);
+  });
+}, 60 * 60 * 1000);
+competitorRefreshScheduler.unref();
+void enqueueDueCompetitorRefreshes().catch((error: unknown) => {
+  console.error("Competitor refresh startup scheduling failed.", error);
 });

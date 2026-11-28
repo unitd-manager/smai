@@ -92,6 +92,7 @@ model Workspace {
   contentPlans             ContentPlan[]
   competitors              Competitor[]
   competitorSnapshots      CompetitorSnapshot[]
+  competitorResearchJobs   CompetitorResearchJob[]
   posts                    Post[]
   postTargets              PostTarget[]
   publishJobs              PublishJob[]
@@ -141,6 +142,7 @@ model Brand {
   contentPlans             ContentPlan[]
   competitors              Competitor[]
   competitorSnapshots      CompetitorSnapshot[]
+  competitorResearchJobs   CompetitorResearchJob[]
   marketingRecommendations MarketingRecommendation[]
   instagramAutopilotRuns   InstagramAutopilotRun[]
   posts                    Post[]
@@ -266,6 +268,7 @@ model SocialAccount {
   brandId           String?
   provider          String
   providerAccountId String
+  providerUserId    String?
   displayName       String
   encryptedTokens   String    @db.Text
   tokenExpiresAt    DateTime?
@@ -276,6 +279,18 @@ model SocialAccount {
 
   @@unique([provider, providerAccountId])
   @@index([workspaceId, resellerId])
+  @@index([providerUserId])
+}
+
+model MetaDataDeletionRequest {
+  id                   String   @id @default(cuid())
+  confirmationCodeHash String   @unique @db.VarChar(64)
+  status               String   @default("COMPLETED")
+  createdAt            DateTime @default(now())
+  completedAt          DateTime @default(now())
+  expiresAt            DateTime
+
+  @@index([expiresAt])
 }
 
 model MediaAsset {
@@ -374,7 +389,7 @@ model Design {
   templateId  String?
   title       String
   designJson  Json
-  previewUrl  String?          @db.Text
+  previewUrl  String?          @db.MediumText
   status      String           @default("DRAFT")
   inGallery   Boolean          @default(false)
   createdAt   DateTime         @default(now())
@@ -702,6 +717,30 @@ model CompetitorSnapshot {
   competitor       Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, brandId, competitorId, observedAt])
+}
+
+model CompetitorResearchJob {
+  id          String    @id @default(cuid())
+  workspaceId String
+  brandId     String
+  dedupeKey   String    @db.VarChar(191)
+  status      String    @default("QUEUED") @db.VarChar(32)
+  stage       String    @default("Discovering competitors") @db.VarChar(80)
+  progress    Int       @default(0)
+  attempts    Int       @default(0)
+  error       String?   @db.Text
+  warnings    Json?
+  startedAt   DateTime?
+  completedAt DateTime?
+  runAt       DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand       Brand     @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, brandId, dedupeKey], map: "CompetitorResearchJob_dedupe_unique")
+  @@index([status, runAt, createdAt], map: "CompetitorResearchJob_queue_idx")
+  @@index([workspaceId, brandId, createdAt], map: "CompetitorResearchJob_brand_idx")
 }
 
 model ContactMessage {

@@ -39,6 +39,52 @@ export function isMusicStyle(value: unknown): value is MusicStyle {
   return musicStyles.some((style) => style.id === value);
 }
 
+export function createMagicHourAudioFilterGraph(input: {
+  hasSourceAudio: boolean;
+  hasVoiceover: boolean;
+  hasMusic: boolean;
+  totalDurationSeconds: number;
+  voiceoverDurationSeconds?: number;
+  musicVolume: number;
+  musicDucking: number;
+  musicStyle: MusicStyle;
+}) {
+  if (!Number.isFinite(input.totalDurationSeconds) || input.totalDurationSeconds <= 0) {
+    throw new Error("Video duration must be a positive finite number.");
+  }
+  if (!isMusicStyle(input.musicStyle)) throw new Error("The selected music treatment is not available.");
+
+  const duration = input.totalDurationSeconds.toFixed(3);
+  const filters: string[] = [];
+  const hasBaseAudio = input.hasVoiceover || input.hasSourceAudio;
+  if (input.hasVoiceover) {
+    filters.push(`[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad=whole_dur=${duration},atrim=duration=${duration},asetpts=PTS-STARTPTS[base]`);
+  } else if (input.hasSourceAudio) {
+    filters.push(`[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,apad=whole_dur=${duration},atrim=duration=${duration},asetpts=PTS-STARTPTS[base]`);
+  }
+
+  if (input.hasMusic) {
+    const musicInputIndex = input.hasVoiceover ? 2 : 1;
+    const volume = Math.max(0, Math.min(1, input.musicVolume));
+    const ducking = Math.max(0, Math.min(1, input.musicDucking));
+    const duckDuration = input.hasVoiceover
+      ? Math.min(input.totalDurationSeconds, Math.max(0, input.voiceoverDurationSeconds ?? input.totalDurationSeconds))
+      : input.hasSourceAudio ? input.totalDurationSeconds : 0;
+    const voiceVolume = hasBaseAudio ? `if(lt(t,${duckDuration.toFixed(3)}),${ducking},1)` : "1";
+    const treatment = musicStyles.find((style) => style.id === input.musicStyle)!.filter;
+    filters.push(`[${musicInputIndex}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,${treatment},volume='${volume}*${voiceVolume}',atrim=duration=${duration},asetpts=PTS-STARTPTS[music]`);
+  }
+
+  if (hasBaseAudio && input.hasMusic) {
+    filters.push("[base][music]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95[aout]");
+  } else if (hasBaseAudio) {
+    filters.push("[base]anull[aout]");
+  } else if (input.hasMusic) {
+    filters.push("[music]anull[aout]");
+  }
+  return filters.join(";");
+}
+
 export async function createVideoThumbnail(videoPath: string, thumbnailPath: string, signal?: AbortSignal) {
   const ffmpegPath = await resolveExecutable("ffmpeg");
   await execFileAsync(ffmpegPath, [

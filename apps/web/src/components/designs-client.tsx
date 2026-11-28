@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Star } from "lucide-react";
 import type { DesignDocument, DesignLayer } from "@united-technologies/shared/design-document";
 import { apiRequest } from "@/lib/api";
 import { CompactSelect } from "@/components/compact-select";
 import { DesignDocumentPreview, DesignImagePreview } from "@/components/design-document-preview";
+import { getDateTimeInputValue, getTimezoneLabel, localDateTimeToIso } from "@/lib/timezone";
 
 type Design = {
   id: string;
@@ -22,16 +24,24 @@ type Design = {
   previewUrl: string | null;
   status: string;
   createdAt: string;
-  brand: { name: string };
+  brand: { name: string; timezone: string };
 };
 
 type BrandOption = { id: string; name: string };
 type GeneratedContent = {
   id: string;
   request: string | null;
-  contentJson: { title?: string; caption?: string; hashtags?: string[] };
+  contentJson: {
+    title?: string;
+    caption?: string;
+    hashtags?: string[];
+    platforms?: string[];
+    platformCaptions?: Array<{ platform: string; caption: string }>;
+  };
 };
 type DesignSet = { id: string; title: string; designs: Design[] };
+type QualityReport = { passed: boolean; issues: Array<{ severity: "error" | "warning" | "tip"; message: string }> };
+type ScheduledPostResponse = { post: { id: string; status: string }; demoMode: boolean };
 type DesignVersion = {
   id: string;
   version: number;
@@ -58,6 +68,21 @@ function replaceDesignText(document: DesignDocument, layerId: string, text: stri
     return layer;
   };
   return { ...document, pages: document.pages.map((page) => ({ ...page, layers: page.layers.map(replace) })) };
+}
+
+function designPlatforms(design: Design, content: GeneratedContent) {
+  const platforms = design.designJson.platforms?.length
+    ? design.designJson.platforms
+    : content.contentJson.platforms?.length
+      ? content.contentJson.platforms
+      : ["Instagram"];
+  return [...new Set(platforms)];
+}
+
+function designCaption(content: GeneratedContent, platform: string) {
+  return content.contentJson.platformCaptions?.find((item) => item.platform === platform)?.caption
+    ?? content.contentJson.caption
+    ?? "";
 }
 
 function groupDesigns(designs: Design[]): DesignSet[] {
@@ -98,6 +123,11 @@ export function DesignsClient() {
   const [editedTitle, setEditedTitle] = useState("");
   const [editingCopyId, setEditingCopyId] = useState("");
   const [editedDocument, setEditedDocument] = useState<DesignDocument | null>(null);
+  const [schedulingDesignId, setSchedulingDesignId] = useState("");
+  const [scheduleDateTime, setScheduleDateTime] = useState("");
+  const [scheduleMinimum, setScheduleMinimum] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleConfirmation, setScheduleConfirmation] = useState("");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -266,6 +296,74 @@ export function DesignsClient() {
     }
   }
 
+  async function scheduleSavedDesign(event: FormEvent<HTMLFormElement>, design: Design, content: GeneratedContent) {
+    event.preventDefault();
+    setScheduleError("");
+    setNotice("");
+
+    const scheduledAt = localDateTimeToIso(scheduleDateTime, design.brand.timezone);
+    if (!scheduledAt) {
+      setScheduleError("Choose a valid date and time in the brand time zone.");
+      return;
+    }
+    if (new Date(scheduledAt) <= new Date()) {
+      setScheduleError("Choose a future date and time.");
+      return;
+    }
+
+    const platforms = designPlatforms(design, content);
+    const captions = Object.fromEntries(platforms.map((targetPlatform) => [
+      targetPlatform,
+      designCaption(content, targetPlatform),
+    ]));
+    if (Object.values(captions).some((caption) => !caption.trim())) {
+      setScheduleError("Add a caption to this content before scheduling it.");
+      return;
+    }
+
+    setBusyId(design.id);
+    try {
+      const qualityResponse = await apiRequest<{ quality: QualityReport }>("/api/posts/quality-check", {
+        method: "POST",
+        body: JSON.stringify({ platforms, captions }),
+      });
+      if (!qualityResponse.quality.passed) {
+        const issues = qualityResponse.quality.issues
+          .filter((issue) => issue.severity === "error")
+          .map((issue) => issue.message);
+        setScheduleError(`Resolve the post quality issues before scheduling${issues.length ? `: ${issues.join(" ")}` : "."}`);
+        return;
+      }
+
+      const response = await apiRequest<ScheduledPostResponse>("/api/posts", {
+        method: "POST",
+        body: JSON.stringify({
+          contentId: content.id,
+          designId: design.id,
+          platforms,
+          captionOverrides: captions,
+          scheduledAt,
+          timezone: design.brand.timezone,
+        }),
+      });
+      const scheduleLabel = new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: design.brand.timezone,
+      }).format(new Date(scheduledAt));
+      setNotice(response.demoMode
+        ? `Demo only — this post was not sent to a social platform. Scheduled for ${scheduleLabel}.`
+        : `Post scheduled for ${scheduleLabel}. Track it in Posts and Queue.`);
+      setScheduleConfirmation(response.demoMode
+        ? `Demo only — this post was not sent to a social platform. Scheduled for ${scheduleLabel}.`
+        : `Post scheduled for ${scheduleLabel}. Track it in Posts and Queue.`);
+    } catch (requestError) {
+      setScheduleError(requestError instanceof Error ? requestError.message : "Could not schedule this design.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   async function remove(set: DesignSet) {
     if (!window.confirm(`Delete “${set.title}” and its ${set.designs.length} layout${set.designs.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
     setBusyId(set.id);
@@ -320,6 +418,53 @@ export function DesignsClient() {
             const content = generatedContentId ? contentById[generatedContentId] : undefined;
             const selectedDocument = selectedDesign.designJson.document;
             const editableText = selectedDocument ? textLayers(selectedDocument) : [];
+            const toggleScheduleForm = () => {
+              const opening = schedulingDesignId !== selectedDesign.id;
+              setSchedulingDesignId(opening ? selectedDesign.id : "");
+              const minimumDate = opening ? new Date(Date.now() + 2 * 60_000) : null;
+              setScheduleMinimum(minimumDate ? getDateTimeInputValue(minimumDate, selectedDesign.brand.timezone) : "");
+              setScheduleDateTime(minimumDate
+                ? getDateTimeInputValue(new Date(minimumDate.getTime() + 13 * 60_000), selectedDesign.brand.timezone)
+                : "");
+              setScheduleError("");
+              setScheduleConfirmation("");
+              setError("");
+              setNotice("");
+            };
+            const scheduleForm = generatedContentId && content && schedulingDesignId === selectedDesign.id ? scheduleConfirmation ? (
+              <div className="design-schedule-form">
+                <h3>Post scheduled</h3>
+                <p role="status">{scheduleConfirmation}</p>
+                <div className="content-editor-actions">
+                  <button type="button" onClick={() => {
+                    setSchedulingDesignId("");
+                    setScheduleConfirmation("");
+                    setScheduleDateTime("");
+                  }}>Done</button>
+                </div>
+              </div>
+            ) : (
+              <form className="design-schedule-form" onSubmit={(event) => void scheduleSavedDesign(event, selectedDesign, content)}>
+                <h3>Schedule this design</h3>
+                <p>Choose when to publish this saved design with its source post caption.</p>
+                {scheduleError && <p className="form-error" role="alert">{scheduleError}</p>}
+                <label className="refine-input">Schedule for
+                  <input
+                    type="datetime-local"
+                    required
+                    min={scheduleMinimum}
+                    value={scheduleDateTime}
+                    onChange={(event) => setScheduleDateTime(event.target.value)}
+                  />
+                  <small>Time shown in {getTimezoneLabel(selectedDesign.brand.timezone)}.</small>
+                </label>
+                <p>Platforms: {designPlatforms(selectedDesign, content).join(", ")}</p>
+                <div className="content-editor-actions">
+                  <button type="submit" disabled={busy}>{busy ? "Scheduling…" : "Schedule post"}</button>
+                  <button type="button" disabled={busy} onClick={() => setSchedulingDesignId("")}>Cancel</button>
+                </div>
+              </form>
+            ) : null;
             return <article className="design-card" key={set.id}>
               <div className="design-card-preview">
                 {selectedDesign.designJson.document
@@ -344,6 +489,7 @@ export function DesignsClient() {
                         </section>}
                         {content?.contentJson.caption && <p className="design-post-caption">{content.contentJson.caption}</p>}
                         {content?.contentJson.hashtags && content.contentJson.hashtags.length > 0 && <p className="design-post-hashtags">{content.contentJson.hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}</p>}
+                        {scheduleForm}
                         {content?.request && <div className="design-source-brief"><strong>Original creation brief</strong><p>{content.request}</p></div>}
                         {editingDesignId === selectedDesign.id ? <div className="content-editor">
                           <label>Design title<input value={editedTitle} onChange={(event) => setEditedTitle(event.target.value)} /></label>
@@ -368,6 +514,7 @@ export function DesignsClient() {
                         {error && <p className="form-error" role="alert">{error}</p>}
                       </>}
                       modalActions={<>
+                        {generatedContentId && content && <button type="button" role="menuitem" disabled={busy} onClick={toggleScheduleForm}>{schedulingDesignId === selectedDesign.id ? "Close schedule" : "Schedule post"}</button>}
                         {generatedContentId && <Link href={`/dashboard/content?edit=${encodeURIComponent(generatedContentId)}`} role="menuitem">Edit content</Link>}
                         <button type="button" role="menuitem" disabled={busy} onClick={() => void duplicate(selectedDesign)}>Duplicate design</button>
                         <button type="button" role="menuitem" onClick={() => toggleFavorite(set.id)}>{favorites.includes(set.id) ? "Remove favorite" : "Add favorite"}</button>
@@ -379,8 +526,10 @@ export function DesignsClient() {
                         <p className="design-post-date">{new Date(selectedDesign.createdAt).toLocaleDateString()} / {set.designs.length} style option{set.designs.length === 1 ? "" : "s"}</p>
                         {content?.contentJson.caption && <p className="design-post-caption">{content.contentJson.caption}</p>}
                         {content?.contentJson.hashtags?.length ? <p className="design-post-hashtags">{content.contentJson.hashtags.map((tag) => tag.startsWith("#") ? tag : `#${tag}`).join(" ")}</p> : null}
+                        {scheduleForm}
                         {content?.request && <div className="design-source-brief"><strong>Original creation brief</strong><p>{content.request}</p></div>}
                       </>} modalActions={<>
+                        {generatedContentId && content && <button type="button" role="menuitem" disabled={busy} onClick={toggleScheduleForm}>{schedulingDesignId === selectedDesign.id ? "Close schedule" : "Schedule post"}</button>}
                         {generatedContentId && <Link href={`/dashboard/content?edit=${encodeURIComponent(generatedContentId)}`} role="menuitem">Edit content</Link>}
                         <button type="button" role="menuitem" disabled={busy} onClick={() => void duplicate(selectedDesign)}>Duplicate design</button>
                         <button type="button" role="menuitem" onClick={() => toggleFavorite(set.id)}>{favorites.includes(set.id) ? "Remove favorite" : "Add favorite"}</button>
@@ -388,7 +537,7 @@ export function DesignsClient() {
                       </>} />
                     : <div className="design-preview-unavailable">Preview unavailable<span>Design details remain available</span></div>}
                 <span className="design-card-status">{selectedDesign.status}</span>
-                <button type="button" className={`design-favorite ${favorites.includes(set.id) ? "is-favorite" : ""}`} aria-label={favorites.includes(set.id) ? `Remove ${set.title} from favorites` : `Add ${set.title} to favorites`} aria-pressed={favorites.includes(set.id)} onClick={() => toggleFavorite(set.id)}>{favorites.includes(set.id) ? "\u2605" : "\u2606"}</button>
+                <button type="button" className={`design-favorite ${favorites.includes(set.id) ? "is-favorite" : ""}`} aria-label={favorites.includes(set.id) ? `Remove ${set.title} from favorites` : `Add ${set.title} to favorites`} aria-pressed={favorites.includes(set.id)} onClick={() => toggleFavorite(set.id)}><Star size={16} fill={favorites.includes(set.id) ? "currentColor" : "none"} aria-hidden="true" /></button>
               </div>
               <div className="design-card-details">
                 <div className="design-card-title-row"><div><h2>{set.title}</h2><p>{selectedDesign.brand.name}</p></div><span className="design-variant-count">{set.designs.length} {set.designs.length === 1 ? "version" : "versions"}</span></div>

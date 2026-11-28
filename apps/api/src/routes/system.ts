@@ -6,7 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { Router } from "express";
 import { prisma } from "../db.js";
-import { approvalEmailConfigured, approvalEmailProvider, env, hasPartialSmtpConfiguration } from "../env.js";
+import { approvalEmailConfigured, approvalEmailProvider, cloudflareAiConfigured, env, hasPartialSmtpConfiguration } from "../env.js";
 import { requireAuth, requireWorkspace, requireWorkspaceRole } from "../middleware/auth.js";
 import { getInstagramAccessToken, isInstagramConfigured } from "../services/instagram.js";
 import { isFacebookConfigured } from "../services/facebook.js";
@@ -190,9 +190,9 @@ router.get("/status", async (req, res, next) => {
       checks.push({ id: "music", label: "Background music", status: "error", message: "The music library could not be loaded.", action: "Check the local music manifest and audio files." });
     }
 
-    const contentProviderConfigured = Boolean(env.GOOGLE_AI_STUDIO_API_KEY || env.GROQ_API_KEY || env.OPENAI_API_KEY);
+    const contentProviderConfigured = Boolean(cloudflareAiConfigured || env.GROQ_API_KEY || env.OPENAI_API_KEY);
     const configuredProviders = [
-      env.GOOGLE_AI_STUDIO_API_KEY ? "Gemini" : null,
+      cloudflareAiConfigured ? "Cloudflare Workers AI" : null,
       env.GROQ_API_KEY ? "Groq" : null,
       env.OPENAI_API_KEY ? "OpenAI" : null,
     ].filter((provider): provider is string => provider !== null);
@@ -203,7 +203,7 @@ router.get("/status", async (req, res, next) => {
       message: contentProviderConfigured
         ? `Configured AI text providers in fallback order: ${configuredProviders.join(" → ")}.`
         : "AI content generation is unavailable until a provider key is configured.",
-      ...(!contentProviderConfigured ? { action: "Add GOOGLE_AI_STUDIO_API_KEY, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env and restart the API." } : {}),
+      ...(!contentProviderConfigured ? { action: "Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, GROQ_API_KEY, or OPENAI_API_KEY to apps/api/.env and restart the API." } : {}),
     });
     checks.push({
       id: "approval-email",

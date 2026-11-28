@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderDesignPageSvg } from "@united-technologies/shared/design-document";
-import { buildImageDesignPrompt, createAiDesignDocument, imageAspectRatio, sanitizeGroqArtworkSvg, type DesignCopy } from "../src/services/design-image-generator.js";
+import { buildImageDesignPrompt, createAiDesignDocument, generateCloudflareImageDesign, imageAspectRatio, sanitizeGroqArtworkSvg, selectArtworkProvider, type DesignCopy } from "../src/services/design-image-generator.js";
 
 const copy: DesignCopy = {
   headline: "Ideas that take off",
@@ -50,10 +50,64 @@ test("AI brochure generation creates two landscape print sides", () => {
 
 test("image generation chooses a matching composition ratio for each output format", () => {
   assert.equal(imageAspectRatio("flyer"), "3:4");
-  assert.equal(imageAspectRatio("brochure"), "16:9");
   assert.equal(imageAspectRatio("story"), "9:16");
   assert.equal(imageAspectRatio("brochure"), "4:3");
   assert.equal(imageAspectRatio("pinterest-pin"), "2:3");
+});
+
+test("artwork provider selection follows photo mode and reports the provider actually used", () => {
+  assert.equal(selectArtworkProvider({ photorealistic: true, groqConfigured: true, cloudflareConfigured: true }), "cloudflare");
+  assert.equal(selectArtworkProvider({ photorealistic: true, groqConfigured: true, cloudflareConfigured: false }), null);
+  assert.equal(selectArtworkProvider({ photorealistic: false, groqConfigured: true, cloudflareConfigured: true }), "groq");
+  assert.equal(selectArtworkProvider({ photorealistic: false, groqConfigured: false, cloudflareConfigured: true }), "cloudflare");
+  assert.equal(selectArtworkProvider({ photorealistic: false, groqConfigured: false, cloudflareConfigured: false }), null);
+});
+
+test("Cloudflare reference artwork uses image-to-image and returns validated editable copy", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; body: Record<string, unknown>; authorization: string | null }> = [];
+  const expectedCopy = {
+    headline: "A thoughtful campaign",
+    supportingLine: "A clear message made for your audience.",
+    callToAction: "DISCOVER MORE",
+    sections: copy.sections,
+  };
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    calls.push({ url, body, authorization: new Headers(init?.headers).get("authorization") });
+    if (url.includes("/ai/run/")) {
+      return new Response(JSON.stringify({ success: true, result: { image: Buffer.from("image-fixture").toString("base64") } }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(expectedCopy) } }] }), { status: 200 });
+  };
+
+  try {
+    const generated = await generateCloudflareImageDesign({
+      accountId: "a".repeat(32),
+      apiToken: "cf-test-token",
+      model: "@cf/black-forest-labs/flux-1-schnell",
+      referenceImageModel: "@cf/runwayml/stable-diffusion-v1-5-img2img",
+      textModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      prompt: "A warm restaurant launch poster",
+      format: "flyer",
+      brandName: "Juniper House",
+      colors: ["#253746"],
+      referenceImage: { mimeType: "image/png", data: Buffer.from("reference-fixture").toString("base64") },
+    });
+    assert.deepEqual(generated.image, Buffer.from("image-fixture"));
+    assert.equal(generated.model, "@cf/runwayml/stable-diffusion-v1-5-img2img");
+    assert.equal(generated.copy.headline, expectedCopy.headline);
+    assert.equal(calls[0]?.url.includes("/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"), true);
+    assert.equal(calls[0]?.authorization, "Bearer cf-test-token");
+    assert.equal(calls[0]?.body.image_b64, Buffer.from("reference-fixture").toString("base64"));
+    assert.equal(calls[0]?.body.width, 1024);
+    assert.equal(calls[0]?.body.height, 1365);
+    assert.equal(calls[1]?.url.endsWith("/ai/v1/chat/completions"), true);
+    assert.equal(calls[1]?.authorization, "Bearer cf-test-token");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("Groq SVG artwork is restricted to local vector markup and gets the selected canvas size", () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { type ErrorRequestHandler } from "express";
@@ -29,6 +30,7 @@ import { approvalEmailRouter } from "./routes/approval-email.js";
 import { agencyRouter } from "./routes/agency.js";
 import { listeningRouter } from "./routes/listening.js";
 import { inboxRouter } from "./routes/inbox.js";
+import { metaRouter } from "./routes/meta.js";
 import { requireAuth, requireWorkspace } from "./middleware/auth.js";
 import { prisma } from "./db.js";
 import { Prisma } from "@prisma/client";
@@ -41,7 +43,7 @@ app.disable("x-powered-by");
 // rate limits can use the forwarded client address without trusting public proxies.
 app.set("trust proxy", "loopback");
 app.use(helmet());
-app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
+app.use(cors({ origin: [env.WEB_ORIGIN, env.WEB_ORIGIN_LOCAL].filter(Boolean) as string[], credentials: true }));
 app.use(express.json({ limit: "5mb" }));
 app.use(cookieParser());
 
@@ -72,6 +74,7 @@ app.use("/api/templates", templatesRouter);
 app.use("/api/designs", designsRouter);
 app.use("/api/posts", postsRouter);
 app.use("/api/social-accounts", socialAccountsRouter);
+app.use("/api/meta", express.urlencoded({ extended: false, limit: "8kb" }), metaRouter);
 app.use("/api/listening", listeningRouter);
 app.use("/api/inbox", inboxRouter);
 app.use("/api/videos", videosRouter);
@@ -213,8 +216,9 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(413).json({ error: "The uploaded file exceeds the 100 MB per-file limit." });
     return;
   }
-  console.error("Unhandled API error", error);
-  res.status(500).json({ error: "An unexpected error occurred." });
+  const errorId = randomUUID();
+  console.error("Unhandled API error", { errorId, error });
+  res.status(500).json({ error: "An unexpected error occurred.", errorId });
 };
 
 app.use(errorHandler);

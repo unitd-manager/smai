@@ -80,7 +80,7 @@ type CreatedItem = {
 
 type GenerationResponse = {
   provider: string;
-  geminiConfigured: boolean;
+  cloudflareConfigured: boolean;
   groqConfigured: boolean;
   openaiConfigured: boolean;
   configured: boolean;
@@ -128,7 +128,7 @@ export function CreateClient() {
   const [tone, setTone] = useState("Warm and confident");
   const [language, setLanguage] = useState("English");
   const [results, setResults] = useState<CreatedItem[]>([]);
-  const [geminiConfigured, setGeminiConfigured] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [configurationLoaded, setConfigurationLoaded] = useState(false);
   const [configurationError, setConfigurationError] = useState("");
   const [usage, setUsage] = useState<GenerationResponse["usage"] | null>(null);
@@ -136,6 +136,7 @@ export function CreateClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [activeDesign, setActiveDesign] = useState<Record<string, number>>({});
+  const [creationMode, setCreationMode] = useState<"ai" | "template">("ai");
   const [templateId, setTemplateId] = useState("");
   const [templateName, setTemplateName] = useState("");
   const [templateCopy, setTemplateCopy] = useState<TemplateCopy | null>(null);
@@ -164,12 +165,12 @@ export function CreateClient() {
   useEffect(() => {
     apiRequest<{ configured: boolean }>("/api/content/configuration")
       .then(({ configured }) => {
-        setGeminiConfigured(configured);
+        setAiConfigured(configured);
         setConfigurationError("");
       })
       .catch((requestError: unknown) => {
-        setGeminiConfigured(false);
-        setConfigurationError(requestError instanceof Error ? requestError.message : "Could not check Gemini configuration.");
+        setAiConfigured(false);
+        setConfigurationError(requestError instanceof Error ? requestError.message : "Could not check AI provider configuration.");
       })
       .finally(() => setConfigurationLoaded(true));
   }, []);
@@ -290,6 +291,7 @@ export function CreateClient() {
             throw new Error("The selected template is not available for content creation.");
           }
           setTemplateId(selected.id);
+          setCreationMode("template");
           setTemplateName(typeof selected.name === "string" ? selected.name : "Selected template");
           if (selected.templateCopy && [selected.templateCopy.headline, selected.templateCopy.supportingLine, selected.templateCopy.callToAction].every((value) => typeof value === "string")) {
             setTemplateCopy(selected.templateCopy as TemplateCopy);
@@ -331,6 +333,10 @@ export function CreateClient() {
 
   async function generate(event?: FormEvent<HTMLFormElement>, onlyFormat?: string, refineText?: string) {
     event?.preventDefault();
+    if (creationMode === "template" && !templateId) {
+      setError("Choose a template before generating content in template mode.");
+      return;
+    }
     setError("");
     setNotice("");
     setGenerating(true);
@@ -344,7 +350,7 @@ export function CreateClient() {
           ...((onlyFormat === "carousel" || (!onlyFormat && selectedFormats.includes("carousel")))
             ? { carouselSlideCount }
             : {}),
-          ...(templateId ? { templateId } : {}),
+          ...(creationMode === "template" && templateId ? { templateId } : {}),
           ...(templateCopy ? { templateCopy } : {}),
           useBrandTemplate,
           platforms: selectedPlatforms,
@@ -359,7 +365,7 @@ export function CreateClient() {
           ...Object.fromEntries(response.items.map((item) => [item.id, current[item.id] ?? calendarDate])),
         }));
       }
-      setGeminiConfigured(response.configured);
+      setAiConfigured(response.configured);
       setUsage(response.usage);
       const warningNote = response.designWarnings?.length ? ` Layout note: ${response.designWarnings[0]}` : "";
       setNotice(`${response.items.length} draft${response.items.length === 1 ? " is" : "s are"} ready for your review, generated with ${response.provider} and rendered with the built-in vector templates. Nothing is scheduled or published until you choose an action.${warningNote}`);
@@ -537,7 +543,7 @@ export function CreateClient() {
     try {
       const response = await apiRequest<{
         provider: string;
-        geminiConfigured: boolean;
+        cloudflareConfigured: boolean;
         groqConfigured: boolean;
         openaiConfigured: boolean;
         configured: boolean;
@@ -592,7 +598,7 @@ export function CreateClient() {
         <summary><span><strong>Custom AI artwork</strong><small>Generate an original visual from a prompt or reference image</small></span><span className="create-artwork-disclosure-action">Open artwork studio</span></summary>
         <CustomAiArtworkClient />
       </details>
-      {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
+      {configurationLoaded && !aiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>CLOUDFLARE_ACCOUNT_ID</code> and <code>CLOUDFLARE_API_TOKEN</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
       <form className="create-form" onSubmit={(event) => generate(event)}>
         <div className="create-idea-field create-brief-section">
           <div className="create-idea-heading">
@@ -605,9 +611,25 @@ export function CreateClient() {
         <section className="create-config-card" aria-labelledby="create-design-options-title">
           <h2 id="create-design-options-title"><span className="create-step-number">02</span><span><strong>Format and design</strong><small>Choose how your content should look</small></span></h2>
         <fieldset className="create-fieldset">
+          <legend>Creation method</legend>
+          <div className="create-option-grid">
+            <label className="create-check"><input type="radio" name="creation-mode" checked={creationMode === "ai"} onChange={() => { setCreationMode("ai"); setTemplateId(""); setTemplateName(""); setTemplateCopy(null); }} />Create with AI</label>
+            <label className="create-check"><input type="radio" name="creation-mode" checked={creationMode === "template"} onChange={() => setCreationMode("template")} />Use a template</label>
+          </div>
+          <small>{creationMode === "ai" ? "AI writes the content and creates flexible editable layouts." : "Choose a distinct layout; AI writes original copy to fit it."}</small>
+        </fieldset>
+        <fieldset className="create-fieldset">
           <legend>Content format</legend>
           <div className="create-option-grid">
-            {formats.map(([value, label]) => <label className="create-check" key={value}><input type="radio" name="content-format" checked={selectedFormats[0] === value} onChange={() => setSelectedFormats([value])} />{label}</label>)}
+            {formats.map(([value, label]) => <label className="create-check" key={value}><input type="radio" name="content-format" checked={selectedFormats[0] === value} onChange={() => {
+              setSelectedFormats([value]);
+              const selectedTemplate = templates.find((template) => template.id === templateId);
+              if (selectedTemplate && selectedTemplate.format !== value && !(selectedTemplate.format === "video" && value === "thumbnail")) {
+                setTemplateId("");
+                setTemplateName("");
+                setTemplateCopy(null);
+              }
+            }} />{label}</label>)}
           </div>
         </fieldset>
         {selectedFormats.includes("carousel") && (
@@ -620,7 +642,7 @@ export function CreateClient() {
             <small>Each slide is designed with a headline, supporting line, and body copy.</small>
           </label>
         )}
-        <label className="create-template-select">Design template
+        {creationMode === "template" && <label className="create-template-select">Design template
           <CompactSelect
             aria-label="Design template"
             value={templateId}
@@ -628,6 +650,7 @@ export function CreateClient() {
               const selected = templates.find((template) => template.id === event.target.value);
               setTemplateId(selected?.id ?? "");
               setTemplateName(selected?.name ?? "");
+              setTemplateCopy(null);
               if (selected) setSelectedFormats([selected.format]);
             }}
           >
@@ -636,9 +659,9 @@ export function CreateClient() {
               <option value={template.id} key={template.id}>{template.name} · {template.format.replaceAll("-", " ")}</option>
             ))}
           </CompactSelect>
-          <small>{templateLoadError || (templateId ? `Using “${templateName}” from your in-app template library.` : "Choose a built-in design for this format, or leave it empty to generate three layout options. Designs stay crisp and editable in the app.")}</small>
-        </label>
-        {!templateId && <label className="create-check"><input type="checkbox" checked={useBrandTemplate} onChange={(event) => setUseBrandTemplate(event.target.checked)} /> Use my preferred Brand Kit template</label>}
+          <small>{templateLoadError || (templateId ? `Using “${templateName}” from your in-app template library.` : "Select a layout to continue; designs stay editable in the app.")}</small>
+        </label>}
+        {creationMode === "ai" && <label className="create-check"><input type="checkbox" checked={useBrandTemplate} onChange={(event) => setUseBrandTemplate(event.target.checked)} /> Use my preferred Brand Kit template</label>}
         </section>
         <section className="create-config-card" aria-labelledby="create-channel-options-title">
           <h2 id="create-channel-options-title"><span className="create-step-number">03</span><span><strong>Channels and voice</strong><small>Tailor copy for each selected platform</small></span></h2>
@@ -695,6 +718,10 @@ export function CreateClient() {
               const designPageCount = designDocument?.pages.length ?? 1;
               return (
                 <article className="created-card create-review-card" key={item.id}>
+                  <header className="created-review-header">
+                    <div className="created-card-title"><h3>{content.title}</h3></div>
+                    <div className="created-platforms" aria-label="Posting platforms">{content.platforms.map((platform) => <span key={platform}>{platform}</span>)}</div>
+                  </header>
                   <div className="created-preview-wrap">
                     {designDocument ? (
                       <button type="button" className="created-preview-trigger" onClick={() => setPreviewTarget({ itemId: item.id, pageIndex: 0 })} aria-label={`Open ${content.title} preview`}>
@@ -713,10 +740,8 @@ export function CreateClient() {
                     ) : <div className="created-preview-empty">Preview unavailable</div>}
                     <span className="created-format-badge">{content.format}</span>
                   </div>
-                  <SocialFeedPreview platforms={content.platforms} title={content.title} imageSrc={feedPreviewImage} captions={platformCaptions} />
                   <div className="created-card-body">
-                    <div className="created-card-title"><h3>{content.title}</h3></div>
-                    <div className="created-platforms" aria-label="Posting platforms">{content.platforms.map((platform) => <span key={platform}>{platform}</span>)}</div>
+                    <SocialFeedPreview platforms={content.platforms} title={content.title} imageSrc={feedPreviewImage} captions={platformCaptions} />
                     <div className="platform-content-set">
                       <h4>Platform-specific copy</h4>
                       <p>Edit each version independently. These versions are saved to the corresponding post targets.</p>

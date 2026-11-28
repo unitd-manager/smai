@@ -1,0 +1,23 @@
+CREATE TABLE `CompetitorResearchJob` (
+    `id` VARCHAR(191) NOT NULL,
+    `workspaceId` VARCHAR(191) NOT NULL,
+    `brandId` VARCHAR(191) NOT NULL,
+    `dedupeKey` VARCHAR(191) NOT NULL,
+    `status` VARCHAR(32) NOT NULL DEFAULT 'QUEUED',
+    `stage` VARCHAR(80) NOT NULL DEFAULT 'Discovering competitors',
+    `progress` INTEGER NOT NULL DEFAULT 0,
+    `attempts` INTEGER NOT NULL DEFAULT 0,
+    `error` TEXT NULL,
+    `warnings` JSON NULL,
+    `startedAt` DATETIME(3) NULL,
+    `completedAt` DATETIME(3) NULL,
+    `runAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    UNIQUE INDEX `CompetitorResearchJob_dedupe_unique`(`workspaceId`, `brandId`, `dedupeKey`),
+    INDEX `CompetitorResearchJob_queue_idx`(`status`, `runAt`, `createdAt`),
+    INDEX `CompetitorResearchJob_brand_idx`(`workspaceId`, `brandId`, `createdAt`),
+    PRIMARY KEY (`id`),
+    CONSTRAINT `CompetitorResearchJob_workspaceId_fkey` FOREIGN KEY (`workspaceId`) REFERENCES `Workspace`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT `CompetitorResearchJob_brandId_fkey` FOREIGN KEY (`brandId`) REFERENCES `Brand`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
-import { createAudioFilterGraph, getNarrationSpeed, getRemotionBrowserExecutablePath, listMusicTracks, musicStyles, parseScenes, resolveRemotionBundleDirectory, voiceStyles } from "../src/services/video-renderer.js";
+import { createAudioFilterGraph, createMagicHourAudioFilterGraph, getNarrationSpeed, getRemotionBrowserExecutablePath, listMusicTracks, musicStyles, parseScenes, resolveRemotionBundleDirectory } from "../src/services/video-renderer.js";
 import { piperVoiceProfiles, resolvePiperVoice, selectTtsProvider, ttsConfiguration } from "../src/services/video-tts.js";
 import { getTargetSceneDuration, getTargetSceneDurations, getVideoSceneTimeline } from "../src/video/types.js";
 import { inferIllustrationKind } from "../src/video/video-illustrations.js";
@@ -81,6 +81,49 @@ test("video music treatments generate distinct FFmpeg processing graphs", () => 
   const graph = createAudioFilterGraph([2], true, 0.12, 0.2, 5, "cinematic");
   assert.match(graph, /equalizer=f=120:t=q:w=1:g=2/);
   assert.match(graph, /equalizer=f=7000:t=q:w=1:g=2/);
+});
+
+test("Magic Hour product narration replaces generated audio and ducks the selected music", () => {
+  const graph = createMagicHourAudioFilterGraph({
+    hasSourceAudio: true,
+    hasVoiceover: true,
+    hasMusic: true,
+    totalDurationSeconds: 15,
+    voiceoverDurationSeconds: 8,
+    musicVolume: 0.2,
+    musicDucking: 0.25,
+    musicStyle: "warm",
+  });
+  assert.match(graph, /^\[1:a\].*\[base\]/);
+  assert.match(graph, /\[2:a\].*volume='0\.2\*if\(lt\(t,8\.000\),0\.25,1\)'/);
+  assert.match(graph, /amix=inputs=2:duration=first/);
+  assert.doesNotMatch(graph, /\[0:a\]/);
+});
+
+test("Magic Hour avatar audio can mix background music or keep the original speech alone", () => {
+  const withMusic = createMagicHourAudioFilterGraph({
+    hasSourceAudio: true,
+    hasVoiceover: false,
+    hasMusic: true,
+    totalDurationSeconds: 10,
+    musicVolume: 0.12,
+    musicDucking: 0.3,
+    musicStyle: "balanced",
+  });
+  assert.match(withMusic, /\[0:a\].*\[base\]/);
+  assert.match(withMusic, /\[1:a\].*volume='0\.12\*if\(lt\(t,10\.000\),0\.3,1\)'/);
+
+  const withoutMusic = createMagicHourAudioFilterGraph({
+    hasSourceAudio: true,
+    hasVoiceover: false,
+    hasMusic: false,
+    totalDurationSeconds: 10,
+    musicVolume: 0.12,
+    musicDucking: 0.3,
+    musicStyle: "balanced",
+  });
+  assert.match(withoutMusic, /\[0:a\].*\[base\]/);
+  assert.match(withoutMusic, /\[base\]anull\[aout\]/);
 });
 
 test("dialogue timing follows measured clips with short varied turns and a short scene tail", () => {

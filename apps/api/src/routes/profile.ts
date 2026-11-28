@@ -1,7 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import { approvalEmailConfigured, env, hasPartialSmtpConfiguration } from "../env.js";
+import { approvalEmailConfigured, cloudflareAiConfigured, env, hasPartialSmtpConfiguration } from "../env.js";
 import { prisma } from "../db.js";
 import {
   requireAuth,
@@ -11,9 +11,10 @@ import {
 } from "../middleware/auth.js";
 import { isInstagramMediaHostingConfigured } from "../services/instagram.js";
 import { runInstagramAutopilot } from "../services/instagram-autopilot.js";
-import { autopilotFormatOptions, defaultInstagramAutopilotScheduleSettings, defaultInstagramAutopilotSettings, getAutopilotPostCount, readAutopilotScheduleSettings } from "../services/instagram-autopilot.js";
+import { autopilotFormatOptions, defaultAutopilotVideoSettings, defaultInstagramAutopilotScheduleSettings, defaultInstagramAutopilotSettings, getAutopilotPostCount, readAutopilotScheduleSettings } from "../services/instagram-autopilot.js";
 import { getNextWeeklyAutopilotRunAt } from "../services/instagram-autopilot-schedule.js";
 import { starterTemplates } from "../services/template-library.js";
+import { enqueueCompetitorResearch } from "../services/competitor-research-worker.js";
 
 const router = Router();
 const supportedTimezones = new Set(["UTC", ...Intl.supportedValuesOf("timeZone")]);
@@ -23,14 +24,37 @@ const autopilotRunLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
 });
+const autopilotSourceSchema = {
+  creationMode: z.enum(["ai", "template"]).default("ai"),
+  templateIds: z.record(z.string(), z.string().trim().min(1)).default({}),
+};
+const autopilotAutomationSourceSchema = {
+  automationCreationMode: z.enum(["ai", "template"]).default("ai"),
+  automationTemplateIds: z.record(z.string(), z.string().trim().min(1)).default({}),
+};
+const autopilotVideoSettingsSchema = z.object({
+  videoType: z.enum(["product-motion", "realistic-avatar", "animated-avatar"]).default(defaultAutopilotVideoSettings.videoType),
+  durationSeconds: z.number().int().min(3).max(60).default(defaultAutopilotVideoSettings.durationSeconds),
+  narrationEnabled: z.boolean().default(defaultAutopilotVideoSettings.narrationEnabled),
+  voiceName: z.string().trim().max(120).default(defaultAutopilotVideoSettings.voiceName),
+  musicId: z.string().trim().max(80).nullable().default(defaultAutopilotVideoSettings.musicId),
+  musicStyle: z.enum(["balanced", "warm", "bright", "calm", "cinematic"]).default(defaultAutopilotVideoSettings.musicStyle),
+});
 const autopilotRunSchema = z.object({
   days: z.number().int().min(1).max(30).default(defaultInstagramAutopilotSettings.days),
   campaignGoal: z.string().trim().max(500).default(""),
+  videoSettings: autopilotVideoSettingsSchema.default(defaultAutopilotVideoSettings),
+  ...autopilotSourceSchema,
   counts: z.object(Object.fromEntries(autopilotFormatOptions.map((format) => [format, z.number().int().min(0).max(30).default(defaultInstagramAutopilotSettings.counts[format])])) as Record<typeof autopilotFormatOptions[number], z.ZodDefault<z.ZodNumber>>),
 }).default(defaultInstagramAutopilotSettings).superRefine((settings, context) => {
   const total = getAutopilotPostCount(settings);
   if (total < 1 || total > 30) context.addIssue({ code: "custom", path: ["counts"], message: "Choose between 1 and 30 posts for each Autopilot run." });
   if (total < settings.days) context.addIssue({ code: "custom", path: ["days"], message: "Choose no more scheduled days than posts." });
+  if (settings.counts["video-product-demo"] + settings.counts["video-avatar"] > 0 &&
+    (settings.videoSettings.videoType !== "product-motion" || settings.videoSettings.narrationEnabled) &&
+    !settings.videoSettings.voiceName) {
+    context.addIssue({ code: "custom", path: ["videoSettings", "voiceName"], message: "Choose a voice for the selected Autopilot video type." });
+  }
 });
 const autopilotAutomationSchema = z.object({
   enabled: z.boolean(),
@@ -38,12 +62,53 @@ const autopilotAutomationSchema = z.object({
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default(defaultInstagramAutopilotScheduleSettings.time),
   days: z.number().int().min(1).max(30).default(defaultInstagramAutopilotSettings.days),
   campaignGoal: z.string().trim().max(500).default(""),
+  videoSettings: autopilotVideoSettingsSchema.default(defaultAutopilotVideoSettings),
+  automationVideoSettings: autopilotVideoSettingsSchema.default(defaultAutopilotVideoSettings),
+  ...autopilotSourceSchema,
+  ...autopilotAutomationSourceSchema,
   counts: z.object(Object.fromEntries(autopilotFormatOptions.map((format) => [format, z.number().int().min(0).max(30).default(defaultInstagramAutopilotSettings.counts[format])])) as Record<typeof autopilotFormatOptions[number], z.ZodDefault<z.ZodNumber>>),
 }).superRefine((settings, context) => {
   const total = getAutopilotPostCount(settings);
   if (total < 1 || total > 30) context.addIssue({ code: "custom", path: ["counts"], message: "Choose between 1 and 30 posts for each weekly run." });
   if (total < settings.days) context.addIssue({ code: "custom", path: ["days"], message: "Choose no more scheduled days than posts." });
+  if (settings.counts["video-product-demo"] + settings.counts["video-avatar"] > 0) {
+    if ((settings.videoSettings.videoType !== "product-motion" || settings.videoSettings.narrationEnabled) && !settings.videoSettings.voiceName) {
+      context.addIssue({ code: "custom", path: ["videoSettings", "voiceName"], message: "Choose a voice for manual video generation." });
+    }
+    if ((settings.automationVideoSettings.videoType !== "product-motion" || settings.automationVideoSettings.narrationEnabled) && !settings.automationVideoSettings.voiceName) {
+      context.addIssue({ code: "custom", path: ["automationVideoSettings", "voiceName"], message: "Choose a voice for recurring video generation." });
+    }
+  }
 });
+
+async function validateAutopilotTemplates(
+  workspaceId: string,
+  settings: { creationMode: "ai" | "template"; templateIds: Record<string, string>; counts: Record<string, number> },
+) {
+  if (settings.creationMode !== "template") return null;
+  const requiredFormats = Object.entries(settings.counts)
+    .filter(([format, count]) => count > 0 && !format.startsWith("video-"))
+    .map(([format]) => format);
+  const missingFormats = requiredFormats.filter((format) => !settings.templateIds[format]);
+  if (missingFormats.length) return `Select a template for each selected static format: ${missingFormats.join(", ")}.`;
+  const requested = requiredFormats.map((format) => [format, settings.templateIds[format]!] as const);
+  if (!requested.length) return null;
+
+  const stored = await prisma.template.findMany({
+    where: {
+      id: { in: requested.map(([, id]) => id) },
+      active: true,
+      OR: [{ workspaceId: null, resellerId: null }, { workspaceId }],
+    },
+    select: { id: true, format: true },
+  });
+  const available = new Map<string, string>([
+    ...starterTemplates.map((template) => [template.id, template.format] as const),
+    ...stored.map((template) => [template.id, template.format] as const),
+  ]);
+  const invalid = requested.find(([format, id]) => available.get(id) !== format);
+  return invalid ? `The selected ${invalid[0]} template is unavailable or has the wrong format. Choose another template.` : null;
+}
 
 function hasNonEmptyList(value: unknown) {
   return Array.isArray(value) && value.some((item) => typeof item === "string" && item.trim());
@@ -138,7 +203,7 @@ async function getInstagramAutopilotStatus(workspaceId: string, brandId?: string
       ? "Complete SMTP_HOST, SMTP_USER, and SMTP_PASSWORD in apps/api/.env, then restart the API."
       : "Configure SMTP_HOST, SMTP_USER, and SMTP_PASSWORD in apps/api/.env, or set RESEND_API_KEY and EMAIL_FROM, then restart the API.");
   }
-  if (!env.GOOGLE_AI_STUDIO_API_KEY && !env.GROQ_API_KEY && !env.OPENAI_API_KEY) {
+  if (!cloudflareAiConfigured && !env.GROQ_API_KEY && !env.OPENAI_API_KEY) {
     blockers.push("Configure an AI provider API key on the API.");
   }
   if (connectedPlatforms.includes("Instagram") && !isInstagramMediaHostingConfigured()) {
@@ -241,6 +306,16 @@ router.get("/instagram-autopilot/status", async (req, res, next) => {
 router.put("/instagram-autopilot/settings", requireWorkspaceRole("OWNER"), requireWritableWorkspace, async (req, res, next) => {
   try {
     const settings = autopilotAutomationSchema.parse(req.body ?? {});
+    const batchTemplateError = await validateAutopilotTemplates(req.workspace!.id, settings);
+    const recurringTemplateError = await validateAutopilotTemplates(req.workspace!.id, {
+      creationMode: settings.automationCreationMode,
+      templateIds: settings.automationTemplateIds,
+      counts: settings.counts,
+    });
+    if (batchTemplateError || recurringTemplateError) {
+      res.status(400).json({ error: batchTemplateError ?? recurringTemplateError });
+      return;
+    }
     const brand = await prisma.brand.findFirst({
       where: { workspaceId: req.workspace!.id, ...(req.header("x-brand-id") ? { id: req.header("x-brand-id")! } : {}) },
       select: { id: true, timezone: true },
@@ -261,12 +336,36 @@ router.put("/instagram-autopilot/settings", requireWorkspaceRole("OWNER"), requi
         segment: "business-unverified",
         instagramAutopilotEnabled: settings.enabled,
         instagramAutopilotNextRunAt: nextRunAt,
-        instagramAutopilotSettings: { weekday: settings.weekday, time: settings.time, days: settings.days, counts: settings.counts, campaignGoal: settings.campaignGoal },
+        instagramAutopilotSettings: {
+          weekday: settings.weekday,
+          time: settings.time,
+          days: settings.days,
+          counts: settings.counts,
+          campaignGoal: settings.campaignGoal,
+          creationMode: settings.creationMode,
+          templateIds: settings.templateIds,
+          videoSettings: settings.videoSettings,
+          automationCreationMode: settings.automationCreationMode,
+          automationTemplateIds: settings.automationTemplateIds,
+          automationVideoSettings: settings.automationVideoSettings,
+        },
       },
       update: {
         instagramAutopilotEnabled: settings.enabled,
         instagramAutopilotNextRunAt: nextRunAt,
-        instagramAutopilotSettings: { weekday: settings.weekday, time: settings.time, days: settings.days, counts: settings.counts, campaignGoal: settings.campaignGoal },
+        instagramAutopilotSettings: {
+          weekday: settings.weekday,
+          time: settings.time,
+          days: settings.days,
+          counts: settings.counts,
+          campaignGoal: settings.campaignGoal,
+          creationMode: settings.creationMode,
+          templateIds: settings.templateIds,
+          videoSettings: settings.videoSettings,
+          automationCreationMode: settings.automationCreationMode,
+          automationTemplateIds: settings.automationTemplateIds,
+          automationVideoSettings: settings.automationVideoSettings,
+        },
       },
     });
     await prisma.auditLog.create({
@@ -276,10 +375,19 @@ router.put("/instagram-autopilot/settings", requireWorkspaceRole("OWNER"), requi
         action: settings.enabled ? "instagram_autopilot.schedule_updated" : "instagram_autopilot.schedule_paused",
         targetType: "brand",
         targetId: brand.id,
-        metadata: { weekday: settings.weekday, time: settings.time, days: settings.days, totalPosts: getAutopilotPostCount(settings) },
+        metadata: {
+          weekday: settings.weekday,
+          time: settings.time,
+          days: settings.days,
+          totalPosts: getAutopilotPostCount(settings),
+          batchCreationMode: settings.creationMode,
+          automationCreationMode: settings.automationCreationMode,
+          batchVideoType: settings.videoSettings.videoType,
+          automationVideoType: settings.automationVideoSettings.videoType,
+        },
       },
     });
-    res.json({ enabled: settings.enabled, settings: { weekday: settings.weekday, time: settings.time, days: settings.days, counts: settings.counts, campaignGoal: settings.campaignGoal }, nextRunAt });
+    res.json({ enabled: settings.enabled, settings, nextRunAt });
   } catch (error) {
     next(error);
   }
@@ -293,6 +401,11 @@ router.post(
   async (req, res, next) => {
     try {
       const settings = autopilotRunSchema.parse(req.body ?? {});
+      const templateError = await validateAutopilotTemplates(req.workspace!.id, settings);
+      if (templateError) {
+        res.status(400).json({ error: templateError });
+        return;
+      }
       const status = await getInstagramAutopilotStatus(req.workspace!.id, req.header("x-brand-id"));
       if (!status) {
         res.status(404).json({ error: "No brand profile exists in this workspace." });
@@ -470,7 +583,15 @@ router.put("/", requireWorkspaceRole("OWNER", "ADMIN"), requireWritableWorkspace
         select: { id: true, name: true, timezone: true, profile: true, kit: true },
       });
     });
-    res.json({ brand: saved });
+    let competitorResearchJob = null;
+    try {
+      competitorResearchJob = await enqueueCompetitorResearch(req.workspace!.id, saved.id);
+    } catch (error) {
+      console.error("Brand profile saved, but competitor research could not be queued.", { workspaceId: req.workspace!.id, brandId: saved.id, error });
+    }
+    res.json({ brand: saved, competitorResearchJob: competitorResearchJob ? {
+      id: competitorResearchJob.id, status: competitorResearchJob.status, stage: competitorResearchJob.stage,
+    } : null });
   } catch (error) {
     next(error);
   }

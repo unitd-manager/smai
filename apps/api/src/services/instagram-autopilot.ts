@@ -1,27 +1,61 @@
 import jwt from "jsonwebtoken";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
-import { approvalEmailConfigured, env } from "../env.js";
+import { approvalEmailConfigured, cloudflareAiConfigured, env } from "../env.js";
 import { isInstagramMediaHostingConfigured } from "./instagram.js";
 import { createInstagramAutopilotSchedule, getNextWeeklyAutopilotRunAt } from "./instagram-autopilot-schedule.js";
-import { getMagicHourVoices } from "./magic-hour.js";
 import { sendAutopilotApprovalEmail } from "./approval-email.js";
 
 export const autopilotFormatOptions = ["post", "carousel", "brochure", "video-product-demo", "video-avatar", "linkedin-banner", "facebook-cover"] as const;
 type AutopilotFormat = typeof autopilotFormatOptions[number];
-export type AutopilotSettings = { days: number; counts: Record<AutopilotFormat, number>; campaignGoal: string };
-export type AutopilotScheduleSettings = AutopilotSettings & { weekday: number; time: string };
+export type AutopilotSettings = {
+  days: number;
+  counts: Record<AutopilotFormat, number>;
+  campaignGoal: string;
+  creationMode: "ai" | "template";
+  templateIds: Partial<Record<AutopilotFormat, string>>;
+  videoSettings: AutopilotVideoSettings;
+};
+export type AutopilotVideoSettings = {
+  videoType: "product-motion" | "realistic-avatar" | "animated-avatar";
+  durationSeconds: number;
+  narrationEnabled: boolean;
+  voiceName: string;
+  musicId: string | null;
+  musicStyle: "balanced" | "warm" | "bright" | "calm" | "cinematic";
+};
+export type AutopilotScheduleSettings = AutopilotSettings & {
+  weekday: number;
+  time: string;
+  automationCreationMode: "ai" | "template";
+  automationTemplateIds: Partial<Record<AutopilotFormat, string>>;
+  automationVideoSettings: AutopilotVideoSettings;
+};
+export const defaultAutopilotVideoSettings: AutopilotVideoSettings = {
+  videoType: "product-motion",
+  durationSeconds: 15,
+  narrationEnabled: true,
+  voiceName: "",
+  musicId: null,
+  musicStyle: "balanced",
+};
 export const defaultInstagramAutopilotSettings: AutopilotSettings = {
   days: 7,
   // The unattended weekly run should work without external video services or assets.
   // It creates native Instagram image posts and carousels from the saved brand profile.
   counts: { post: 4, carousel: 3, brochure: 0, "video-product-demo": 0, "video-avatar": 0, "linkedin-banner": 0, "facebook-cover": 0 },
   campaignGoal: "",
+  creationMode: "ai",
+  templateIds: {},
+  videoSettings: defaultAutopilotVideoSettings,
 };
 export const defaultInstagramAutopilotScheduleSettings: AutopilotScheduleSettings = {
   ...defaultInstagramAutopilotSettings,
   weekday: 2,
   time: "09:00",
+  automationCreationMode: "ai",
+  automationTemplateIds: {},
+  automationVideoSettings: defaultAutopilotVideoSettings,
 };
 const retryIntervalMs = 15 * 60 * 1000;
 const renderPollIntervalMs = 30 * 1000;
@@ -67,7 +101,34 @@ function readSettings(value: Prisma.JsonValue | null | undefined): AutopilotSett
     days: typeof raw.days === "number" && Number.isInteger(raw.days) ? raw.days : defaultInstagramAutopilotSettings.days,
     counts,
     campaignGoal: typeof raw.campaignGoal === "string" ? raw.campaignGoal.slice(0, 500) : "",
+    creationMode: raw.creationMode === "template" ? "template" : "ai",
+    templateIds: readTemplateIds(raw.templateIds),
+    videoSettings: readAutopilotVideoSettings(raw.videoSettings),
   };
+}
+
+function readAutopilotVideoSettings(value: unknown): AutopilotVideoSettings {
+  const raw = record(value);
+  return {
+    videoType: raw.videoType === "realistic-avatar" || raw.videoType === "animated-avatar" ? raw.videoType : "product-motion",
+    durationSeconds: typeof raw.durationSeconds === "number" && Number.isInteger(raw.durationSeconds) && raw.durationSeconds >= 3 && raw.durationSeconds <= 60
+      ? raw.durationSeconds
+      : defaultAutopilotVideoSettings.durationSeconds,
+    narrationEnabled: typeof raw.narrationEnabled === "boolean" ? raw.narrationEnabled : defaultAutopilotVideoSettings.narrationEnabled,
+    voiceName: typeof raw.voiceName === "string" ? raw.voiceName.trim().slice(0, 120) : defaultAutopilotVideoSettings.voiceName,
+    musicId: typeof raw.musicId === "string" && raw.musicId.trim() ? raw.musicId.trim().slice(0, 80) : null,
+    musicStyle: raw.musicStyle === "warm" || raw.musicStyle === "bright" || raw.musicStyle === "calm" || raw.musicStyle === "cinematic"
+      ? raw.musicStyle
+      : "balanced",
+  };
+}
+
+function readTemplateIds(value: unknown): Partial<Record<AutopilotFormat, string>> {
+  if (!value || Array.isArray(value) || typeof value !== "object") return {};
+  return Object.fromEntries(autopilotFormatOptions.flatMap((format) => {
+    const id = (value as Record<string, unknown>)[format];
+    return typeof id === "string" && id.trim() ? [[format, id.trim()]] : [];
+  })) as Partial<Record<AutopilotFormat, string>>;
 }
 
 export function readAutopilotScheduleSettings(value: Prisma.JsonValue | null | undefined): AutopilotScheduleSettings {
@@ -78,13 +139,71 @@ export function readAutopilotScheduleSettings(value: Prisma.JsonValue | null | u
     const count = value.counts && !Array.isArray(value.counts) && typeof value.counts === "object" ? value.counts[format] : undefined;
     if (typeof count === "number" && Number.isInteger(count) && count >= 0 && count <= 30) counts[format] = count;
   }
+  const creationMode = value.creationMode === "template" ? "template" : "ai";
   return {
     days: typeof value.days === "number" && Number.isInteger(value.days) && value.days >= 1 && value.days <= 30 ? value.days : defaults.days,
     counts,
     campaignGoal: typeof value.campaignGoal === "string" ? value.campaignGoal.slice(0, 500) : defaults.campaignGoal,
+    creationMode,
+    templateIds: readTemplateIds(value.templateIds),
+    videoSettings: readAutopilotVideoSettings(value.videoSettings),
+    automationCreationMode: value.automationCreationMode === "template"
+      ? "template"
+      : value.automationCreationMode === undefined && creationMode === "template" ? "template" : "ai",
+    automationTemplateIds: readTemplateIds(value.automationTemplateIds === undefined ? value.templateIds : value.automationTemplateIds),
+    automationVideoSettings: readAutopilotVideoSettings(value.automationVideoSettings === undefined ? value.videoSettings : value.automationVideoSettings),
     weekday: typeof value.weekday === "number" && Number.isInteger(value.weekday) && value.weekday >= 0 && value.weekday <= 6 ? value.weekday : defaults.weekday,
     time: typeof value.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.time) ? value.time : defaults.time,
   };
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringsFrom(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 1) : [];
+}
+
+export function buildAutopilotCompetitorGuidance(analyses: Array<{ analysis: unknown; observedAt: Date }>) {
+  const analysisRecords = analyses.map(({ analysis }) => record(analysis));
+  const content = analysisRecords.map((analysis) => record(analysis.content));
+  const actionPlans = analysisRecords.map((analysis) => record(analysis.actionPlan));
+  const audiences = analysisRecords.map((analysis) => record(analysis.audience));
+  const creative = analysisRecords.map((analysis) => record(analysis.creative));
+  const takeaways = [
+    ...content.flatMap((item) => stringsFrom(item.formats)),
+    ...content.flatMap((item) => stringsFrom(item.patterns)),
+    ...content.flatMap((item) => stringsFrom(item.repetitionAndGaps)),
+    ...actionPlans.flatMap((item) => stringsFrom(item.formatsToPrioritize)),
+    ...actionPlans.flatMap((item) => stringsFrom(item.topicsToOwn)),
+    ...actionPlans.flatMap((item) => stringsFrom(item.audienceNeeds)),
+    ...audiences.flatMap((item) => stringsFrom(item.unmetNeeds)),
+    ...creative.flatMap((item) => stringsFrom(item.differentiationIdeas)),
+  ].map((item) => item.trim().slice(0, 220));
+  const uniqueTakeaways = [...new Set(takeaways)].slice(0, 8);
+  if (!uniqueTakeaways.length) return "";
+  const dates = analyses.map(({ observedAt }) => observedAt).filter((date) => Number.isFinite(date.getTime()));
+  const newest = dates.sort((left, right) => right.getTime() - left.getTime())[0];
+  return [
+    newest ? `Latest saved public competitor analysis: ${newest.toISOString().slice(0, 10)}.` : "",
+    `Use these high-level strategic signals as inspiration, not source material: ${uniqueTakeaways.join(" | ")}.`,
+    "Create original concepts grounded in this brand's verified products, audience, tone, and offers. Do not copy competitor wording, named campaigns, logos, distinctive visuals, or specific post concepts; do not imply competitor claims are facts about this brand.",
+  ].filter(Boolean).join(" ");
+}
+
+async function getAutopilotCompetitorGuidance(workspaceId: string, brandId: string) {
+  const snapshots = await prisma.competitorSnapshot.findMany({
+    where: { workspaceId, brandId },
+    orderBy: { observedAt: "desc" },
+    take: 30,
+    select: { analysisJson: true, observedAt: true },
+  });
+  return buildAutopilotCompetitorGuidance(
+    snapshots.flatMap((snapshot) => snapshot.analysisJson
+      ? [{ analysis: snapshot.analysisJson, observedAt: snapshot.observedAt }]
+      : []).slice(0, 8),
+  );
 }
 
 function selectedFormats(settings: AutopilotSettings) {
@@ -139,6 +258,15 @@ async function internalRequest<T>(brand: BrandContext, userId: string, route: st
     const message = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
       ? payload.error
       : `Request failed with status ${response.status}.`;
+    const errorId = payload && typeof payload === "object" && "errorId" in payload && typeof payload.errorId === "string"
+      ? payload.errorId
+      : null;
+    if (errorId) {
+      throw new Error(`Instagram Autopilot request to ${route} failed with HTTP ${response.status} (error reference ${errorId}). Check the API logs for this reference.`);
+    }
+    if (message === "An unexpected error occurred.") {
+      throw new Error(`Instagram Autopilot request to ${route} failed with HTTP ${response.status}; the API returned no diagnostic reference.`);
+    }
     throw new Error(message);
   }
   return payload as T;
@@ -178,7 +306,17 @@ async function verifyPrerequisites(brand: BrandContext, settings = defaultInstag
   }
 }
 
-async function generateStaticContent(brand: BrandContext, userId: string, runId: string, index: number, format: string, batchSize: number, campaignGoal: string) {
+async function generateStaticContent(
+  brand: BrandContext,
+  userId: string,
+  runId: string,
+  index: number,
+  format: string,
+  batchSize: number,
+  campaignGoal: string,
+  competitorGuidance: string,
+  templateId?: string,
+) {
   const priorContent = await prisma.generatedContent.findMany({
     where: {
       workspaceId: brand.workspaceId,
@@ -204,6 +342,7 @@ async function generateStaticContent(brand: BrandContext, userId: string, runId:
     brand.profile?.offers ? `Current offers: ${brand.profile.offers}.` : "",
     brand.profile?.tone ? `Brand voice: ${brand.profile.tone}.` : "",
     campaignGoal ? `Campaign focus: ${campaignGoal}. Tie the post to this focus only when it fits the business and audience; do not invent offers or claims.` : "",
+    competitorGuidance ? `Competitor intelligence: ${competitorGuidance}` : "",
     strings(brand.profile?.goals).length ? `Business goals: ${strings(brand.profile?.goals).join(", ")}.` : "",
     "Create content for this business as a service provider, not as one of its customers. Keep every post tied to its listed industry, audience, and services; do not invent discounts, prices, client results, or offers.",
     format === "brochure" || format === "flyer"
@@ -214,6 +353,7 @@ async function generateStaticContent(brand: BrandContext, userId: string, runId:
     idea,
     formats: [format],
     platforms: ["Instagram"],
+    ...(templateId ? { templateId } : {}),
     language: strings(brand.profile?.languages)[0] ?? "English",
     useBrandProfile: true,
     carouselSlideCount: 6,
@@ -224,7 +364,16 @@ async function generateStaticContent(brand: BrandContext, userId: string, runId:
   return id;
 }
 
-async function generateMagicHourVideo(brand: BrandContext, userId: string, runId: string, index: number, format: "video-product-demo" | "video-avatar", campaignGoal: string) {
+async function generateMagicHourVideo(
+  brand: BrandContext,
+  userId: string,
+  runId: string,
+  index: number,
+  format: "video-product-demo" | "video-avatar",
+  campaignGoal: string,
+  competitorGuidance: string,
+  videoSettings: AutopilotVideoSettings,
+) {
   const sources = await prisma.mediaAsset.findMany({
     where: {
       workspaceId: brand.workspaceId,
@@ -238,21 +387,28 @@ async function generateMagicHourVideo(brand: BrandContext, userId: string, runId
     select: { id: true },
   });
   if (!sources.length) throw new Error(`Add at least one image to Gallery before generating a Magic Hour ${format === "video-avatar" ? "avatar" : "product demonstration"} video.`);
-  const voiceResponse = format === "video-avatar" ? await getMagicHourVoices() : null;
-  const voices = voiceResponse && Array.isArray(voiceResponse.voices) ? voiceResponse.voices : [];
-  const firstVoice = voices.find((voice) => voice && typeof voice === "object" && !Array.isArray(voice) && typeof (voice as Record<string, unknown>).id === "string") as Record<string, unknown> | undefined;
-  if (format === "video-avatar" && typeof firstVoice?.id !== "string") throw new Error("Magic Hour did not return a voice for avatar narration. Check the Magic Hour voice setup and retry.");
-  const avatar = format === "video-avatar";
+  const avatar = videoSettings.videoType !== "product-motion";
+  const spoken = avatar || videoSettings.narrationEnabled;
+  const voiceName = videoSettings.voiceName;
+  if (spoken && !voiceName) throw new Error("Choose a Magic Hour voice in the Autopilot video settings before generating videos.");
   const title = avatar ? `${brand.name} Presenter` : `${brand.name} Product Demonstration`;
-  const description = [brand.profile?.description, brand.profile?.industry && `Industry: ${brand.profile.industry}`, brand.profile?.audience && `Audience: ${brand.profile.audience}`, brand.profile?.products && `Products and services: ${brand.profile.products}`, brand.profile?.tone && `Brand voice: ${brand.profile.tone}`].filter(Boolean).join(". ");
-  const script = [
-    `Introduce ${brand.name} and explain one useful benefit of ${brand.profile?.products || brand.profile?.industry || "its services"}.`,
-    brand.profile?.audience ? `Speak directly to ${brand.profile.audience}.` : "",
-    brand.profile?.tone ? `Use this tone: ${brand.profile.tone}.` : "",
-    campaignGoal ? `Campaign focus: ${campaignGoal}, if it is relevant to the business.` : "",
-    brand.profile?.offers ? `Mention only this current offer: ${brand.profile.offers}.` : "Do not invent an offer, price, discount, result, or guarantee.",
-    "End with a clear invitation to contact the business.",
+  const description = [
+    brand.profile?.description,
+    brand.profile?.industry && `Industry: ${brand.profile.industry}`,
+    brand.profile?.audience && `Audience: ${brand.profile.audience}`,
+    brand.profile?.products && `Products and services: ${brand.profile.products}`,
+    brand.profile?.tone && `Brand voice: ${brand.profile.tone}`,
+    campaignGoal && `Campaign focus: ${campaignGoal}`,
+    competitorGuidance && `Use competitor research for original strategy only: ${competitorGuidance}`,
+  ].filter(Boolean).join(". ").slice(0, 1700);
+  const spokenScript = [
+    `Discover ${brand.name}.`,
+    brand.profile?.products || brand.profile?.industry ? `Explore ${brand.profile.products || brand.profile.industry}.` : "",
+    brand.profile?.audience ? `Made for ${brand.profile.audience}.` : "",
+    brand.profile?.offers ? `${brand.profile.offers}.` : "",
+    `Contact ${brand.name} to learn more.`,
   ].filter(Boolean).join(" ");
+  const script = spokenScript.split(/\s+/).slice(0, Math.max(8, Math.floor(videoSettings.durationSeconds * 2.8))).join(" ");
   const generated = await internalRequest<{ job?: { id?: unknown }; contentId?: unknown }>(brand, userId, "/api/videos/magic-hour/generate", {
     generationType: avatar ? "talking-photo" : "product-image",
     title: title.slice(0, 120),
@@ -260,9 +416,13 @@ async function generateMagicHourVideo(brand: BrandContext, userId: string, runId
     description,
     style: "commercial",
     aspectRatio: "9:16",
-    durationSeconds: 15,
+    durationSeconds: videoSettings.durationSeconds,
     sourceAssetId: sources[index % sources.length]!.id,
-    ...(avatar ? { script, voiceName: firstVoice!.id as string } : {}),
+    ...(spoken && avatar ? { script, voiceName } : {}),
+    ...(spoken && !avatar ? { narrationMode: "voiceover", voiceoverScript: script, voiceName } : {}),
+    avatarStyle: videoSettings.videoType === "animated-avatar" ? "animated" : "realistic",
+    musicId: videoSettings.musicId,
+    musicStyle: videoSettings.musicStyle,
     language: strings(brand.profile?.languages)[0] ?? "English",
     automationKey: `instagram-autopilot:${runId}:content:${index}`,
   });
@@ -279,6 +439,7 @@ async function prepareAssets(run: {
   const settings = readSettings(run.contentIds);
   const formats = selectedFormats(settings);
   if (formats.length === 0) throw new Error("Choose at least one post format for this Autopilot run.");
+  const competitorGuidance = await getAutopilotCompetitorGuidance(run.brand.workspaceId, run.brand.id);
   const contentIds = stringMap(run.contentIds);
   const videoJobIds = stringMap(run.videoJobIds);
   for (const [index, format] of formats.entries()) {
@@ -286,11 +447,22 @@ async function prepareAssets(run: {
     if (!contentIds[key]) {
       await prisma.instagramAutopilotRun.update({ where: { id: run.id }, data: { lockedAt: new Date() } });
       if (format === "video-product-demo" || format === "video-avatar") {
-        const generated = await generateMagicHourVideo(run.brand, userId, run.id, index, format, settings.campaignGoal);
+        const generated = await generateMagicHourVideo(run.brand, userId, run.id, index, format, settings.campaignGoal, competitorGuidance, settings.videoSettings);
         contentIds[key] = generated.contentId;
         videoJobIds[key] = generated.jobId;
       } else {
-        contentIds[key] = await generateStaticContent(run.brand, userId, run.id, index, format, formats.length, settings.campaignGoal);
+        const templateId = settings.creationMode === "template" ? settings.templateIds[format] : undefined;
+        contentIds[key] = await generateStaticContent(
+          run.brand,
+          userId,
+          run.id,
+          index,
+          format,
+          formats.length,
+          settings.campaignGoal,
+          competitorGuidance,
+          templateId,
+        );
       }
       await prisma.instagramAutopilotRun.update({
         where: { id: run.id },
@@ -501,17 +673,23 @@ async function queueDueProfiles(now: Date) {
     if (!profile.brand.name.trim() || !profile.industry?.trim() || !profile.products?.trim() || !profile.audience?.trim() ||
       !profile.tone?.trim() || !goals.length || !hasColors || !hasFonts || !account || !owner || !canWrite ||
       !approvalEmailConfigured || !isInstagramMediaHostingConfigured() ||
-      (!env.GOOGLE_AI_STUDIO_API_KEY && !env.GROQ_API_KEY && !env.OPENAI_API_KEY)) continue;
+      !cloudflareAiConfigured && !env.GROQ_API_KEY && !env.OPENAI_API_KEY) continue;
     const weekStart = profile.instagramAutopilotNextRunAt ?? now;
     const scheduleSettings = readAutopilotScheduleSettings(profile.instagramAutopilotSettings);
-    const { weekday, time, ...settings } = scheduleSettings;
+    const { weekday, time, automationCreationMode, automationTemplateIds, automationVideoSettings, ...settings } = scheduleSettings;
+    const runSettings: AutopilotSettings = {
+      ...settings,
+      creationMode: automationCreationMode,
+      templateIds: automationTemplateIds,
+      videoSettings: automationVideoSettings,
+    };
     const run = await prisma.instagramAutopilotRun.upsert({
       where: { brandId_weekStart: { brandId: profile.brandId, weekStart } },
       create: {
         workspaceId: profile.workspaceId,
         brandId: profile.brandId,
         weekStart,
-        contentIds: contentIdsWithSettings({}, settings),
+        contentIds: contentIdsWithSettings({}, runSettings),
       },
       update: {},
       select: { id: true },

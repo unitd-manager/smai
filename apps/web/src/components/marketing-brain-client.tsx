@@ -15,7 +15,7 @@ type Recommendation = {
 
 type BrainResponse = {
   brand: { name: string; industry: string | null };
-  health: { score: number; label: string; signals: number; totalSignals: number };
+  health: { score: number; label: string; signals: number; totalSignals: number; checks?: Array<{ key: string; label: string; active: boolean }> };
   strategy: string[];
   metrics: { recentPosts: number; drafts: number; plannedCampaigns: number; connectedAccounts: number; analyticsAvailable: boolean };
   content: { formats: string[]; gaps: string[] };
@@ -95,7 +95,7 @@ export function MarketingBrainClient() {
       {loading && <p className="loading-label">Reviewing your brand and recent activity…</p>}
       {!loading && data && <>
         <section className="brain-hero-grid" aria-label="Marketing health overview">
-          <article className="brain-health-card"><span className="card-kicker">Brand health</span><strong>{data.health.score}</strong><span>/100 · {data.health.label}</span><div className="brain-health-meter" aria-label={`${data.health.score} out of 100`}><i style={{ width: `${data.health.score}%` }} /></div><small>{data.health.signals}/{data.health.totalSignals} signals active</small></article>
+          <article className="brain-health-card"><span className="card-kicker">Brand health</span><strong>{data.health.score}</strong><span>/100 · {data.health.label}</span><div className="brain-health-meter" aria-label={`${data.health.score} out of 100`}><i style={{ width: `${data.health.score}%` }} /></div><small>{data.health.signals}/{data.health.totalSignals} signals active</small>{data.health.checks && <details className="brain-health-details"><summary>How this score is calculated</summary><ul>{data.health.checks.map((check) => <li key={check.key}><span aria-hidden="true">{check.active ? "✓" : "–"}</span>{check.label}<strong>{check.active ? "Active" : "Not active"}</strong></li>)}</ul><p>Each active signal contributes 12.5 points. The score reflects profile setup and workspace activity, not business results.</p></details>}</article>
           <article className="brain-next-card"><span className="card-kicker">Next best move</span><h2>{data.recommendations[0]?.title ?? data.priorities[0] ?? "Keep your brand profile current"}</h2><p>{data.recommendations[0]?.explanation ?? "Your workspace is ready for the next content batch."}</p>{data.recommendations[0] && <><Link className="button button-gold" href={data.recommendations[0].actionHref}>{data.recommendations[0].actionLabel}</Link><details className="brain-decision-details"><summary>More actions</summary><div className="brain-decision-actions"><button className="button button-outline" type="button" onClick={() => void decide(data.recommendations[0]!.id, "accept")} disabled={busyId === data.recommendations[0]!.id}>Accept</button><button className="button button-outline" type="button" onClick={() => void decide(data.recommendations[0]!.id, "snooze")} disabled={busyId === data.recommendations[0]!.id}>Snooze 7 days</button><button className="button button-outline" type="button" onClick={() => void decide(data.recommendations[0]!.id, "dismiss")} disabled={busyId === data.recommendations[0]!.id}>Dismiss</button></div></details>{busyId === data.recommendations[0]!.id && <small className="loading-label">Saving your choice…</small>}</>}</article>
         </section>
         <section className="brain-context-panel" aria-label="Business context">

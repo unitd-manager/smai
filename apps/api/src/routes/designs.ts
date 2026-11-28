@@ -5,11 +5,11 @@ import { Prisma } from "@prisma/client";
 import sharp from "sharp";
 import { getLegacyDesignDocument, parseDesignDocument, renderDesignPageSvg } from "@united-technologies/shared/design-document";
 import { z } from "zod";
-import { env } from "../env.js";
+import { cloudflareAiConfigured, env } from "../env.js";
 import { prisma } from "../db.js";
 import { requireAuth, requireCompleteBrandProfile, requireWritableWorkspace, requireWorkspace } from "../middleware/auth.js";
 import { recordDesignVersion } from "../services/content-version-history.js";
-import { createAiDesignDocument, generateGroqSvgDesign, generateImageDesign, imageDesignFormats } from "../services/design-image-generator.js";
+import { createAiDesignDocument, generateCloudflareImageDesign, generateGroqSvgDesign, imageDesignFormats, selectArtworkProvider } from "../services/design-image-generator.js";
 import { recordGeneratedContentVersion } from "../services/content-version-history.js";
 import { getAiGenerationLimit } from "../services/plan-limits.js";
 
@@ -43,11 +43,12 @@ router.use(requireAuth, requireWorkspace, requireCompleteBrandProfile);
 
 router.get("/image-generation-status", (_req, res) => {
   const usesGroq = Boolean(env.GROQ_API_KEY);
+  const usesCloudflare = cloudflareAiConfigured;
   res.json({
-    configured: usesGroq || Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
-    photorealisticAvailable: Boolean(env.GOOGLE_AI_STUDIO_API_KEY),
-    provider: usesGroq ? "Groq vector artwork" : "Gemini image generation",
-    model: usesGroq ? env.GROQ_MODEL : env.DESIGN_IMAGE_MODEL,
+    configured: usesGroq || usesCloudflare,
+    photorealisticAvailable: usesCloudflare,
+    provider: usesCloudflare && usesGroq ? "Cloudflare Workers AI and Groq vector artwork" : usesCloudflare ? "Cloudflare Workers AI image generation" : "Groq vector artwork",
+    model: usesCloudflare ? env.CLOUDFLARE_IMAGE_MODEL : env.GROQ_MODEL,
   });
 });
 
@@ -65,8 +66,15 @@ router.post(
   async (req, res, next) => {
     try {
       const input = aiDesignSchema.parse(req.body);
-      if (!env.GOOGLE_AI_STUDIO_API_KEY && !env.GROQ_API_KEY) {
-        res.status(503).json({ error: "AI artwork is not configured. Add GOOGLE_AI_STUDIO_API_KEY or GROQ_API_KEY to apps/api/.env and restart the API." });
+      const artworkProvider = selectArtworkProvider({
+        photorealistic: input.photorealistic,
+        groqConfigured: Boolean(env.GROQ_API_KEY),
+        cloudflareConfigured: cloudflareAiConfigured,
+      });
+      if (!artworkProvider) {
+        res.status(503).json({ error: input.photorealistic
+          ? "Photo-rich artwork needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in apps/api/.env. Configure Workers AI and restart the API."
+          : "AI artwork is not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN or GROQ_API_KEY to apps/api/.env and restart the API." });
         return;
       }
       const brand = await prisma.brand.findFirst({
@@ -114,7 +122,6 @@ router.post(
       let generated;
       try {
         const commonInput = {
-          model: env.GROQ_MODEL,
           prompt: input.prompt,
           format: input.format,
           brandName: brand.name,
@@ -122,14 +129,19 @@ router.post(
           colors: Array.isArray(brand.kit?.colors) ? brand.kit.colors.filter((value): value is string => typeof value === "string") : [],
           ...(input.referenceImage ? { referenceImage: input.referenceImage } : {}),
         };
-        if (input.photorealistic && env.GOOGLE_AI_STUDIO_API_KEY) {
-          generated = await generateImageDesign({ ...commonInput, apiKey: env.GOOGLE_AI_STUDIO_API_KEY, model: env.DESIGN_IMAGE_MODEL });
-        } else if (env.GROQ_API_KEY) {
-          generated = await generateGroqSvgDesign({ ...commonInput, apiKey: env.GROQ_API_KEY });
-        } else if (env.GOOGLE_AI_STUDIO_API_KEY) {
-          generated = await generateImageDesign({ ...commonInput, apiKey: env.GOOGLE_AI_STUDIO_API_KEY, model: env.DESIGN_IMAGE_MODEL });
+        if (artworkProvider === "cloudflare" && cloudflareAiConfigured) {
+          generated = await generateCloudflareImageDesign({
+            ...commonInput,
+            accountId: env.CLOUDFLARE_ACCOUNT_ID!,
+            apiToken: env.CLOUDFLARE_API_TOKEN!,
+            model: input.referenceImage ? env.CLOUDFLARE_REFERENCE_IMAGE_MODEL : env.CLOUDFLARE_IMAGE_MODEL,
+            referenceImageModel: env.CLOUDFLARE_REFERENCE_IMAGE_MODEL,
+            textModel: env.CLOUDFLARE_TEXT_MODEL,
+          });
+        } else if (artworkProvider === "groq" && env.GROQ_API_KEY) {
+          generated = await generateGroqSvgDesign({ ...commonInput, apiKey: env.GROQ_API_KEY, model: env.GROQ_MODEL });
         } else {
-          res.status(503).json({ error: "AI artwork is not configured. Add GROQ_API_KEY or GOOGLE_AI_STUDIO_API_KEY to apps/api/.env and restart the API." });
+          res.status(503).json({ error: "AI artwork is not configured. Add Cloudflare Workers AI credentials or GROQ_API_KEY to apps/api/.env and restart the API." });
           return;
         }
       } catch (error) {
@@ -137,23 +149,19 @@ router.post(
           : error && typeof error === "object" && "statusCode" in error && typeof error.statusCode === "number" ? error.statusCode : 502;
         const rawProviderMessage = error instanceof Error ? error.message : "Unknown image provider error";
         const safeProviderMessage = rawProviderMessage
-          .replace(env.GOOGLE_AI_STUDIO_API_KEY ?? "\u0000", "[redacted]")
+          .replace(env.CLOUDFLARE_API_TOKEN ?? "\u0000", "[redacted]")
           .replace(env.GROQ_API_KEY ?? "\u0000", "[redacted]")
           .replace(/[\r\n\t]+/g, " ")
           .slice(0, 360);
-        const providerDetail = safeProviderMessage.toLocaleLowerCase();
-        const usesGroq = Boolean(env.GROQ_API_KEY);
-        const providerName = usesGroq ? "Groq" : "Google AI Studio";
-        const providerModel = usesGroq ? env.GROQ_MODEL : env.DESIGN_IMAGE_MODEL;
+        const usesGroq = artworkProvider === "groq";
+        const providerName = usesGroq ? "Groq" : "Cloudflare Workers AI";
+        const providerModel = usesGroq ? env.GROQ_MODEL : input.referenceImage ? env.CLOUDFLARE_REFERENCE_IMAGE_MODEL : env.CLOUDFLARE_IMAGE_MODEL;
         console.error(`${providerName} artwork generation failed`, { status, model: providerModel, detail: safeProviderMessage });
-        const noFreeImageQuota = providerDetail.includes("generate_content_free_tier_requests") || providerDetail.includes("free tier") && /limit\s*:?\s*0|quota\s*:?\s*0/.test(providerDetail);
         const message = status === 429 ? usesGroq
           ? "Groq returned HTTP 429 for vector artwork. Check the Groq project rate limits and usage quota, then try again."
-          : noFreeImageQuota
-            ? "This Google AI project has no free-tier quota for image generation. Enable Gemini API billing for this project. If it is already paid, check the model-specific image rate limit and project spend cap."
-            : "Google returned HTTP 429 for image generation. Gemini 3.1 Flash Image has no free-tier generation quota; enable Gemini API billing if this project is free-tier, or check the paid project's image rate limit, spend cap, and usage."
-          : status === 403 || status === 401 ? `${providerName} denied access for this API key or model. Check project permissions and model availability.`
-            : status === 404 ? `The ${providerName} model “${providerModel}” is unavailable. Check the model configured in apps/api/.env.`
+          : "Cloudflare Workers AI returned HTTP 429 for artwork generation. Check Workers AI account permissions, model availability, rate limits, and usage."
+          : status === 403 || status === 401 ? `${providerName} denied access for this API token or model. Check account permissions and model availability.`
+            : status === 404 ? `The ${providerName} model "${providerModel}" is unavailable. Check the model configured in apps/api/.env.`
               : error instanceof Error && error.message.includes("no artwork") ? error.message
                 : error instanceof Error && error.message.includes("could not create this design") ? error.message
                   : status === 400 || status === 422 ? `${providerName} rejected the artwork request: ${safeProviderMessage}`
@@ -216,7 +224,7 @@ router.post(
             brandId: brand.id,
             request: input.prompt,
             contentJson: generatedContentJson,
-            provider: env.GROQ_API_KEY && !input.photorealistic ? "groq-vector-artwork" : "google-ai-studio",
+            provider: artworkProvider === "groq" ? "groq-vector-artwork" : "cloudflare-image",
             model: generated.model,
           },
           select: { id: true, contentJson: true },
@@ -290,7 +298,7 @@ router.get("/", async (req, res, next) => {
         previewUrl: true,
         status: true,
         createdAt: true,
-        brand: { select: { name: true, kit: { select: { colors: true } } } },
+        brand: { select: { name: true, timezone: true, kit: { select: { colors: true } } } },
       },
     });
     const compatibleDesigns = designs.map((design) => {

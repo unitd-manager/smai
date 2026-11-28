@@ -323,7 +323,7 @@ export function CampaignsClient() {
   const [notice, setNotice] = useState("");
   const [historyError, setHistoryError] = useState("");
   const [teamError, setTeamError] = useState("");
-  const [geminiConfigured, setGeminiConfigured] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [configurationLoaded, setConfigurationLoaded] = useState(false);
   const [configurationError, setConfigurationError] = useState("");
   const [brandMarket, setBrandMarket] = useState({ country: "", industry: "" });
@@ -331,11 +331,11 @@ export function CampaignsClient() {
   useEffect(() => {
     apiRequest<{ configured: boolean }>("/api/content/configuration")
       .then(({ configured }) => {
-        setGeminiConfigured(configured);
+        setAiConfigured(configured);
         setConfigurationError("");
       })
       .catch((requestError: unknown) => {
-        setGeminiConfigured(false);
+        setAiConfigured(false);
         setConfigurationError(requestError instanceof Error ? requestError.message : "Could not check AI provider configuration.");
       })
       .finally(() => setConfigurationLoaded(true));
@@ -674,7 +674,7 @@ export function CampaignsClient() {
         <h1>Campaign intelligence</h1>
         <p className="dashboard-lead">Turn a marketing goal into a sequenced, reviewable content plan.</p>
       </header>
-      {configurationLoaded && !geminiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
+      {configurationLoaded && !aiConfigured && <div className="notice notice-error" role="alert">{configurationError || <>AI generation is unavailable. Add <code>CLOUDFLARE_ACCOUNT_ID</code> and <code>CLOUDFLARE_API_TOKEN</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</>}</div>}
       <details className="campaign-capability-note">
         <summary>How campaign recommendations and publishing work</summary>
         <p>Strategy and copy are AI recommendations based on your brief and saved brand profile. External market and trend research is not connected.</p>
@@ -773,7 +773,7 @@ export function CampaignsClient() {
           </div>
         </fieldset>
         {error && <div className="campaign-error-panel" role="alert">
-          <strong>{/AI provider|google-ai-studio|groq|openai|gemini|high demand|rate limit/i.test(error) ? "Strategy could not be generated" : "Campaign action could not be completed"}</strong>
+          <strong>{/AI provider|cloudflare|workers ai|groq|openai|high demand|rate limit/i.test(error) ? "Strategy could not be generated" : "Campaign action could not be completed"}</strong>
           <p>{campaignErrorSummary(error)}</p>
           {error.length > 240 && <details><summary>Technical details</summary><pre>{error}</pre></details>}
         </div>}

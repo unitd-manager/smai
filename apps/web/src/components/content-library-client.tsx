@@ -33,7 +33,7 @@ type ContentVersion = {
 
 export function ContentLibraryClient() {
   const [items, setItems] = useState<LibraryItem[]>([]);
-  const [geminiConfigured, setGeminiConfigured] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formatFilter, setFormatFilter] = useState("all");
@@ -85,7 +85,7 @@ export function ContentLibraryClient() {
     ])
       .then(([response, workspaceData]) => {
         setItems(response.items);
-        setGeminiConfigured(response.configured);
+        setAiConfigured(response.configured);
         setBrands([...new Map(workspaceData.workspaces.flatMap((workspace) => workspace.brands).map((item) => [item.id, item])).values()]);
         setError("");
       })
@@ -262,7 +262,7 @@ export function ContentLibraryClient() {
         <div><span>Formats</span><strong>{formatCount}</strong></div>
         <div><span>Brands</span><strong>{new Set(items.map((item) => item.brand.name)).size}</strong></div>
       </div>}
-      {!loading && !geminiConfigured && <div className="notice notice-error" role="alert">AI generation is unavailable. Add <code>GOOGLE_AI_STUDIO_API_KEY</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</div>}
+      {!loading && !aiConfigured && <div className="notice notice-error" role="alert">AI generation is unavailable. Add <code>CLOUDFLARE_ACCOUNT_ID</code> and <code>CLOUDFLARE_API_TOKEN</code>, <code>GROQ_API_KEY</code>, or <code>OPENAI_API_KEY</code> to <code>apps/api/.env</code>, then restart the API.</div>}
       {error && <div className="notice notice-error" role="alert">{error}</div>}
       {notice && <p className="form-success" role="status">{notice}</p>}
       <div className="library-toolbar">
@@ -293,7 +293,7 @@ export function ContentLibraryClient() {
           <article className={`library-item${selectedIds.includes(item.id) ? " is-selected" : ""}`} key={item.id}>
             <div className="library-item-type">{(item.contentJson.format ?? "content").slice(0, 1).toUpperCase()}</div>
             <div className="library-item-copy">
-              <div className="library-item-badges"><span className="library-badge">{item.contentJson.format ?? "content"}</span><span className="library-badge">{item.provider === "google-ai-studio" ? "Gemini" : item.provider === "groq" ? "Groq" : item.provider === "openai" ? "OpenAI" : item.provider === "media-upload" ? "Imported" : "Legacy"}</span><span className="library-status" data-status={item.status.toLowerCase()}>{item.status.replaceAll("_", " ").toLocaleLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</span></div>
+              <div className="library-item-badges"><span className="library-badge">{item.contentJson.format ?? "content"}</span><span className="library-badge">{item.provider === "cloudflare" || item.provider === "cloudflare-image" ? "Cloudflare Workers AI" : item.provider === "groq" ? "Groq" : item.provider === "openai" ? "OpenAI" : item.provider === "media-upload" ? "Imported" : "Legacy"}</span><span className="library-status" data-status={item.status.toLowerCase()}>{item.status.replaceAll("_", " ").toLocaleLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</span></div>
               {editingId === item.id ? (
                 <div className="content-editor">
                   <label>Title<input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>

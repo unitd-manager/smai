@@ -13,7 +13,7 @@ import {
   MagicHourError,
   uploadMagicHourAsset,
 } from "./magic-hour.js";
-import { createVideoThumbnail, resolveExecutable } from "./video-renderer.js";
+import { createMagicHourAudioFilterGraph, createVideoThumbnail, isMusicStyle, listMusicTracks, resolveExecutable } from "./video-renderer.js";
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const outputRoot = path.join(apiRoot, "assets", "rendered");
@@ -95,6 +95,7 @@ async function setStage(jobId: string, input: Input, stage: string, progress: nu
 async function createSpeech(job: Job, input: Input) {
   const slot = accountSlot(input);
   const customVoice = str(input, "voiceMode") === "custom";
+  const script = str(input, "voiceoverScript") || str(input, "script");
   let endpoint = "/ai-voice-generator";
   let body: Record<string, unknown>;
   if (customVoice) {
@@ -107,13 +108,13 @@ async function createSpeech(job: Job, input: Input) {
     body = {
       name: `${str(input, "title", "Video")} custom voice`,
       assets: { audio_file_path: samplePath },
-      style: { prompt: str(input, "script"), language: str(input, "language", "english") },
+      style: { prompt: script, language: str(input, "language", "english") },
     };
   } else {
     body = {
-      script: str(input, "script"),
+      script,
       name: `${str(input, "title", "Video")} voice`,
-      style: { prompt: str(input, "script"), voice_name: str(input, "voiceName"), language: str(input, "language", "english") },
+      style: { prompt: script, voice_name: str(input, "voiceName"), language: str(input, "language", "english") },
     };
   }
   const response = await magicHourRequest<Record<string, unknown>>(endpoint, {
@@ -214,33 +215,75 @@ async function downloadOutput(url: string, jobId: string) {
   return { fullPath, key: fileName, size: bytes.byteLength };
 }
 
-async function ensureMagicHourAudioTrack(videoPath: string) {
+async function applyMagicHourAudio(job: Job, input: Input, videoPath: string) {
   const ffmpeg = await resolveExecutable("ffmpeg");
   const ffprobe = await resolveExecutable("ffprobe");
   const { stdout: streamTypes } = await execFileAsync(ffprobe, [
     "-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", videoPath,
   ], { windowsHide: true });
-  if (streamTypes.split(/\r?\n/).some((value) => value.trim() === "audio")) return;
-
-  const musicPath = path.join(apiRoot, "assets", "music", "calm-horizon.wav");
+  const hasSourceAudio = streamTypes.split(/\r?\n/).some((value) => value.trim() === "audio");
   const { stdout: durationText } = await execFileAsync(ffprobe, [
     "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", videoPath,
   ], { windowsHide: true });
   const duration = Number.parseFloat(durationText.trim());
   if (!Number.isFinite(duration) || duration <= 0) throw new Error("Could not determine the Magic Hour video duration before adding its audio track.");
 
+  const hasVoiceover = str(input, "generationType").startsWith("product-") && str(input, "narrationMode") === "voiceover";
+  const voiceExtension = str(input, "magicHourVoiceExtension");
+  const voicePath = hasVoiceover && ["mp3", "wav"].includes(voiceExtension)
+    ? path.join(outputRoot, `magic-hour-${job.id}-voice.${voiceExtension}`)
+    : "";
+  if (hasVoiceover && (!voicePath || !(await stat(voicePath).catch(() => null)))) {
+    throw new Error("The generated product voiceover file is unavailable. Retry the video generation.");
+  }
+
+  const selectedMusicId = input.musicId === null || input.musicId === undefined ? "" : str(input, "musicId");
+  const hasMusic = selectedMusicId !== "none";
+  const tracks = hasMusic ? await listMusicTracks() : [];
+  const musicTrack = hasMusic
+    ? tracks.find((track) => track.id === (selectedMusicId || "calm-horizon"))
+    : undefined;
+  if (hasMusic && !musicTrack) throw new Error("The selected background music is no longer available. Retry with a current music track.");
+  const musicStyleValue = str(input, "musicStyle", "balanced");
+  if (!isMusicStyle(musicStyleValue)) throw new Error("The selected background music treatment is not available.");
+
+  if (!hasVoiceover && !hasSourceAudio && !musicTrack) return;
+  const voiceoverDuration = voicePath
+    ? Number.parseFloat((await execFileAsync(ffprobe, [
+      "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", voicePath,
+    ], { windowsHide: true })).stdout.trim())
+    : undefined;
+  if (voicePath && (!voiceoverDuration || !Number.isFinite(voiceoverDuration))) {
+    throw new Error("Could not determine the generated voiceover duration.");
+  }
   const temporaryPath = videoPath.replace(/\.mp4$/i, ".with-audio.mp4");
-  await execFileAsync(ffmpeg, [
-    "-y",
-    "-stream_loop", "-1", "-i", musicPath,
-    "-i", videoPath,
-    "-map", "1:v:0", "-map", "0:a:0",
+  const args = ["-y", "-i", videoPath];
+  if (voicePath) args.push("-i", voicePath);
+  if (musicTrack) args.push("-stream_loop", "-1", "-i", musicTrack.file);
+  const filter = createMagicHourAudioFilterGraph({
+    hasSourceAudio,
+    hasVoiceover: Boolean(voicePath),
+    hasMusic: Boolean(musicTrack),
+    totalDurationSeconds: duration,
+    voiceoverDurationSeconds: voiceoverDuration,
+    musicVolume: num(input, "musicVolume", 0.12),
+    musicDucking: num(input, "musicDucking", 0.25),
+    musicStyle: musicStyleValue,
+  });
+  args.push(
+    "-filter_complex", filter,
+    "-map", "0:v:0", "-map", "[aout]",
     "-t", duration.toFixed(3),
     "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
-    "-movflags", "+faststart",
-    temporaryPath,
-  ], { windowsHide: true, timeout: 240_000 });
-  await rename(temporaryPath, videoPath);
+    "-movflags", "+faststart", temporaryPath,
+  );
+  try {
+    await execFileAsync(ffmpeg, args, { windowsHide: true, timeout: 240_000 });
+    await rename(temporaryPath, videoPath);
+  } finally {
+    await unlink(temporaryPath).catch(() => undefined);
+  }
+  if (voicePath) await unlink(voicePath).catch(() => undefined);
 }
 
 async function finish(job: Job, input: Input, project: Record<string, unknown>) {
@@ -249,7 +292,7 @@ async function finish(job: Job, input: Input, project: Record<string, unknown>) 
   const url = output?.url;
   if (typeof url !== "string") throw new Error("Magic Hour completed the project without a downloadable video URL.");
   const file = await downloadOutput(url, job.id);
-  await ensureMagicHourAudioTrack(file.fullPath);
+  await applyMagicHourAudio(job, input, file.fullPath);
   await watermarkVideo(job, file.fullPath);
   file.size = (await stat(file.fullPath)).size;
   const thumbnailPath = file.fullPath.replace(/\.mp4$/i, ".jpg");
@@ -277,7 +320,9 @@ async function process(job: Job) {
   let input = job.inputJson;
   const slot = accountSlot(input);
   const type = str(input, "generationType");
-  if (["talking-photo", "lip-sync"].includes(type) && !str(input, "magicHourProjectId")) {
+  const presenterWorkflow = ["talking-photo", "lip-sync"].includes(type);
+  const productVoiceover = type.startsWith("product-") && str(input, "narrationMode") === "voiceover";
+  if ((presenterWorkflow || productVoiceover) && !str(input, "magicHourProjectId")) {
     if (!str(input, "magicHourAudioProjectId")) {
       await createSpeech(job, input);
       return;
@@ -295,9 +340,18 @@ async function process(job: Job) {
     const res = await fetch(item.url, { signal: AbortSignal.timeout(90_000) });
     if (!res.ok) throw new Error("Could not download the generated voice track.");
     const bytes = Buffer.from(await res.arrayBuffer());
-    const isWav = item.url.toLowerCase().includes(".wav");
-    const audioPath = await uploadMagicHourAsset({ bytes, extension: isWav ? "wav" : "mp3", type: "audio", contentType: isWav ? "audio/wav" : "audio/mpeg", slot });
-    input = updateInput(input, { magicHourAudioFilePath: audioPath, magicHourVoiceCreditsCharged: typeof audio.credits_charged === "number" ? audio.credits_charged : null });
+    const extension = item.url.toLowerCase().split("?")[0]?.endsWith(".wav") ? "wav" : "mp3";
+    const voiceCreditsCharged = typeof audio.credits_charged === "number" ? audio.credits_charged : null;
+    if (productVoiceover) {
+      await mkdir(outputRoot, { recursive: true });
+      await writeFile(path.join(outputRoot, `magic-hour-${job.id}-voice.${extension}`), bytes);
+      input = updateInput(input, { magicHourVoiceExtension: extension, magicHourVoiceCreditsCharged: voiceCreditsCharged });
+      await setStage(job.id, input, "Starting product video", 10);
+      await submitVideo(job, input);
+      return;
+    }
+    const audioPath = await uploadMagicHourAsset({ bytes, extension, type: "audio", contentType: extension === "wav" ? "audio/wav" : "audio/mpeg", slot });
+    input = updateInput(input, { magicHourAudioFilePath: audioPath, magicHourVoiceCreditsCharged: voiceCreditsCharged });
     await setStage(job.id, input, "Starting avatar animation", 10);
     await submitVideo(job, input, audioPath);
     return;

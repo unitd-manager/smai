@@ -9,7 +9,7 @@ import {
   videoPlanSchema,
 } from "../src/services/video-plan.js";
 
-test("video outline normalization accepts cast fields returned by Gemini", () => {
+test("video outline normalization accepts cast fields returned by an AI provider", () => {
   const normalized = normalizeGeneratedVideoOutline({
     cast: [
       { id: "A", name: "Maya", ageGroup: "adult", skinTone: "warm brown", hairstyle: "curly hair", outfit: "blue jacket", accessory: "gold pin", extra: true },
@@ -22,16 +22,18 @@ test("video outline normalization accepts cast fields returned by Gemini", () =>
   assert.equal(normalized.cast[2]?.personality, "helpful and upbeat");
 });
 
-test("video plan selection prefers Gemini and configures Groq as an optional fallback", () => {
+test("video plan selection prefers Cloudflare Workers AI and configures Groq as an optional fallback", () => {
   assert.deepEqual(selectVideoPlanProvider({
-    googleAiStudioApiKey: "AQ.google",
-    googleAiStudioModel: "gemini-test",
+    cloudflareApiToken: "cf-token",
+    cloudflareAccountId: "a".repeat(32),
+    cloudflareModel: "cloudflare-test",
     groqApiKey: "gsk-test",
     groqModel: "llama-test",
   }), {
-    name: "google-ai-studio",
-    model: "gemini-test",
-    apiKey: "AQ.google",
+    name: "cloudflare",
+    model: "cloudflare-test",
+    apiKey: "cf-token",
+    accountId: "a".repeat(32),
     fallback: { name: "groq", model: "llama-test", apiKey: "gsk-test" },
   });
   assert.deepEqual(selectVideoPlanProvider({ groqApiKey: "gsk-test" }), {
@@ -40,22 +42,24 @@ test("video plan selection prefers Gemini and configures Groq as an optional fal
     apiKey: "gsk-test",
   });
   assert.deepEqual(selectVideoPlanProvider({}), {
-    name: "google-ai-studio",
-    model: null,
+    name: "cloudflare",
+    model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
   });
 });
 
-test("video plan provider chains Gemini, Groq, and OpenAI when configured", () => {
+test("video plan provider chains Cloudflare Workers AI, Groq, and OpenAI when configured", () => {
   assert.deepEqual(selectVideoPlanProvider({
-    googleAiStudioApiKey: "AQ.google",
-    googleAiStudioModel: "gemini-test",
+    cloudflareApiToken: "cf-token",
+    cloudflareAccountId: "a".repeat(32),
+    cloudflareModel: "cloudflare-test",
     groqApiKey: "gsk-test",
     groqModel: "llama-test",
     openAiApiKey: "sk-openai-test",
   }), {
-    name: "google-ai-studio",
-    model: "gemini-test",
-    apiKey: "AQ.google",
+    name: "cloudflare",
+    model: "cloudflare-test",
+    apiKey: "cf-token",
+    accountId: "a".repeat(32),
     fallback: {
       name: "groq",
       model: "llama-test",
@@ -70,10 +74,11 @@ test("video plan provider chains Gemini, Groq, and OpenAI when configured", () =
   });
 });
 
-test("video plans fall through Gemini and Groq to OpenAI", async () => {
+test("video plans fall through Cloudflare Workers AI and Groq to OpenAI", async () => {
   const provider = selectVideoPlanProvider({
-    googleAiStudioApiKey: "AQ.video-test",
-    googleAiStudioModel: "gemini-test",
+    cloudflareApiToken: "cf.video-test",
+    cloudflareAccountId: "a".repeat(32),
+    cloudflareModel: "cloudflare-test",
     groqApiKey: "gsk.video-test",
     groqModel: "llama-test",
     openAiApiKey: "sk-openai-video-test",
@@ -124,12 +129,13 @@ test("video plans fall through Gemini and Groq to OpenAI", async () => {
     ahaMoment: index === 2,
   }));
   const originalFetch = globalThis.fetch;
-  let geminiCalls = 0;
+  let cloudflareCalls = 0;
   let groqCalls = 0;
   let openAiCalls = 0;
   globalThis.fetch = async (input, init) => {
-    if (String(input).includes("generativelanguage.googleapis.com")) {
-      geminiCalls += 1;
+    if (String(input).includes("api.cloudflare.com")) {
+      cloudflareCalls += 1;
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer cf.video-test");
       return new Response(JSON.stringify({ error: { code: 503, status: "UNAVAILABLE" } }), { status: 503 });
     }
     if (String(input).includes("api.groq.com")) {
@@ -155,7 +161,7 @@ test("video plans fall through Gemini and Groq to OpenAI", async () => {
 
   try {
     const result = await generateVideoPlan(request, provider);
-    assert.equal(geminiCalls, 3);
+    assert.equal(cloudflareCalls, 3);
     assert.equal(groqCalls, 1);
     assert.equal(openAiCalls, 2);
     assert.equal(result.provider.name, "openai");
@@ -167,8 +173,8 @@ test("video plans fall through Gemini and Groq to OpenAI", async () => {
   }
 });
 
-test("Idea to MP4 generates its outline and scene chunk through the native Gemini SDK", async () => {
-  const provider = selectVideoPlanProvider({ googleAiStudioApiKey: "AQ.video-test", googleAiStudioModel: "gemini-test" });
+test("Idea to MP4 generates its outline and scene chunk through Cloudflare Workers AI", async () => {
+  const provider = selectVideoPlanProvider({ cloudflareApiToken: "cf.video-test", cloudflareAccountId: "a".repeat(32), cloudflareModel: "cloudflare-test" });
   const request = {
     idea: "A Pune clinic uses an AI receptionist to route appointment requests to the right doctor.",
     durationSeconds: 60,
@@ -225,29 +231,27 @@ test("Idea to MP4 generates its outline and scene chunk through the native Gemin
   let calls = 0;
   let repairedPrompt = "";
   globalThis.fetch = async (input, init) => {
-    assert.equal(new Headers(init?.headers).get("x-goog-api-key"), "AQ.video-test");
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer cf.video-test");
     assert.equal(new URL(String(input)).search, "");
     calls += 1;
     if (calls < 3) {
       return new Response(JSON.stringify({ error: { code: 503, status: "UNAVAILABLE" } }), { status: 503 });
     }
-    const body = JSON.parse(String(init?.body)) as { contents?: Array<{ parts?: Array<{ text?: string }> }> };
-    if (calls === 5) repairedPrompt = body.contents?.[0]?.parts?.[0]?.text ?? "";
+    const body = JSON.parse(String(init?.body)) as { messages?: Array<{ content?: string }> };
+    if (calls === 5) repairedPrompt = body.messages?.[1]?.content ?? "";
     const responseScenes = calls === 4
-      ? scenes.map((scene, index) => index === 0
-        ? { ...scene, dialogue: scene.dialogue.map((line, lineIndex) => lineIndex === 3 ? { ...line, text: "Fine." } : line) }
-        : scene)
+      ? []
       : scenes;
     return new Response(JSON.stringify({
-      candidates: [{ content: { parts: [{ text: JSON.stringify(calls === 3 ? outline : responseScenes) }] } }],
+      choices: [{ message: { content: JSON.stringify(calls === 3 ? outline : responseScenes) } }],
     }), { status: 200 });
   };
 
   try {
     const result = await generateVideoPlan(request, provider);
     assert.equal(calls, 5);
-    assert.match(repairedPrompt, /Each dialogue turn must contain 3 to 12 words/);
-    assert.equal(result.provider.name, "google-ai-studio");
+    assert.match(repairedPrompt, /each line must contain 3 to 12 words/i);
+    assert.equal(result.provider.name, "cloudflare");
     assert.equal(result.plan.scenes.length, 5);
     assert.equal(result.plan.scenes.filter((scene) => scene.ahaMoment).length, 1);
     assert.deepEqual(result.plan.cast?.map((character) => character.id), ["A", "B", "C"]);
