@@ -106,7 +106,7 @@ router.post("/deauthorize", callbackLimiter, async (req, res, next) => {
   try {
     const verified = verifiedUserId(req.body);
     if ("error" in verified) {
-      res.status(verified.status).json({ error: verified.error });
+      res.status(verified.status  ?? 400).json({ error: verified.error });
       return;
     }
     await removeConnectedAccountData(verified.userId);
@@ -120,7 +120,7 @@ router.post("/data-deletion", callbackLimiter, async (req, res, next) => {
   try {
     const verified = verifiedUserId(req.body);
     if ("error" in verified) {
-      res.status(verified.status).json({ error: verified.error });
+      res.status(verified.status  ?? 400).json({ error: verified.error });
       return;
     }
     const confirmationCode = randomBytes(32).toString("hex");
